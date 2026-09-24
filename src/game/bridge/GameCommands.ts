@@ -16,6 +16,9 @@ export type GameCommandMap = {
   switchScene: { sceneId: SceneId };
   spawnAt: { spawnPointId: SpawnPointId };
   startRace: { raceId: RaceId };
+  /** Put the player car back on its current spawn point, at rest. */
+  resetVehicle: void;
+  setHandlingPreset: { presetId: string };
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -67,6 +70,8 @@ export interface GameCommands {
   switchScene(sceneId: SceneId): void;
   spawnAt(spawnPointId: SpawnPointId): void;
   startRace(raceId: RaceId): void;
+  resetVehicle(): void;
+  setHandlingPreset(presetId: string): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -78,5 +83,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     switchScene: (sceneId) => dispatch("switchScene", { sceneId }),
     spawnAt: (spawnPointId) => dispatch("spawnAt", { spawnPointId }),
     startRace: (raceId) => dispatch("startRace", { raceId }),
+    resetVehicle: () => dispatch("resetVehicle"),
+    setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
   };
 }

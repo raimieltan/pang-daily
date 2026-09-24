@@ -198,4 +198,38 @@ describe("SceneManager", () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it("ignores command handlers a superseded scene registers after its teardown", async () => {
+    const staleGate = deferred();
+    const freshGate = deferred();
+    const onSpawn = vi.fn();
+    const { manager, bridge } = create({
+      stale: {
+        setup: async (ctx) => {
+          withCamera(ctx.scene);
+          await staleGate.promise;
+          ctx.bridge.handle("spawnAt", vi.fn());
+        },
+      },
+      fresh: {
+        setup: async (ctx) => {
+          withCamera(ctx.scene);
+          await freshGate.promise;
+          ctx.bridge.handle("spawnAt", onSpawn);
+        },
+      },
+    });
+
+    const stale = manager.switchTo("stale");
+    const fresh = manager.switchTo("fresh");
+    // The stale scene claims the command first; the live one must still get it.
+    staleGate.resolve();
+    await stale;
+    freshGate.resolve();
+    await fresh;
+    bridge.ui.commands.spawnAt("home");
+
+    expect(manager.activeId).toBe("fresh");
+    expect(onSpawn).toHaveBeenCalledOnce();
+  });
 });

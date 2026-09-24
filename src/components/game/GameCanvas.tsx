@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { bindGameUiStore, useGameUiStore } from "@/state/gameUiStore";
 import { bindHudStore } from "@/state/hudStore";
+import { bindVehicleDebugStore } from "@/state/vehicleDebugStore";
 
 /**
  * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
@@ -24,7 +25,7 @@ export function GameCanvas() {
 
         const game = createGame(canvas);
         // Bind before start() so no early event is missed.
-        const unbinders = [bindGameUiStore(game), bindHudStore(game.events)];
+        const unbinders = [bindGameUiStore(game), bindHudStore(game.events), bindVehicleDebugStore(game.events)];
         game.start();
 
         teardown = () => {

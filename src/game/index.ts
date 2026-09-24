@@ -21,8 +21,11 @@ export type {
   GameEventMap,
   GameEventName,
   GameEventSource,
+  HandlingPresetInfo,
   RaceResult,
   RaceStanding,
+  VehicleDebugInfo,
   VehicleSummary,
+  VehicleTelemetry,
 } from "./bridge";
 export type { SceneId } from "./scenes";

@@ -69,6 +69,8 @@ export class SceneManager<Id extends string> {
           if (this.current === slot) this.bridge.emit(event, ...args);
         },
         handle: (command, handler) => {
+          // Nor may it claim commands after teardown: nothing would ever release them.
+          if (this.current !== slot) return () => {};
           const release = this.bridge.handle(command, handler);
           slot.releases.push(release);
           return release;

@@ -6,7 +6,15 @@
  */
 import type { SceneId } from "../scenes";
 import type { GameCommandName } from "./GameCommands";
-import type { DialogueId, RaceResult, RaceStanding, SpawnPointId, VehicleSummary } from "./types";
+import type {
+  DialogueId,
+  RaceResult,
+  RaceStanding,
+  SpawnPointId,
+  VehicleDebugInfo,
+  VehicleSummary,
+  VehicleTelemetry,
+} from "./types";
 
 export type GameEventMap = {
   ready: void;
@@ -20,6 +28,9 @@ export type GameEventMap = {
   playerSpawned: { spawnPointId: SpawnPointId };
   /** Throttled and change-only; see SummaryPublisher. */
   vehicleStateUpdated: VehicleSummary;
+  /** Handling debug readout, ~10 Hz while a car is driving. */
+  vehicleTelemetry: VehicleTelemetry;
+  vehicleDebugInfo: VehicleDebugInfo;
   raceStarted: RaceStanding;
   /** Emitted when the player's position changes, not every frame. */
   raceStandingChanged: RaceStanding;
