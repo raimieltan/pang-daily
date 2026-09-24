@@ -3,6 +3,7 @@ import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { GameBridge } from "../bridge";
 import { SceneManager } from "./SceneManager";
 import type { SceneContext, SceneDefinition } from "./types";
 
@@ -25,7 +26,8 @@ describe("SceneManager", () => {
   function create<Id extends string>(definitions: Record<Id, SceneDefinition>) {
     engine = new NullEngine();
     const hooks = { onLoading: vi.fn(), onReady: vi.fn(), onError: vi.fn() };
-    return { manager: new SceneManager(engine, definitions, hooks), hooks };
+    const bridge = new GameBridge();
+    return { manager: new SceneManager(engine, definitions, bridge.runtime, hooks), hooks, bridge };
   }
 
   it("loads a scene and reports loading then ready", async () => {
@@ -146,5 +148,54 @@ describe("SceneManager", () => {
     expect(onDispose).toHaveBeenCalledTimes(1);
     expect(manager.activeId).toBeNull();
     expect(engine.scenes).toHaveLength(0);
+  });
+
+  it("releases a scene's command handlers when it is torn down", async () => {
+    const onSpawn = vi.fn();
+    const { manager, bridge } = create({
+      a: {
+        setup: (ctx) => {
+          withCamera(ctx.scene);
+          ctx.bridge.handle("spawnAt", onSpawn);
+        },
+      },
+      b: empty,
+    });
+    const rejected = vi.fn();
+    bridge.ui.events.on("commandRejected", rejected);
+
+    await manager.switchTo("a");
+    bridge.ui.commands.spawnAt("home");
+    await manager.switchTo("b");
+    bridge.ui.commands.spawnAt("home");
+    // Re-entering "a" must be able to register the handler again.
+    await manager.switchTo("a");
+
+    expect(onSpawn).toHaveBeenCalledOnce();
+    expect(rejected).toHaveBeenCalledOnce();
+    expect(manager.activeId).toBe("a");
+  });
+
+  it("drops events emitted by a superseded scene", async () => {
+    const gate = deferred();
+    const { manager, bridge } = create({
+      slow: {
+        setup: async (ctx) => {
+          withCamera(ctx.scene);
+          await gate.promise;
+          ctx.bridge.emit("dialogueTriggered", { dialogueId: "stale" });
+        },
+      },
+      fast: empty,
+    });
+    const listener = vi.fn();
+    bridge.ui.events.on("dialogueTriggered", listener);
+
+    const slow = manager.switchTo("slow");
+    await manager.switchTo("fast");
+    gate.resolve();
+    await slow;
+
+    expect(listener).not.toHaveBeenCalled();
   });
 });

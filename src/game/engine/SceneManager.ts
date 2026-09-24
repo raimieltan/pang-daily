@@ -1,5 +1,6 @@
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import { Scene } from "@babylonjs/core/scene";
+import type { RuntimePort } from "../bridge";
 import type { GameSystem, SceneContext, SceneDefinition } from "./types";
 
 export type SceneManagerHooks<Id extends string> = {
@@ -12,6 +13,8 @@ type SceneSlot<Id extends string> = {
   id: Id;
   scene: Scene;
   systems: GameSystem[];
+  /** Command handler registrations to undo on teardown. */
+  releases: (() => void)[];
   controller: AbortController;
   ready: boolean;
 };
@@ -28,6 +31,7 @@ export class SceneManager<Id extends string> {
   constructor(
     private readonly engine: AbstractEngine,
     private readonly definitions: Readonly<Record<Id, SceneDefinition>>,
+    private readonly bridge: RuntimePort,
     private readonly hooks: SceneManagerHooks<Id> = {},
   ) {}
 
@@ -48,6 +52,7 @@ export class SceneManager<Id extends string> {
       id,
       scene: new Scene(this.engine),
       systems: [],
+      releases: [],
       controller: new AbortController(),
       ready: false,
     };
@@ -58,6 +63,17 @@ export class SceneManager<Id extends string> {
       engine: this.engine,
       scene: slot.scene,
       signal: slot.controller.signal,
+      bridge: {
+        // A superseded scene (e.g. still finishing async setup) must not leak events.
+        emit: (event, ...args) => {
+          if (this.current === slot) this.bridge.emit(event, ...args);
+        },
+        handle: (command, handler) => {
+          const release = this.bridge.handle(command, handler);
+          slot.releases.push(release);
+          return release;
+        },
+      },
       addSystem: (system) => {
         slot.systems.push(system);
         return system;
@@ -100,6 +116,7 @@ export class SceneManager<Id extends string> {
     if (!slot) return;
     this.current = null;
     slot.controller.abort();
+    for (const release of slot.releases) release();
     for (let i = slot.systems.length - 1; i >= 0; i--) slot.systems[i].dispose?.();
     slot.scene.dispose();
   }

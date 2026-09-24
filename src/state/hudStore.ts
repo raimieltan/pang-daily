@@ -1,0 +1,35 @@
+import { create } from "zustand";
+import type { GameEventSource, RaceResult, RaceStanding, VehicleSummary } from "@/game";
+
+/**
+ * Driving HUD state: what the speedo and race tower show.
+ * Kept separate from the runtime store so HUD updates (~10 Hz while driving)
+ * only re-render HUD components.
+ */
+type HudState = {
+  vehicle: VehicleSummary | null;
+  race: RaceStanding | null;
+  lastResult: RaceResult | null;
+};
+
+const initialState: HudState = { vehicle: null, race: null, lastResult: null };
+
+export const useHudStore = create<HudState>(() => initialState);
+
+/** Feeds the store from game events. Returns an unbind that also resets the store. */
+export function bindHudStore(events: GameEventSource): () => void {
+  const set = useHudStore.setState;
+  const unsubscribers = [
+    events.on("vehicleStateUpdated", (vehicle) => set({ vehicle })),
+    events.on("raceStarted", (race) => set({ race, lastResult: null })),
+    events.on("raceStandingChanged", (race) => set({ race })),
+    events.on("raceFinished", (lastResult) => set({ race: null, lastResult })),
+    // A scene switch tears down whatever was driving/racing.
+    events.on("sceneLoading", () => set(initialState)),
+  ];
+
+  return () => {
+    unsubscribers.forEach((off) => off());
+    set(initialState);
+  };
+}

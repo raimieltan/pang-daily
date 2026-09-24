@@ -1,6 +1,11 @@
 "use client";
 
 import { useGameUiStore } from "@/state/gameUiStore";
+import { CommandNotice } from "./CommandNotice";
+import { DialogueBox } from "./DialogueBox";
+import { DrivingHud } from "./DrivingHud";
+
+const buttonClass = "rounded border border-amber-200/30 px-2 py-1 hover:bg-amber-200/10";
 
 /** Presentation-only overlay. Reads the UI store and sends intents via commands. */
 export function HudOverlay() {
@@ -22,11 +27,13 @@ export function HudOverlay() {
             {activeScene && (
               <>
                 <span>scene: {activeScene}</span>
-                <button
-                  type="button"
-                  onClick={() => commands?.switchScene(activeScene)}
-                  className="rounded border border-amber-200/30 px-2 py-1 hover:bg-amber-200/10"
-                >
+                <button type="button" onClick={() => commands?.spawnAt("coffee_shop")} className={buttonClass}>
+                  Spawn at coffee shop
+                </button>
+                <button type="button" onClick={() => commands?.startRace("debug_sprint")} className={buttonClass}>
+                  Start race
+                </button>
+                <button type="button" onClick={() => commands?.switchScene(activeScene)} className={buttonClass}>
                   Reload scene
                 </button>
               </>
@@ -34,7 +41,7 @@ export function HudOverlay() {
             <button
               type="button"
               onClick={() => (paused ? commands?.resume() : commands?.pause())}
-              className="rounded border border-amber-200/30 px-2 py-1 hover:bg-amber-200/10"
+              className={buttonClass}
             >
               {paused ? "Resume" : "Pause"}
             </button>
@@ -45,6 +52,13 @@ export function HudOverlay() {
       {status === "loading" && <p className="self-center">Loading…</p>}
       {status === "ready" && loadingScene && <p className="self-center">Loading {loadingScene}…</p>}
       {status === "error" && <p className="self-center text-red-400">Failed to start: {errorMessage}</p>}
+      {status === "ready" && (
+        <div className="flex flex-col gap-3">
+          <CommandNotice />
+          <DialogueBox />
+          <DrivingHud />
+        </div>
+      )}
     </div>
   );
 }

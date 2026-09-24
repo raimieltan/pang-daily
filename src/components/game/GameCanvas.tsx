@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useGameUiStore } from "@/state/gameUiStore";
+import { bindGameUiStore, useGameUiStore } from "@/state/gameUiStore";
+import { bindHudStore } from "@/state/hudStore";
 
 /**
- * Mounts the Babylon runtime on a canvas and pipes bridge events into the UI store.
+ * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
  * Lifecycle only — no game logic belongs in this component.
  */
 export function GameCanvas() {
@@ -16,44 +17,25 @@ export function GameCanvas() {
 
     let cancelled = false;
     let teardown: (() => void) | undefined;
-    const setUi = useGameUiStore.setState;
 
     import("@/game")
       .then(({ createGame }) => {
         if (cancelled) return;
 
         const game = createGame(canvas);
-        const unsubscribers = [
-          game.events.on("ready", () => setUi({ status: "ready" })),
-          game.events.on("paused", ({ paused }) => setUi({ paused })),
-          game.events.on("statsUpdated", ({ fps }) => setUi({ fps })),
-          game.events.on("sceneLoading", ({ sceneId }) => setUi({ activeScene: null, loadingScene: sceneId })),
-          game.events.on("sceneReady", ({ sceneId }) => setUi({ activeScene: sceneId, loadingScene: null })),
-          game.events.on("error", ({ message }) =>
-            setUi({ status: "error", errorMessage: message, loadingScene: null }),
-          ),
-        ];
-
-        setUi({ commands: game.commands });
+        // Bind before start() so no early event is missed.
+        const unbinders = [bindGameUiStore(game), bindHudStore(game.events)];
         game.start();
 
         teardown = () => {
-          unsubscribers.forEach((off) => off());
+          unbinders.forEach((unbind) => unbind());
           game.dispose();
-          setUi({
-            status: "loading",
-            commands: null,
-            paused: false,
-            fps: 0,
-            activeScene: null,
-            loadingScene: null,
-          });
         };
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
-        setUi({ status: "error", errorMessage: message });
+        useGameUiStore.setState({ status: "error", errorMessage: message });
       });
 
     return () => {

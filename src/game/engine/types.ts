@@ -1,5 +1,6 @@
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import type { Scene } from "@babylonjs/core/scene";
+import type { RuntimePort } from "../bridge";
 
 /**
  * A unit of frame-level logic that lives inside one scene
@@ -20,6 +21,8 @@ export interface SceneContext {
   readonly scene: Scene;
   /** Aborted when this scene is superseded or the runtime is disposed. Pass to async loaders. */
   readonly signal: AbortSignal;
+  /** Scene-scoped bridge access: command handlers registered here are removed on teardown. */
+  readonly bridge: RuntimePort;
   addSystem<T extends GameSystem>(system: T): T;
 }
 
