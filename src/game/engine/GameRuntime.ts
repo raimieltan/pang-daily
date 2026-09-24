@@ -1,28 +1,47 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
-import type { Scene } from "@babylonjs/core/scene";
 import { GameEvents, type GameCommands } from "../bridge";
-import { createBootScene } from "../world/createBootScene";
+import { INITIAL_SCENE, scenes, type SceneId } from "../scenes";
+import { SceneManager } from "./SceneManager";
 
 const STATS_INTERVAL_MS = 500;
+/** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
+const MAX_FRAME_DT_SECONDS = 0.1;
+
+export type GameRuntimeOptions = {
+  initialScene?: SceneId;
+};
 
 /**
- * Owns the Babylon engine, active scene, and render loop.
+ * Owns the Babylon engine, resize handling, render loop, and scene manager.
  * All frame-level state lives here; React only sees `events` and `commands`.
+ *
+ * Lifecycle: constructor (engine + resize) → start() (loop + initial scene) → dispose().
  */
 export class GameRuntime {
   readonly events = new GameEvents();
   readonly commands: GameCommands;
 
   private readonly engine: Engine;
-  private readonly scene: Scene;
+  private readonly scenes: SceneManager<SceneId>;
   private readonly resizeObserver: ResizeObserver;
+  private readonly initialScene: SceneId;
   private paused = false;
   private lastStatsAt = 0;
+  private started = false;
   private disposed = false;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, options: GameRuntimeOptions = {}) {
+    this.initialScene = options.initialScene ?? INITIAL_SCENE;
     this.engine = new Engine(canvas, true, { stencil: true, powerPreference: "high-performance" }, true);
-    this.scene = createBootScene(this.engine, canvas);
+
+    this.scenes = new SceneManager(this.engine, scenes, {
+      onLoading: (sceneId) => this.events.emit("sceneLoading", { sceneId }),
+      onReady: (sceneId) => this.events.emit("sceneReady", { sceneId }),
+      onError: (sceneId, error) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.events.emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
+      },
+    });
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);
@@ -30,12 +49,16 @@ export class GameRuntime {
     this.commands = {
       pause: () => this.setPaused(true),
       resume: () => this.setPaused(false),
+      switchScene: (sceneId) => void this.scenes.switchTo(sceneId),
     };
   }
 
   start(): void {
+    if (this.started || this.disposed) return;
+    this.started = true;
     this.engine.runRenderLoop(() => this.frame());
     this.events.emit("ready");
+    void this.scenes.switchTo(this.initialScene);
   }
 
   dispose(): void {
@@ -43,13 +66,18 @@ export class GameRuntime {
     this.disposed = true;
     this.resizeObserver.disconnect();
     this.engine.stopRenderLoop();
-    this.scene.dispose();
+    this.scenes.dispose();
     this.engine.dispose();
     this.events.clear();
   }
 
   private frame(): void {
-    if (!this.paused) this.scene.render();
+    if (!this.paused) {
+      const dt = Math.min(this.engine.getDeltaTime() / 1000, MAX_FRAME_DT_SECONDS);
+      this.scenes.update(dt);
+    }
+    // Keep rendering while paused so resizes and camera orbit still draw; systems stay frozen.
+    this.scenes.render();
 
     const now = performance.now();
     if (now - this.lastStatsAt >= STATS_INTERVAL_MS) {

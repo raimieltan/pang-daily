@@ -4,11 +4,15 @@
  * Carries derived, low-frequency state only (see TECH_ARCHITECTURE §4–5).
  * Never emit per-frame physics or transform data through here.
  */
+import type { SceneId } from "../scenes";
+
 export type GameEventMap = {
   ready: void;
   error: { message: string };
   paused: { paused: boolean };
   statsUpdated: { fps: number };
+  sceneLoading: { sceneId: SceneId };
+  sceneReady: { sceneId: SceneId };
 };
 
 export type GameEventName = keyof GameEventMap;

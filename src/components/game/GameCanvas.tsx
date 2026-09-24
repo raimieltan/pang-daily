@@ -27,7 +27,11 @@ export function GameCanvas() {
           game.events.on("ready", () => setUi({ status: "ready" })),
           game.events.on("paused", ({ paused }) => setUi({ paused })),
           game.events.on("statsUpdated", ({ fps }) => setUi({ fps })),
-          game.events.on("error", ({ message }) => setUi({ status: "error", errorMessage: message })),
+          game.events.on("sceneLoading", ({ sceneId }) => setUi({ activeScene: null, loadingScene: sceneId })),
+          game.events.on("sceneReady", ({ sceneId }) => setUi({ activeScene: sceneId, loadingScene: null })),
+          game.events.on("error", ({ message }) =>
+            setUi({ status: "error", errorMessage: message, loadingScene: null }),
+          ),
         ];
 
         setUi({ commands: game.commands });
@@ -36,7 +40,14 @@ export function GameCanvas() {
         teardown = () => {
           unsubscribers.forEach((off) => off());
           game.dispose();
-          setUi({ status: "loading", commands: null, paused: false, fps: 0 });
+          setUi({
+            status: "loading",
+            commands: null,
+            paused: false,
+            fps: 0,
+            activeScene: null,
+            loadingScene: null,
+          });
         };
       })
       .catch((error: unknown) => {

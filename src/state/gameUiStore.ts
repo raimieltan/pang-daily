@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GameCommands } from "@/game";
+import type { GameCommands, SceneId } from "@/game";
 
 export type GameStatus = "loading" | "ready" | "error";
 
@@ -12,6 +12,9 @@ type GameUiState = {
   errorMessage: string | null;
   paused: boolean;
   fps: number;
+  /** Scene currently rendering; null while a scene is loading. */
+  activeScene: SceneId | null;
+  loadingScene: SceneId | null;
   commands: GameCommands | null;
 };
 
@@ -20,5 +23,7 @@ export const useGameUiStore = create<GameUiState>(() => ({
   errorMessage: null,
   paused: false,
   fps: 0,
+  activeScene: null,
+  loadingScene: null,
   commands: null,
 }));

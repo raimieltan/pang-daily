@@ -17,3 +17,4 @@ export function createGame(canvas: HTMLCanvasElement): GameHandle {
 }
 
 export type { GameCommands, GameEventMap, GameEventName } from "./bridge";
+export type { SceneId } from "./scenes";
