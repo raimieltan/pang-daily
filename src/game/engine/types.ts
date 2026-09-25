@@ -4,6 +4,7 @@ import type { RuntimePort } from "../bridge";
 import type { VehicleSession } from "../../game-core/maintenance/VehicleSession";
 import type { JobSession } from "../../game-core/jobs/JobSession";
 import type { Workshop } from "../marketplace/MarketplaceService";
+import type { InventorySession } from "../../game-core/inventory/InventorySession";
 
 /**
  * A unit of frame-level logic that lives inside one scene
@@ -28,6 +29,8 @@ export interface SceneContext {
   readonly bridge: RuntimePort;
   readonly session: VehicleSession;
   readonly jobs: JobSession;
+  /** Owned parts and what is installed on which car (wheels read their install from here). */
+  readonly inventory: InventorySession;
   /** Lend the scene's talyer to the phone marketplace for part inspections; release on teardown. */
   readonly market: { useWorkshop(workshop: Workshop): () => void };
   addSystem<T extends GameSystem>(system: T): T;

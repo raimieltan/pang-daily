@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { VehicleSession } from '../maintenance/VehicleSession';
 import type { InventoryItem, InventorySession, RevealMethod } from '../inventory/InventorySession';
-import { partDefinition } from '../parts/parts';
+import { partDefinition, type PartCategory } from '../parts/parts';
 import { generateListing, GRADE_LABEL, listingSchema, listingView, seller, verdictFor, type Grade, type Listing, type ListingView, type Verdict } from './listings';
 
 /** Visible listings at once; expired ones are replaced on the next sync. */
@@ -15,7 +15,7 @@ export type MarketSave = z.infer<typeof marketSaveSchema>;
 
 /** An inventory item as the phone shows it: condition only once revealed. */
 export type OwnedPartView = {
-  id: string; title: string; paidPhp: number | null; seller: string | null; advertised: { grade: Grade; label: string } | null;
+  id: string; title: string; category: PartCategory; paidPhp: number | null; seller: string | null; advertised: { grade: Grade; label: string } | null;
   installedOn: string | null;
   actual: { condition: number; label: string; verdict: Verdict | null; method: RevealMethod } | null;
 };
@@ -127,8 +127,9 @@ export class MarketplaceSession {
   private partView(item: InventoryItem): OwnedPartView {
     const origin = item.origin.kind === 'marketplace' ? item.origin : null;
     const shown = item.revealedBy && item.condition !== null ? item.condition : null;
+    const part = partDefinition(item.partId)!;
     return {
-      id: item.id, title: partDefinition(item.partId)!.name, paidPhp: origin?.paidPhp ?? null,
+      id: item.id, title: part.name, category: part.category, paidPhp: origin?.paidPhp ?? null,
       seller: origin ? seller(origin.sellerId)?.name ?? 'Unknown seller' : null,
       advertised: origin ? { grade: origin.advertisedGrade, label: GRADE_LABEL[origin.advertisedGrade] } : null,
       installedOn: this.inventory.installation(item.id)?.vehicleId ?? null,

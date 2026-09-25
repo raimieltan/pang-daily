@@ -39,6 +39,8 @@ export type GameEventMap = {
   marketplace: import('../../game-core/marketplace/MarketplaceSession').MarketplaceView | null;
   partPurchased: import('../../game-core/marketplace/MarketplaceSession').PartPurchase;
   partInspected: import('../../game-core/marketplace/MarketplaceSession').PartInspection;
+  /** Wheels on the player car, their fitment and listed effects. On scene setup and after every swap. */
+  wheelsState: import('../vehicles/WheelSystem').WheelsView;
   maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
   repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;
   repairCompleted: import('../../game-core/maintenance/VehicleSession').RepairReceipt;

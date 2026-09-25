@@ -16,7 +16,9 @@ import { VehicleBody, type VehiclePose } from "./VehicleBody";
 import { VehicleController, type DriverInputSource } from "./VehicleController";
 import type { VehicleRuntimeDefinition } from "./VehicleDefinition";
 import { VehicleVisual } from "./VehicleVisual";
-import { PRISTINE_CONDITION } from "../../game-core/vehicles/vehicleStats";
+import { NO_MODIFIERS, PRISTINE_CONDITION, type StatModifiers } from "../../game-core/vehicles/vehicleStats";
+import { calculateFitment, wheelModifiers, type Fitment, type WheelPart } from "../../game-core/wheels";
+import { WheelSwapper, type WheelAssetSource } from "./WheelSwapper";
 import type { VehicleCondition } from "../../game-core/vehicles/VehicleDefinition";
 import type { WearSample } from "../../game-core/maintenance/condition";
 import { conditionHandling } from "../maintenance/conditionHandling";
@@ -32,6 +34,8 @@ export type PlayerVehicleOptions = {
   initialSpawn: SpawnPointId;
   /** Overrides the definition's preset (e.g. from `?handling=`). */
   presetId?: HandlingPresetId;
+  /** Overrides where wheel GLBs load from (file bytes in tests). */
+  wheelSource?: WheelAssetSource;
 };
 
 const PRESET_INFO = Object.entries(HANDLING_PRESETS).map(([id, { name, description }]) => ({ id, name, description }));
@@ -50,6 +54,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private readonly telemetry: SummaryPublisher<VehicleTelemetry>;
   /** Runs after `place`, e.g. to snap the camera. */
   onPlaced?: () => void;
+  /** Runs after a wheel swap, e.g. to re-light the new wheel meshes. */
+  onWheelsChanged?: () => void;
   canReposition?: () => boolean;
   impactSerial = 0;
   impactStrength = 0;
@@ -57,6 +63,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private releaseImpact: () => void;
   private baseConfig: HandlingConfig;
   private condition: VehicleCondition = { ...PRISTINE_CONDITION };
+  private wheelEffects: StatModifiers = NO_MODIFIERS;
+  readonly wheels: WheelSwapper;
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -66,6 +74,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     readonly visual: VehicleVisual,
     presetId: HandlingPresetId,
   ) {
+    this.wheels = new WheelSwapper(visual.model.root.getScene(), visual.model, options.wheelSource);
     this.presetId = presetId;
     this.baseConfig = controller.model.config;
     this.spawnId = options.initialSpawn;
@@ -209,7 +218,30 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   setCondition(condition: VehicleCondition): void {
     this.condition = { ...condition };
-    this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition));
+    this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition, this.wheelEffects));
+  }
+
+  /** The wheel part on the car (null = stock wheels). */
+  get wheelPart(): WheelPart | null {
+    return this.wheels.equipped;
+  }
+
+  /** Stance of the wheels on the car at the current visual ride height. */
+  get fitment(): Fitment {
+    const { model } = this.visual;
+    return calculateFitment(this.definition.spec, model.wheels[0].fit, model.rideHeight);
+  }
+
+  /**
+   * Swaps the wheel visuals on all four sockets and re-derives handling from the part's modifiers
+   * and this copy's `condition`. Physics collision is untouched. Resolves false if superseded.
+   */
+  async equipWheels(part: WheelPart | null, condition: number | null = 1): Promise<boolean> {
+    if (!(await this.wheels.equip(part))) return false;
+    this.wheelEffects = wheelModifiers(this.definition.spec, part, condition);
+    this.setCondition(this.condition);
+    this.onWheelsChanged?.();
+    return true;
   }
 
   maintenanceSample(racing: boolean): WearSample {
@@ -220,6 +252,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   }
 
   dispose(): void {
+    this.wheels.dispose();
     this.releaseImpact();
     this.controller.dispose();
     this.body.dispose();

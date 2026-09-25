@@ -60,6 +60,7 @@ describe("resolveVehicleStats", () => {
       tireGrip: 1,
       brakeDecelerationMps2: 8,
       reliability: 0.8,
+      acceleration: 1,
     });
   });
 

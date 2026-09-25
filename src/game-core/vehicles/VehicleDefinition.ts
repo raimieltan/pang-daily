@@ -44,6 +44,13 @@ export const EXTERIOR_SLOTS = [
   "taillight_r",
 ] as const;
 
+/**
+ * Default wheel socket names (`wheel_<fl|fr|rl|rr>_socket`). A socket is the runtime node a wheel
+ * visual hangs from, inside the steer/spin hub; see docs/VEHICLE_ASSETS.md §4 and
+ * src/game-core/wheels/README.md.
+ */
+export const wheelSocketName = (id: (typeof WHEEL_IDS)[number]) => `wheel_${id}_socket` as const;
+
 export type Drivetrain = (typeof DRIVETRAINS)[number];
 export type WheelId = (typeof WHEEL_IDS)[number];
 export type ConditionComponent = (typeof CONDITION_COMPONENTS)[number];
@@ -191,6 +198,39 @@ const visualSchema = z
     path: ["model", "attachments"],
   });
 
+/** The overall size and placement of a mounted wheel + tire. Shared by stock specs and wheel parts. */
+export const wheelFitSchema = z.strictObject({
+  /** Overall tire diameter, in metres. Drives visual scale, hub height and arch gap. */
+  diameterM: positive,
+  /** Tread width, in metres. */
+  widthM: positive,
+  /** ET in millimetres: positive pulls the wheel into the arch, negative pushes it out. */
+  offsetMm: z.number().int().min(-60).max(80),
+});
+
+export type WheelFit = z.infer<typeof wheelFitSchema>;
+
+/**
+ * Wheel sockets, the factory wheels and the arch around them. Fitment reads these; the runtime
+ * names its socket nodes after `sockets`. All lateral numbers are distances from the centreline.
+ */
+const wheelsSchema = z
+  .strictObject({
+    sockets: z.strictObject({ fl: nodeName, fr: nodeName, rl: nodeName, rr: nodeName }),
+    /** The GLB's own wheels. `massKg` is one wheel + tire; wheel parts are weighed against it. */
+    stock: wheelFitSchema.extend({ massKg: positive }),
+    arch: z.strictObject({
+      /** Tire top to arch lip at the default ride height with stock wheels. */
+      gapM: positive,
+      /** Fender lip. A tire face outside this pokes; well inside it looks sunken. */
+      lipM: positive,
+      /** Nearest inboard obstruction (strut, inner liner). A tire face inside this rubs. */
+      innerM: positive,
+    }),
+  })
+  .refine((w) => new Set(Object.values(w.sockets)).size === 4, { message: "wheel socket names must be unique", path: ["sockets"] })
+  .refine((w) => w.arch.innerM < w.arch.lipM, { message: "arch innerM must be inside lipM", path: ["arch"] });
+
 /**
  * Condition hook: at component condition `c` (0–1), `stat` is scaled by `1 - maxLoss * (1 - c)`.
  * Several effects on the same stat multiply. See `resolveVehicleStats`.
@@ -226,12 +266,14 @@ export const vehicleDefinitionSchema = z.strictObject({
   dimensions: dimensionsSchema,
   market: marketSchema,
   visual: visualSchema,
+  wheels: wheelsSchema,
   condition: conditionSchema,
 });
 
 export type VehicleDefinition = z.infer<typeof vehicleDefinitionSchema>;
 export type VehicleModelSpec = VehicleDefinition["visual"]["model"];
 export type VehicleAttachmentSpec = VehicleModelSpec["attachments"][number];
+export type VehicleWheelsSpec = VehicleDefinition["wheels"];
 
 /** Throws with the offending path when a definition is malformed (e.g. loaded from JSON or the API). */
 export function parseVehicleDefinition(data: unknown): VehicleDefinition {

@@ -53,6 +53,8 @@ export type GameCommandMap = {
   buyListing: { listingId: string };
   /** Pay the mechanic to reveal an owned part's true condition (talyer only). */
   inspectPart: { partId: string };
+  /** Bolt an owned wheel set (inventory item) onto the player car; null puts the stock wheels back. */
+  equipWheels: { itemId: string | null };
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -127,6 +129,7 @@ export interface GameCommands {
   closeMarketplace(): void;
   buyListing(listingId: string): void;
   inspectPart(partId: string): void;
+  equipWheels(itemId: string | null): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -161,5 +164,6 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     closeMarketplace: () => dispatch("closeMarketplace"),
     buyListing: listingId => dispatch("buyListing", { listingId }),
     inspectPart: partId => dispatch("inspectPart", { partId }),
+    equipWheels: itemId => dispatch("equipWheels", { itemId }),
   };
 }

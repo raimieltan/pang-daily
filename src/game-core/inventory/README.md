@@ -22,6 +22,8 @@ then call `add`.
 - **Saves.** Saves that reference missing items, reuse ids or keys, or name unknown parts fall back
   to an empty inventory, matching the other sessions' fresh-session fallback.
 
-Nothing applies installed parts to handling or visuals yet. The garage/customization milestone
+Wheels are the first installed part that does anything: `WheelSystem` (`src/game/vehicles`) watches
+the car's `wheels` slot, swaps the visuals and applies the set's stat modifiers (see
+`game-core/wheels/README.md`). Nothing else applies installed parts to handling or visuals yet. The garage/customization milestone
 reads `installedOn(vehicleId)` and resolves each item through `partDefinition`
 (`component`, `slots`).

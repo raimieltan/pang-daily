@@ -12,6 +12,7 @@ import {
   WHEEL_IDS,
   type ExteriorSlot,
   type VehicleDefinition,
+  type WheelFit,
   type WheelId,
 } from "@/game-core/vehicles";
 
@@ -27,14 +28,23 @@ const GROUND_TOLERANCE_M = 0.01;
 export type VehicleWheel = {
   readonly id: WheelId;
   readonly front: boolean;
+  /** +1 on the car's right (+x), −1 on the left. Measured, so mirrored node names still work. */
+  readonly side: 1 | -1;
   /**
    * Car-space pivot at the wheel's geometric centre, outside the chassis so ride height never
-   * moves it. Rotate this (steer about y, spin about x); the wheel mesh hangs under it.
+   * moves it. Rotate this (steer about y, spin about x); the wheel visual hangs under it.
    */
   readonly hub: TransformNode;
+  /** Named `definition.wheels.sockets[id]`. Holds the wheel visual; wheel offset slides it along the axle. */
+  readonly socket: TransformNode;
+  /** The GLB's own wheel. Hidden while a swapped wheel is mounted. */
   readonly mesh: TransformNode;
-  /** Measured from the mesh, in metres. */
-  readonly radius: number;
+  /** Swapped-in wheel visual (owned by the caller), or null for stock. */
+  mounted: TransformNode | null;
+  /** Size and offset currently on this socket: the definition's stock spec while `mounted` is null. */
+  fit: WheelFit;
+  /** Current rolling radius, in metres: measured stock radius plus the fitted wheel's extra. */
+  radius: number;
 };
 
 export type VehicleAttachmentPoint = {
@@ -68,18 +78,23 @@ type Bounds = { min: Vector3; max: Vector3; center: Vector3; size: Vector3 };
  *
  * ```text
  * <id>_model                   ← parent this to the physics node
- * ├── <id>_chassis             ← ride height offset
+ * ├── <id>_chassis             ← ride height offset + tire lift
  * │   ├── __root__ (glTF)      ← bodywork, lights, trim
  * │   └── <id>_attach_<slot>   ← exterior part anchors
- * └── <id>_hub_<fl|fr|rl|rr>   ← wheel pivots
- *     └── wheel_<id> (glTF)
+ * └── <id>_hub_<fl|fr|rl|rr>   ← wheel pivots (steer/spin), raised by taller tires
+ *     └── wheel_<id>_socket    ← wheel offset along the axle
+ *         └── wheel_<id> (glTF) or a swapped wheel
  * ```
  *
  * Purely visual: nothing here feeds back into physics. Ride height moves the body relative to
- * the wheels; it does not change the collision shape.
+ * the wheels, and a taller tire lifts hubs and body together; neither changes the collision shape.
  */
 export class VehicleModel {
   private rideHeightM: number;
+  /** Mean hub rise over stock across the four sockets; the body sits on it. */
+  private tireLiftM = 0;
+  private readonly stockHubY: ReadonlyMap<WheelId, number>;
+  private readonly stockRadius: ReadonlyMap<WheelId, number>;
 
   private constructor(
     private readonly definition: VehicleDefinition,
@@ -93,6 +108,8 @@ export class VehicleModel {
     /** Non-fatal findings (re-pivots, budget overruns, mirrored names). Log them; fix them in Blender. */
     readonly warnings: readonly string[],
   ) {
+    this.stockHubY = new Map(wheels.map((w) => [w.id, w.hub.position.y]));
+    this.stockRadius = new Map(wheels.map((w) => [w.id, w.radius]));
     this.rideHeightM = 0;
     this.setRideHeight(definition.visual.rideHeight.defaultM);
     this.setPaint(definition.visual.defaultPaint);
@@ -128,8 +145,35 @@ export class VehicleModel {
   setRideHeight(offsetM: number): number {
     const { minM, maxM } = this.definition.visual.rideHeight;
     this.rideHeightM = Math.min(maxM, Math.max(minM, offsetM));
-    this.chassis.position.y = this.rideHeightM;
+    this.chassis.position.y = this.rideHeightM + this.tireLiftM;
     return this.rideHeightM;
+  }
+
+  /**
+   * Swaps the visual wheel on one socket for `node`, sized per `fit`, or restores the stock wheel
+   * with `null`. `node` must already be scaled and facing outboard for `wheel.side` (see
+   * `WheelSwapper`). A taller `fit.diameterM` raises the hub (and, averaged over the four, the
+   * body) so the tire stays on y = 0; `fit.offsetMm` slides the socket along the axle.
+   * Returns the previously mounted wheel, detached, for the caller to dispose or reuse.
+   */
+  mountWheel(id: WheelId, node: TransformNode | null, fit: WheelFit = this.definition.wheels.stock): TransformNode | null {
+    const wheel = this.wheels.find((w) => w.id === id);
+    if (!wheel) throw new Error(`${this.definition.id} has no "${id}" wheel`);
+    const { stock } = this.definition.wheels;
+    const previous = wheel.mounted;
+    if (previous) previous.parent = null;
+    wheel.mounted = node;
+    wheel.fit = node ? { diameterM: fit.diameterM, widthM: fit.widthM, offsetMm: fit.offsetMm } : { ...stock };
+    if (node) node.parent = wheel.socket;
+    wheel.mesh.setEnabled(node === null);
+
+    const lift = (wheel.fit.diameterM - stock.diameterM) / 2;
+    wheel.hub.position.y = this.stockHubY.get(id)! + lift;
+    wheel.radius = this.stockRadius.get(id)! + lift;
+    wheel.socket.position.x = (wheel.side * (stock.offsetMm - wheel.fit.offsetMm)) / 1000;
+    this.tireLiftM = this.wheels.reduce((sum, w) => sum + (w.fit.diameterM - stock.diameterM) / 2, 0) / this.wheels.length;
+    this.setRideHeight(this.rideHeightM);
+    return previous;
   }
 
   /** A material of the loaded model by its GLB name (e.g. `taillight`). Frozen: unfreeze before editing. */
@@ -162,9 +206,10 @@ export class VehicleModel {
     return previous;
   }
 
-  /** Mounted parts are detached, not disposed: they belong to the caller. */
+  /** Mounted parts and wheels are detached, not disposed: they belong to the caller. */
   dispose(): void {
     for (const point of this.attachments.values()) if (point.mounted) point.mounted.parent = null;
+    for (const wheel of this.wheels) if (wheel.mounted) wheel.mounted.parent = null;
     this.root.dispose();
     this.container.dispose();
   }
@@ -268,10 +313,15 @@ export class VehicleModel {
       hub.parent = root;
       hub.position.copyFrom(center);
       hub.rotationQuaternion = Quaternion.Identity();
+      const socket = new TransformNode(definition.wheels.sockets[id], scene);
+      socket.parent = hub;
       const offset = Vector3.Distance(mesh.getAbsolutePosition(), center);
       if (offset > PIVOT_TOLERANCE_M) warnings.push(`"${mesh.name}" origin is ${fmt(offset)} m off its centre; re-pivoted`);
-      mesh.setParent(hub);
-      return { id, front: id[0] === "f", hub, mesh, radius: Math.max(size.y, size.z) / 2 };
+      mesh.setParent(socket);
+      return {
+        id, front: id[0] === "f", side: center.x < 0 ? -1 : 1, hub, socket, mesh,
+        mounted: null, fit: { ...definition.wheels.stock }, radius: Math.max(size.y, size.z) / 2,
+      };
     });
 
     const attachments = new Map<ExteriorSlot, VehicleAttachmentPoint>();

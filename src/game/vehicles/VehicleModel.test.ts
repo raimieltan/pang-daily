@@ -45,7 +45,9 @@ describe("VehicleModel import", () => {
       expect(wheel.radius).toBeCloseTo(0.3, 2);
       expect(hubs[wheel.id].y).toBeCloseTo(0.3, 2);
       expect(wheel.hub.parent).toBe(model.root);
-      expect(wheel.mesh.parent).toBe(wheel.hub);
+      expect(wheel.socket.parent).toBe(wheel.hub);
+      expect(wheel.socket.name).toBe(`wheel_${wheel.id}_socket`);
+      expect(wheel.mesh.parent).toBe(wheel.socket);
     }
     expect(hubs.fl.z - hubs.rl.z).toBeCloseTo(2.5, 2);
     expect(Math.abs(hubs.fl.x - hubs.fr.x)).toBeCloseTo(1.456, 2);

@@ -10,11 +10,13 @@ rigged, and the render budget. Read ART_DIRECTION §6/§14 and TECH_ARCHITECTURE
 
 | Layer | File | Owns |
 |---|---|---|
-| Definition (data) | `src/game-core/vehicles/VehicleDefinition.ts` | Renderer-agnostic schema (zod): identity, drivetrain, power, weight, grip, braking, reliability, dimensions, visual contract, condition hooks. |
+| Definition (data) | `src/game-core/vehicles/VehicleDefinition.ts` | Renderer-agnostic schema (zod): identity, drivetrain, power, weight, grip, braking, reliability, dimensions, visual contract, wheel sockets + arch data, condition hooks. |
 | Catalog (data) | `src/game-core/vehicles/catalog.ts` | Car entries. First: `banwa_dalagan_1996` (fictional marque). |
-| Stats | `src/game-core/vehicles/vehicleStats.ts` | `resolveVehicleStats(definition, condition)`: applies condition hooks. |
+| Stats | `src/game-core/vehicles/vehicleStats.ts` | `resolveVehicleStats(definition, condition, modifiers)`: applies condition hooks, then part modifiers. |
+| Wheels (data) | `src/game-core/wheels/` | Wheel part schema and catalog, `calculateFitment`, `wheelModifiers`. See its README. |
 | Importer | `src/game/vehicles/VehicleModel.ts` | Loads, validates and re-rigs the GLB. Ride height, paint, part mounting. |
 | Wheel animation | `src/game/vehicles/VehicleVisual.ts` | Steers/spins the wheel hubs from the handling state. |
+| Wheel swap | `src/game/vehicles/WheelSwapper.ts`, `WheelSystem.ts` | Loads/clones wheel GLBs onto the sockets; keeps them in step with the inventory's `wheels` install. |
 | Runtime binding | `src/game/vehicles/VehicleDefinition.ts` | Definition + handling preset + collision shapes. Collision never comes from the GLB. |
 
 Everything the importer needs to know about a file lives in `definition.visual.model`. A new
@@ -51,6 +53,7 @@ definition, so these are the starter sedan's (see `catalog.ts`):
 | Stock parts | `mirrors`, `exhaust`, `headlight_l/_r`, `taillight_l/_r` | yes, if a slot names it (`stockNode`) | Hidden when an aftermarket part is mounted in that slot. |
 | Paint material | `paint` | yes (`paintMaterial`) | PBR or Standard. The only material recoloured by customization. |
 | Attachment empties | `attach_<slot>`, e.g. `attach_spoiler` | no | Optional Blender empty. Overrides the anchor position from data. |
+| Wheel sockets | `wheel_fl_socket`, `wheel_fr_socket`, `wheel_rl_socket`, `wheel_rr_socket` | no (created by the importer) | Named by `wheels.sockets`. Not modelled in Blender; see §4. |
 
 A missing or duplicated required node fails with a `VehicleModelError` that lists **every**
 problem, and nothing is added to the scene.
@@ -61,11 +64,12 @@ problem, and nothing is added to the scene.
 
 ```text
 <id>_model                   ← parent this to the physics node
-├── <id>_chassis             ← ride height offset (y)
+├── <id>_chassis             ← ride height offset + tire lift (y)
 │   ├── __root__ (glTF)      ← bodywork, lights, trim
 │   └── <id>_attach_<slot>   ← exterior part anchors
 └── <id>_hub_<fl|fr|rl|rr>   ← wheel pivots: steer about y, spin about x
-    └── wheel_<id> (glTF)
+    └── wheel_<id>_socket    ← wheel offset along the axle (x)
+        └── wheel_<id> (glTF), or a swapped wheel
 ```
 
 **Ride height.** `setRideHeight(m)` moves `<id>_chassis` relative to the wheel hubs, clamped
@@ -85,6 +89,19 @@ exists:
 disposed, on `dispose()`.
 
 **Paint.** `setPaint("#rrggbb")` recolours the `paint` material (sRGB in, linear applied).
+
+**Wheel sockets.** Each hub gets one child socket named by `definition.wheels.sockets`. The
+convention is `wheel_<fl|fr|rl|rr>_socket` (`wheelSocketName(id)`). Sockets turn with the hub, so a
+wheel parented there steers and spins without extra work. `mountWheel(id, node, fit)` hides the
+GLB wheel, parents `node` to the socket and applies the fit:
+
+- **Diameter.** The hub rises by half the extra diameter so the tire stays on y = 0. The chassis
+  rises by the mean of the four, on top of ride height, because a taller tire lifts the car.
+- **Offset.** The socket slides `(stock ET − part ET)` mm along the axle. Lower ET moves it outboard.
+- **Width/scale.** The caller scales the node (`WheelSwapper` does this).
+
+`mountWheel(id, null)` restores the stock wheel. Swapped wheels belong to the caller. None of this
+touches the collision spheres in `VehicleCollisionConfig`, which stay sized for stock wheels.
 
 ---
 
@@ -127,3 +144,22 @@ inside budget, so this is not done yet.
 7. Export as `.glb` with no cameras, lights or animations, and apply modifiers.
 8. Run `yarn vitest run src/game/vehicles/VehicleModel.test.ts`. It loads the real file and
    fails with a list of problems if the contract is broken.
+
+---
+
+## 7. Wheel GLBs
+
+One file per wheel part (`assetPath` in `src/game-core/wheels/catalog.ts`), in `public/model/wheels/`.
+
+| Convention | Rule |
+|---|---|
+| Content | One wheel: tire + rim, any number of primitives. No car, hub or brake parts. |
+| Axes | Model it as the car's **right-hand** wheel as imported: axle along x, outboard face at **+x** in car space. The runtime turns left-side copies 180° about y. |
+| Origin | Anywhere. The runtime centres the wheel on the socket from its bounds. |
+| Size | Near the part's real size is best, but any size works: the runtime scales width (x) to `fit.widthM` and height/length to `fit.diameterM`. |
+| Materials | `tire`, `rim` (tinted by `visual.rimColor`), plus any others (`rim_dark`, `chrome`). Every copy shares them. |
+| Budget | ~800 triangles and at most 4 materials per wheel, since four copies are drawn. |
+
+The placeholder sets are generated by `node scripts/build-wheel-models.mjs` (no dependencies).
+`src/game/vehicles/WheelSwapper.test.ts` loads them onto the starter sedan and checks size,
+ground contact, offset and outboard direction.

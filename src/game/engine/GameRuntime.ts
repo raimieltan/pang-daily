@@ -57,7 +57,8 @@ export class GameRuntime {
     }
 
     // The phone outlives scenes, so the marketplace is runtime-wide like pause.
-    this.market = new MarketplaceService(this.bridge.runtime, loadMarketplaceSession(session, loadInventorySession(storage), storage));
+    const inventory = loadInventorySession(storage);
+    this.market = new MarketplaceService(this.bridge.runtime, loadMarketplaceSession(session, inventory, storage));
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),
       onReady: (sceneId) => emit("sceneReady", { sceneId }),
@@ -65,7 +66,7 @@ export class GameRuntime {
         const reason = error instanceof Error ? error.message : String(error);
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
-    }, session, loadJobSession(session, HUB_JOBS, storage), this.market);
+    }, session, loadJobSession(session, HUB_JOBS, storage), this.market, inventory);
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);

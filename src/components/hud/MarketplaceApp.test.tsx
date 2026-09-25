@@ -10,6 +10,9 @@ import { MarketplaceSession } from '@/game-core/marketplace/MarketplaceSession';
 import { VehicleSession } from '@/game-core/maintenance/VehicleSession';
 import { bindMarketStore } from '@/state/marketStore';
 import { bindGameUiStore } from '@/state/gameUiStore';
+import { WheelSystem } from '@/game/vehicles/WheelSystem';
+import { BANWA_DALAGAN_1996 } from '@/game-core/vehicles';
+import { calculateFitment, type WheelPart } from '@/game-core/wheels';
 
 const release: (() => void)[] = [];
 let root: Root;
@@ -19,13 +22,13 @@ afterEach(() => { act(() => root.unmount()); container.remove(); release.splice(
 const click = (element: Element) => act(() => (element as HTMLElement).click());
 const button = (text: string) => Array.from(container.querySelectorAll('button')).find(el => el.textContent?.startsWith(text))!;
 function setup() {
-  const bridge = new GameBridge(), wallet = new VehicleSession();
-  const market = new MarketplaceSession(wallet, new InventorySession(), undefined, undefined, () => 1_000_000, 5);
+  const bridge = new GameBridge(), wallet = new VehicleSession(), inventory = new InventorySession();
+  const market = new MarketplaceSession(wallet, inventory, undefined, undefined, () => 1_000_000, 5);
   const service = new MarketplaceService(bridge.runtime, market);
   release.push(() => bridge.dispose(), () => service.dispose(), bindGameUiStore(bridge.ui), bindMarketStore(bridge.ui.events));
   act(() => root.render(<MarketplaceApp />));
   act(() => bridge.ui.commands.openMarketplace());
-  return { bridge, wallet, market, service };
+  return { bridge, wallet, market, service, inventory };
 }
 
 it('browses listings with price, place and advertised condition but never the hidden condition', () => {
@@ -60,4 +63,31 @@ it('buys after confirmation, then reveals true condition at the talyer', () => {
   expect(wallet.snapshot().walletPhp).toBe(5000 - target.price - 150);
   click(container.querySelector('[aria-label="Close marketplace"]')!);
   expect(container.querySelector('[aria-label="Baligya marketplace"]')).toBeNull();
+});
+
+it('bolts an owned wheel set on and takes it off, showing fitment and listed effects', async () => {
+  const { bridge, inventory } = setup();
+  const car = BANWA_DALAGAN_1996;
+  let current: WheelPart | null = null;
+  const wheels = new WheelSystem(bridge.runtime, inventory, {
+    id: car.id, definition: { spec: car },
+    get fitment() { return calculateFitment(car, current?.fit ?? car.wheels.stock); },
+    equipWheels: async part => { current = part; return true; },
+  });
+  release.push(() => wheels.dispose());
+  const flush = () => act(() => new Promise(resolve => setTimeout(resolve)));
+  act(() => { inventory.add({ partId: 'oversized_17_deep_dish', condition: 0.3, origin: { kind: 'grant', reason: 'test' } }); });
+  click(button('Your parts'));
+  expect(container.querySelector('[data-testid="wheel-fitment"]')).toBeNull();
+
+  click(button('Bolt on'));
+  await flush();
+  expect(container.textContent).toContain('Installed on your car');
+  expect(container.querySelector('[data-testid="wheel-fitment"]')?.textContent).toBe('Poke · grip +4% · braking -4% · acceleration -6% · +24 kg');
+
+  click(button('Take off'));
+  await flush();
+  expect(container.textContent).not.toContain('Installed on your car');
+  expect(container.querySelector('[data-testid="wheel-fitment"]')).toBeNull();
+  expect(button('Bolt on')).toBeTruthy();
 });

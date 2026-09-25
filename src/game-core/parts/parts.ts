@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EXTERIOR_SLOTS, type ExteriorSlot } from '../vehicles/VehicleDefinition';
 import type { ServiceComponent } from '../maintenance/condition';
+import { WHEEL_PARTS, wheelPart } from '../wheels/catalog';
 
 /**
  * Equip slots on an owned car. Exterior slots are the vehicle schema's `EXTERIOR_SLOTS` (the
@@ -22,12 +23,20 @@ export type PartTemplate = {
   slots: readonly PartSlot[]; priceRange: readonly [number, number]; conditionRange: readonly [number, number]; weight: number;
 };
 
+/** Wheel sets are defined in `game-core/wheels`; this is their listing entry. `weight` = listing frequency. */
+function wheels(id: string, weight: number): PartTemplate {
+  const part = wheelPart(id);
+  if (!part) throw new Error(`Unknown wheel part "${id}"`);
+  return { id, name: part.name, category: 'wheels', fits: part.fits, component: null, slots: ['wheels'],
+    priceRange: part.market.priceRangePhp, conditionRange: part.market.conditionRange, weight };
+}
+
 export const PART_TEMPLATES: readonly PartTemplate[] = [
   { id: 'used_coilovers_01', name: 'Used coilovers (adjustable)', category: 'suspension', fits: 'Most 90s sedans', component: 'suspension', slots: ['shocks', 'springs'], priceRange: [6500, 9000], conditionRange: [.35, .85], weight: 2 },
   { id: 'stock_shocks_set', name: 'Stock shocks, set of 4', category: 'suspension', fits: 'Banwa Dalagan', component: 'suspension', slots: ['shocks'], priceRange: [1800, 2600], conditionRange: [.3, .9], weight: 3 },
   { id: 'lowering_springs', name: 'Lowering springs', category: 'suspension', fits: 'Universal-ish', component: 'suspension', slots: ['springs'], priceRange: [2500, 3800], conditionRange: [.45, .95], weight: 2 },
-  { id: 'mags_15_4x100', name: '15" mags 4x100', category: 'wheels', fits: '4x100 PCD', component: null, slots: ['wheels'], priceRange: [7000, 11000], conditionRange: [.4, .95], weight: 3 },
-  { id: 'steelies_14', name: '14" steel wheels w/ caps', category: 'wheels', fits: '4x100 PCD', component: null, slots: ['wheels'], priceRange: [1500, 2400], conditionRange: [.5, 1], weight: 2 },
+  wheels('mags_15_4x100', 3),
+  wheels('steelies_14', 2),
   { id: 'tires_195_55', name: 'Tires 195/55 R15, 4 pcs', category: 'tires', fits: '15" rims', component: 'tires', slots: ['tires'], priceRange: [4000, 6500], conditionRange: [.2, .85], weight: 3 },
   { id: 'brake_pads_front', name: 'Front brake pads + rotors', category: 'brakes', fits: 'Banwa Dalagan', component: 'brakes', slots: ['brakes_front'], priceRange: [1200, 2000], conditionRange: [.25, .9], weight: 3 },
   { id: 'surplus_alternator', name: 'Japan surplus alternator', category: 'engine', fits: '4A / 4E family', component: 'engine', slots: ['alternator'], priceRange: [2200, 3500], conditionRange: [.2, .9], weight: 2 },
@@ -37,8 +46,10 @@ export const PART_TEMPLATES: readonly PartTemplate[] = [
   { id: 'muffler_canister', name: 'Canister muffler', category: 'exhaust', fits: '2" pipe', component: null, slots: ['exhaust'], priceRange: [1500, 2800], conditionRange: [.4, 1], weight: 2 },
   { id: 'projector_headlights', name: 'Projector headlights, pair', category: 'lighting', fits: 'Banwa Dalagan', component: null, slots: ['headlight_l', 'headlight_r'], priceRange: [3000, 5200], conditionRange: [.35, .95], weight: 2 },
   { id: 'bucket_seat', name: 'Bucket seat w/ rails', category: 'interior', fits: 'Universal rails', component: null, slots: ['seat_driver'], priceRange: [4500, 8000], conditionRange: [.35, .9], weight: 1 },
+  wheels('oversized_17_deep_dish', 1),
 ];
 
 const byId = new Map(PART_TEMPLATES.map(part => [part.id, part]));
+if (WHEEL_PARTS.some(part => !byId.has(part.id))) throw new Error('Every wheel part needs a PART_TEMPLATES entry');
 export const partDefinition = (id: string): PartTemplate | undefined => byId.get(id);
 export const partIdSchema = z.string().refine(id => byId.has(id), 'unknown part');

@@ -7,6 +7,8 @@ import type { OwnedPartView } from '@/game-core/marketplace/MarketplaceSession';
 import { useMarketStore } from '@/state/marketStore';
 import { useMaintenanceStore } from '@/state/maintenanceStore';
 import { useGameUiStore } from '@/state/gameUiStore';
+import { FITMENT_LABELS } from '@/game-core/wheels';
+import type { WheelsView } from '@/game/vehicles/WheelSystem';
 
 const pesos = (value: number) => `₱${value.toLocaleString('en-PH')}`;
 const ago = (s: number) => s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
@@ -127,12 +129,36 @@ function OwnedParts({ parts, feePhp }: { parts: OwnedPartView[]; feePhp: number 
       <p className="flex justify-between gap-2"><span className="text-white/90">{part.title}</span>{part.paidPhp !== null && <span className="text-white/50">{pesos(part.paidPhp)}</span>}</p>
       {part.advertised && <p className="mt-1 text-[11px] text-white/45">from {part.seller} · listed “{part.advertised.label}”</p>}
       {part.installedOn && <p className="mt-1 text-[11px] text-sky-200/80">Installed on your car</p>}
+      {part.category === 'wheels' && <WheelControls part={part} />}
       {part.actual
         ? <p className="mt-2 text-xs"><span className="text-white/60">Mang Boy: </span><strong data-testid="actual-condition" className="text-white">{part.actual.label}</strong> {part.actual.verdict && <span className={VERDICT[part.actual.verdict].tone}>{VERDICT[part.actual.verdict].text}</span>}</p>
         : <button type="button" className="mt-2 rounded-md border border-amber-200/40 px-3 py-1.5 text-xs text-amber-100" onClick={() => commands?.inspectPart(part.id)}>Have Mang Boy inspect · {pesos(feePhp)}</button>}
     </li>)}
     <li className="px-4 py-3 text-[11px] text-white/35">Inspection needs your car at the talyer, parked, with you on foot.</li>
   </ul>;
+}
+
+const FITMENT_TONE = { clean: 'text-emerald-200', sunken: 'text-white/60', poke: 'text-amber-200', rubbing: 'text-red-300', excessive_gap: 'text-amber-200' } as const;
+const percent = (factor: number) => { const pct = Math.round((factor - 1) * 100); return pct > 0 ? `+${pct}%` : `${pct}%`; };
+
+/** The set's listed effects, e.g. "grip +4% · braking −4% · +24 kg". Stock-equal values are left out. */
+function effectsLine({ effects }: WheelsView) {
+  const parts = (['grip', 'braking', 'acceleration'] as const).filter(k => Math.round((effects[k] - 1) * 100) !== 0).map(k => `${k} ${percent(effects[k])}`);
+  if (effects.addedWeightKg !== 0) parts.push(`${effects.addedWeightKg > 0 ? '+' : ''}${Math.round(effects.addedWeightKg)} kg`);
+  return parts.join(' · ');
+}
+
+/** Bolt a wheel set on or take it off. The game decides the install; this only sends the command. */
+function WheelControls({ part }: { part: OwnedPartView }) {
+  const commands = useGameUiStore(s => s.commands);
+  const wheels = useMarketStore(s => s.wheels);
+  const mounted = wheels?.itemId === part.id ? wheels : null;
+  return <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+    <button type="button" className="rounded-md border border-sky-200/40 px-3 py-1.5 text-sky-100 disabled:opacity-40" disabled={!commands}
+      onClick={() => commands?.equipWheels(part.installedOn ? null : part.id)}>{part.installedOn ? 'Take off · back to stock' : 'Bolt on'}</button>
+    {mounted && <p data-testid="wheel-fitment"><span className={FITMENT_TONE[mounted.fitment.state]}>{FITMENT_LABELS[mounted.fitment.state]}</span>
+      {effectsLine(mounted) && <span className="text-white/45"> · {effectsLine(mounted)}</span>}</p>}
+  </div>;
 }
 
 /** Stand-in "digicam flash" listing photo: seeded tone, part glyph, time stamp, grain. */

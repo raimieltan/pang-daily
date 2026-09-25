@@ -12,6 +12,7 @@ import { loadHavok } from "../physics/havok";
 import { PhysicsWorld } from "../physics/PhysicsWorld";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
+import { WheelSystem } from "../vehicles/WheelSystem";
 import { STARTER_SEDAN } from "../vehicles/VehicleDefinition";
 import { buildDebugRoad } from "../world/debugRoad";
 import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
@@ -24,7 +25,7 @@ import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
  * Palette follows ART_DIRECTION §5: charcoal night, asphalt, sodium-orange fill.
  */
 export const drivingScene: SceneDefinition = {
-  async setup({ scene, addSystem, bridge, signal, session }) {
+  async setup({ scene, addSystem, bridge, signal, session, inventory }) {
     scene.clearColor = new Color4(0.06, 0.06, 0.07, 1);
     scene.fogMode = Scene.FOGMODE_EXP2;
     scene.fogDensity = 0.004;
@@ -72,6 +73,7 @@ export const drivingScene: SceneDefinition = {
     player.onPlaced = () => chase.snap();
     addSystem(player);
     addSystem(new MaintenanceSystem(bridge, session, player, () => controls.enabled));
+    addSystem(new WheelSystem(bridge, inventory, player));
     addSystem(chase);
   },
 };

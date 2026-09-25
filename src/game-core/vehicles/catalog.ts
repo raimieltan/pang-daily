@@ -60,6 +60,13 @@ export const BANWA_DALAGAN_1996: VehicleDefinition = parseVehicleDefinition({
     // The model's own paint (linear 0.70/0.72/0.74) in sRGB: tired factory silver.
     defaultPaint: "#dadddf",
   },
+  wheels: {
+    sockets: { fl: "wheel_fl_socket", fr: "wheel_fr_socket", rl: "wheel_rl_socket", rr: "wheel_rr_socket" },
+    // The GLB's tire is 0.60 m across (a touch over a real 175/70R13), 175 wide, factory ET45.
+    stock: { diameterM: 0.6, widthM: 0.175, offsetMm: 45, massKg: 13 },
+    // Tito-spec stance: a finger of gap, stock tire ~15 mm inside the lip.
+    arch: { gapM: 0.05, lipM: 0.83, innerM: 0.62 },
+  },
   condition: {
     effects: [
       { component: "engine", stat: "power", maxLoss: 0.35 },

@@ -5,6 +5,7 @@ import type { GameSystem, SceneContext, SceneDefinition } from "./types";
 import { VehicleSession } from "../../game-core/maintenance/VehicleSession";
 import { JobSession } from "../../game-core/jobs/JobSession";
 import { HUB_JOBS } from "../jobs/hubJobs";
+import { InventorySession } from "../../game-core/inventory/InventorySession";
 
 export type SceneManagerHooks<Id extends string> = {
   onLoading?(id: Id): void;
@@ -39,6 +40,7 @@ export class SceneManager<Id extends string> {
     private readonly session = new VehicleSession(),
     private readonly jobs = new JobSession(session, HUB_JOBS),
     private readonly market: SceneContext["market"] = { useWorkshop: () => () => {} },
+    private readonly inventory = new InventorySession(),
   ) {}
 
   get activeId(): Id | null {
@@ -71,6 +73,7 @@ export class SceneManager<Id extends string> {
       signal: slot.controller.signal,
       session: this.session,
       jobs: this.jobs,
+      inventory: this.inventory,
       market: {
         useWorkshop: (workshop) => {
           const release = this.market.useWorkshop(workshop);

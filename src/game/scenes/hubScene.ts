@@ -45,6 +45,7 @@ import { Sky, skyLast } from "../rendering/Sky";
 import { VehicleLights } from "../rendering/VehicleLights";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
+import { WheelSystem } from "../vehicles/WheelSystem";
 import { STARTER_SEDAN } from "../vehicles/VehicleDefinition";
 import { HUB_LAYOUT } from "../world/hub/hubLayout";
 import { HubLocations, toVehiclePose } from "../world/hub/HubLocations";
@@ -61,7 +62,7 @@ import { buildChunk, WorldKit } from "../world/WorldChunk";
  * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
-  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market }) {
+  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory }) {
     const params = new URLSearchParams(window.location.search);
     const havok = await loadHavok();
     if (signal.aborted) return;
@@ -122,7 +123,10 @@ export const hubScene: SceneDefinition = {
       chaseCamera: chase, walkCamera, world,
     }));
     player.onPlaced = () => modes.vehiclePlaced();
-    lighting.attachCar(modes, [...player.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
+    const lightCar = (car: PlayerVehicle) => lighting.attachCar(modes, [...car.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
+    const litCar = player;
+    lightCar(litCar);
+    litCar.onWheelsChanged = () => lightCar(litCar);
     addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES]));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
@@ -149,6 +153,7 @@ export const hubScene: SceneDefinition = {
         car: maintainedCar.position, speedKmh: maintainedCar.speedKmh, racing: race.active }, zones),
     }));
     addSystem(jobSystem);
+    addSystem(new WheelSystem(bridge, inventory, maintainedCar));
     let footstepTime = 0;
     let footstepDistance = 0;
     addSystem({ name: "footstepAudio", update(dt) {
