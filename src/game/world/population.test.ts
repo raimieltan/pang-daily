@@ -6,8 +6,9 @@ import { footprint, rectsOverlap, containsPoint } from './layoutTools';
 import { MOUNTAIN_HOMES } from './mountain/environment';
 import { OVERLOOK } from './mountain/route';
 import { PROP_KIT } from './props/propKit';
+import { CREW_CARS } from './hub/cafePopulation';
 
-const cars = NEIGHBORHOOD_CARS.map(c => ({ car: c, rect: footprint([c.x, c.z], [1.8, 4.5], c.heading) }));
+const cars = ([...NEIGHBORHOOD_CARS, ...CREW_CARS] as readonly { x: number; z: number; heading: number; y?: number }[]).map(c => ({ car: c, rect: footprint([c.x, c.z], [1.8, 4.5], c.heading) }));
 describe('neighborhood staging', () => {
   it('populates every requested area and the actual mountain house aprons', () => {
     for (const area of ['gas_station', 'talyer', 'streets', 'basketball_court', 'overlook', 'mountain_homes'])

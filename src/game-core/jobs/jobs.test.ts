@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { VehicleSession } from '../maintenance/VehicleSession';
-import { abandonJob, acceptJob, advanceTime, beginJob, completeObjective, damageCargo, defineJob, startBlocker, type JobRun } from './jobs';
+import { abandonJob, acceptJob, advanceTime, beginJob, bonusEarned, completeObjective, damageCargo, defineJob, jobPayout, startBlocker, type JobRun } from './jobs';
 import { JobSession } from './JobSession';
 
 const job = defineJob({
@@ -11,6 +11,11 @@ const job = defineJob({
     { id: 'pickup', label: 'Pick up the box', prompt: 'Load box', locationName: 'A', area: { x: 0, z: 0, radius: 5 }, cargo: 'load' },
     { id: 'dropoff', label: 'Deliver the box', prompt: 'Unload box', locationName: 'B', area: { x: 100, z: 0, radius: 5 }, cargo: 'unload' },
   ],
+});
+const ride = defineJob({
+  ...job, id: 'test_ride', type: 'passenger', title: 'Test ride', timeLimitSeconds: undefined,
+  cargo: { label: 'Rider', kind: 'passenger', maxDamage: .6, impactDamage: .25 },
+  bonus: { label: 'tip', php: 100, withinSeconds: 60, maxDamage: .2 },
 });
 const driving = { mode: 'driving', racing: false } as const;
 const ok = (run: JobRun | { rejected: string }) => { if ('rejected' in run) throw new Error(run.rejected); return run; };
@@ -23,6 +28,9 @@ describe('job definitions', () => {
     expect(() => defineJob({ ...job, objectives: [job.objectives[1], job.objectives[0]] })).toThrow(/loaded before/);
     expect(() => defineJob({ ...job, objectives: [job.objectives[0], { ...job.objectives[1], id: 'pickup' }] })).toThrow(/unique/);
     expect(() => defineJob({ ...job, cargo: undefined })).toThrow(/cargo definition/);
+    expect(job.cargo?.kind).toBe('goods');
+    expect(() => defineJob({ ...ride, bonus: { label: 'tip', php: 100 } })).toThrow(/time or damage/);
+    expect(() => defineJob({ ...ride, cargo: undefined, objectives: [{ ...job.objectives[0], cargo: undefined }], bonus: { label: 'tip', php: 100, maxDamage: .2 } })).toThrow(/needs cargo/);
   });
 });
 
@@ -57,6 +65,26 @@ describe('job run transitions', () => {
   it('abandons only runs in progress', () => {
     expect(ok(abandonJob(acceptJob(job, 'r1'))).status).toBe('abandoned');
     expect(abandonJob({ ...acceptJob(job, 'r1'), status: 'completed' })).toHaveProperty('rejected');
+  });
+});
+
+describe('passenger jobs', () => {
+  it('needs the passenger aboard to finish, and loses them to a rough ride', () => {
+    let run = ok(beginJob(acceptJob(ride, 'p1'), ride, driving));
+    expect(run.cargoLoaded).toBe(false);
+    // A save edited past the pickup still cannot finish without the passenger.
+    expect(completeObjective({ ...run, objectiveIndex: 1 }, ride, 'dropoff')).toEqual({ rejected: 'No passenger aboard.' });
+    run = ok(completeObjective(run, ride, 'pickup'));
+    expect(run.cargoLoaded).toBe(true);
+    expect(damageCargo(run, ride, .7)).toMatchObject({ status: 'failed', reason: 'Rider got out. Too rough a ride.' });
+    expect(ok(completeObjective(run, ride, 'dropoff'))).toMatchObject({ status: 'completed', cargoLoaded: false });
+  });
+  it('adds the bonus only while quick and smooth enough', () => {
+    const run = ok(completeObjective(ok(beginJob(acceptJob(ride, 'p1'), ride, driving)), ride, 'pickup'));
+    expect(jobPayout(run, ride)).toBe(550);
+    expect(bonusEarned(damageCargo(run, ride, .25), ride)).toBe(false);
+    expect(jobPayout(advanceTime(run, ride, 61), ride)).toBe(450);
+    expect(jobPayout(run, job)).toBe(450);
   });
 });
 
@@ -113,6 +141,19 @@ describe('JobSession', () => {
     expect(settled.current).toBeNull();
     expect(settled.outcomes(job.id).completed).toBe(1);
     expect(wallet.snapshot().walletPhp).toBe(5450);
+  });
+  it('pays the bonus with the payout in one ledger entry, and resets the passenger on replay', () => {
+    const wallet = new VehicleSession(), jobs = new JobSession(wallet, [ride]);
+    ok(jobs.accept(ride.id) as JobRun); ok(jobs.begin(driving)); jobs.completeObjective('pickup');
+    expect(jobs.completeObjective('dropoff')).toMatchObject({ ended: { status: 'completed', payoutPhp: 550, bonusPhp: 100 } });
+    ok(jobs.accept(ride.id) as JobRun);
+    expect(jobs.current).toMatchObject({ runId: 'test_ride#2', cargoLoaded: false, cargoDamage: 0, elapsedSeconds: 0 });
+    ok(jobs.begin(driving)); jobs.completeObjective('pickup'); jobs.damageCargo(.3);
+    expect(jobs.completeObjective('dropoff')).toMatchObject({ ended: { payoutPhp: 450, bonusPhp: 0 } });
+    expect(wallet.snapshot().transactions.filter(tx => tx.kind === 'job_payout')).toEqual([
+      expect.objectContaining({ amountPhp: 550, source: 'job:passenger', relatedEntityId: 'test_ride#1' }),
+      expect.objectContaining({ amountPhp: 450, relatedEntityId: 'test_ride#2' }),
+    ]);
   });
   it('drops corrupt saves and runs for jobs no longer in the catalog', () => {
     expect(setup({ broken: true }).jobs.current).toBeNull();

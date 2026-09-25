@@ -3,7 +3,6 @@ export const CAFE_CUSTOMERS = [
   { x: 137.8, z: 105.3, heading: 180, seated: true, shirt: '#b87956', voice: 0 },
   { x: 137.8, z: 103.9, heading: 0, seated: true, shirt: '#728969', voice: 1 },
   { x: 138.2, z: 100.5, heading: 0, seated: true, shirt: '#d0b775', voice: 2 },
-  { x: 138, z: 98.7, heading: 180, seated: true, shirt: '#788fa9', voice: 0 },
   { x: 135.9, z: 105.8, heading: 140, seated: false, shirt: '#bd8a98', voice: 1 },
   { x: 136.5, z: 104.8, heading: 320, seated: false, shirt: '#566c83', voice: 2 },
   { x: 139.6, z: 104.2, heading: 270, seated: false, shirt: '#48443d', voice: 1 },
@@ -18,4 +17,18 @@ export const CAFE_PARKED_CARS = [
   { x: 159.2, z: 81.4, heading: 180, paint: '#c3b18e' },
   { x: 130.6, z: 88.5, heading: 270, paint: '#516353' },
   { x: 130.6, z: 106, heading: 270, paint: '#626475' },
+] as const;
+
+/** The regulars' table (the south one, plus its plastic chair); seats match the chair props. */
+export const CAFE_CREW = [
+  { id: 'Sean', x: 138, z: 98.7, heading: 180, voice: 0 },
+  { id: 'MichaelHandumon', x: 138, z: 97.3, heading: 0, voice: 1 },
+  { id: 'Casey', x: 138.9, z: 97.4, heading: 300, voice: 2 },
+] as const;
+
+/** Their cars, nose-in toward the café's south wall. */
+export const CREW_CARS = [
+  { owner: 'Sean', model: 'lancer', x: 142.6, z: 90.6, heading: 0, paint: '#1f4f9e' },
+  { owner: 'Casey', model: 'civic_rs', x: 145.5, z: 90.6, heading: 0, paint: '#f1f0eb' },
+  { owner: 'MichaelHandumon', model: 'city', x: 148.4, z: 90.6, heading: 0, paint: '#eeede8' },
 ] as const;

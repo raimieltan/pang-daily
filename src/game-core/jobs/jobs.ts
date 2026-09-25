@@ -9,7 +9,8 @@ import { moneySchema } from '../economy/economy';
  *                   └─────────┴──→ abandoned
  *
  * `accepted` means taken but not started: the timer only runs once the start requirements hold
- * (e.g. back in the car). New job types (errand, hatid) reuse the same objective list.
+ * (e.g. back in the car). New job types (errand, hatid) reuse the same objective list: a hatid
+ * passenger is cargo of kind `passenger`, aboard between the `load` and `unload` stops.
  */
 export const JOB_STATUSES = ['available', 'accepted', 'active', 'completed', 'failed', 'abandoned'] as const;
 export type JobStatus = typeof JOB_STATUSES[number];
@@ -42,14 +43,21 @@ export const jobDefinitionSchema = z.object({
   objectives: z.array(objectiveSchema).min(1),
   /** Failure: the run is lost once this many seconds pass while active. */
   timeLimitSeconds: z.number().positive().optional(),
-  /** Failure: cargo damage above `maxDamage`; each impact adds strength × `impactDamage`. */
-  cargo: z.object({ label: z.string().min(1), maxDamage: z.number().gt(0).max(1), impactDamage: z.number().positive() }).optional(),
+  /** Failure: cargo damage above `maxDamage`; each impact adds strength × `impactDamage`. A passenger's damage is their patience. */
+  cargo: z.object({ label: z.string().min(1), kind: z.enum(['goods', 'passenger']).default('goods'),
+    maxDamage: z.number().gt(0).max(1), impactDamage: z.number().positive() }).optional(),
+  /** Driving-quality bonus added to the payout when the run finishes within `withinSeconds` and/or at most `maxDamage`. */
+  bonus: z.object({ label: z.string().min(1), php: moneySchema.refine(v => v > 0),
+    withinSeconds: z.number().positive().optional(), maxDamage: z.number().min(0).max(1).optional() }).optional(),
 }).superRefine((job, ctx) => {
   const ids = job.objectives.map(o => o.id);
   if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', message: 'Objective ids must be unique.' });
   const load = job.objectives.findIndex(o => o.cargo === 'load'), unload = job.objectives.findIndex(o => o.cargo === 'unload');
   if ((load >= 0 || unload >= 0) && !job.cargo) ctx.addIssue({ code: 'custom', message: 'Cargo objectives need a cargo definition.' });
   if (job.cargo && !(load >= 0 && unload > load)) ctx.addIssue({ code: 'custom', message: 'Cargo must be loaded before it is unloaded.' });
+  if (job.bonus && job.bonus.withinSeconds === undefined && job.bonus.maxDamage === undefined)
+    ctx.addIssue({ code: 'custom', message: 'A bonus needs a time or damage condition.' });
+  if (job.bonus?.maxDamage !== undefined && !job.cargo) ctx.addIssue({ code: 'custom', message: 'A damage bonus needs cargo.' });
 });
 export type JobDefinition = z.infer<typeof jobDefinitionSchema>;
 export type JobObjective = JobDefinition['objectives'][number];
@@ -101,7 +109,7 @@ export function damageCargo(run: JobRun, job: JobDefinition, amount: number): Jo
   if (run.status !== 'active' || !run.cargoLoaded || !job.cargo || !Number.isFinite(amount) || amount <= 0) return run;
   const cargoDamage = Math.min(1, run.cargoDamage + amount);
   return cargoDamage > job.cargo.maxDamage
-    ? { ...run, cargoDamage, status: 'failed', reason: `${job.cargo.label} got damaged.` }
+    ? { ...run, cargoDamage, status: 'failed', reason: job.cargo.kind === 'passenger' ? `${job.cargo.label} got out. Too rough a ride.` : `${job.cargo.label} got damaged.` }
     : { ...run, cargoDamage };
 }
 
@@ -118,9 +126,24 @@ export function completeObjective(run: JobRun, job: JobDefinition, objectiveId: 
     const target = job.objectives.find(o => o.id === objectiveId);
     return { rejected: target ? `${objective.label} first.` : 'Unknown objective.' };
   }
+  if (objective.cargo === 'unload' && !run.cargoLoaded)
+    return { rejected: job.cargo?.kind === 'passenger' ? 'No passenger aboard.' : 'Nothing to drop off.' };
   const next = { ...run, objectiveIndex: run.objectiveIndex + 1,
     cargoLoaded: objective.cargo === 'load' ? true : objective.cargo === 'unload' ? false : run.cargoLoaded };
   return next.objectiveIndex >= job.objectives.length ? { ...next, status: 'completed' } : next;
+}
+
+/** Whether the run, as it stands, meets the bonus conditions. */
+export function bonusEarned(run: JobRun, job: JobDefinition): boolean {
+  const { bonus } = job;
+  if (!bonus) return false;
+  return (bonus.withinSeconds === undefined || run.elapsedSeconds <= bonus.withinSeconds)
+    && (bonus.maxDamage === undefined || run.cargoDamage <= bonus.maxDamage);
+}
+
+/** What a completed run pays: the base payout plus the bonus when earned. */
+export function jobPayout(run: JobRun, job: JobDefinition): number {
+  return bonusEarned(run, job) ? job.payoutPhp + job.bonus!.php : job.payoutPhp;
 }
 
 export function abandonJob(run: JobRun): JobRun | Rejection {

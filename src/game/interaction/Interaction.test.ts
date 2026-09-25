@@ -5,7 +5,7 @@ import { HUB_LAYOUT } from "../world/hub/hubLayout";
 import { interactablesFromZones, resolveInteraction, type Interactable } from "./Interaction";
 import { InteractionSystem } from "./InteractionSystem";
 import { containsPoint } from "../world/layoutTools";
-import { KYO_ICE_RUN } from "../jobs/hubJobs";
+import { HUB_JOBS } from "../jobs/hubJobs";
 
 const zone = (id: string, x = 0, priority = 0): Interactable => ({
   id, action: "order_coffee", label: id, priority, area: { kind: "circle", x, z: 0, radius: 3 },
@@ -62,9 +62,21 @@ describe("world interactions", () => {
     expect(resolveInteraction(zones, 137.5, 105.5, "walking")?.action).toBe("hang_out");
   });
 
-  it("puts delivery stops on parking the car can reach", () => {
-    const parking = HUB_LAYOUT.chunks.flatMap((c) => c.zones).filter((z) => z.kind === "parking");
-    for (const { area, id } of KYO_ICE_RUN.objectives)
-      expect(parking.some((z) => containsPoint(z.rect, area.x, area.z)), id).toBe(true);
+  it("offers Mang Boy's errands and hatid requests from their boards", () => {
+    const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap((c) => c.zones));
+    expect(resolveInteraction(zones, 41.6, 154, "walking")?.id).toBe("talyer_job_board");
+    expect(resolveInteraction(zones, 45, 158, "walking")?.action).toBe("hang_out");
+    expect(resolveInteraction(zones, 54, 33, "walking")?.id).toBe("fuel_job_board");
+  });
+
+  it("puts driving stops on parking the car can reach and every job on a board", () => {
+    const all = HUB_LAYOUT.chunks.flatMap((c) => c.zones);
+    const parking = all.filter((z) => z.kind === "parking");
+    const boards = new Set(interactablesFromZones(all).filter((z) => z.action === "browse_jobs").map((z) => z.id));
+    for (const job of HUB_JOBS) {
+      expect(job.offeredAt.every((id) => boards.has(id)), job.id).toBe(true);
+      for (const { area, id, mode } of job.objectives)
+        if (mode === "driving") expect(parking.some((z) => containsPoint(z.rect, area.x, area.z)), `${job.id}:${id}`).toBe(true);
+    }
   });
 });

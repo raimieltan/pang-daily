@@ -4,6 +4,7 @@ import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateBoxVertexData } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateCylinderVertexData } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
 import { CreateSphereVertexData } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
+import { CreateTorusVertexData } from "@babylonjs/core/Meshes/Builders/torusBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -12,14 +13,29 @@ import type { Scene } from "@babylonjs/core/scene";
 const SKIN = "#b88059";
 const SHIRT = "#d0c6ab";
 const JEANS = "#344456";
-export type CharacterAppearance = { shirt?: string; skin?: string; hair?: string; coffee?: boolean };
-type Part = { data: VertexData; at: [number, number, number]; scale: [number, number, number]; color: string };
-const box = (at: Part["at"], scale: Part["scale"], color: string): Part =>
-  ({ data: CreateBoxVertexData({ size: 1 }), at, scale, color });
-const round = (at: Part["at"], scale: Part["scale"], color: string): Part =>
-  ({ data: CreateSphereVertexData({ diameter: 1, segments: 3 }), at, scale, color });
-const taper = (at: Part["at"], scale: Part["scale"], color: string, top = 0.85): Part =>
-  ({ data: CreateCylinderVertexData({ height: 1, diameterBottom: 1, diameterTop: top, tessellation: 8 }), at, scale, color });
+export type CharacterAppearance = {
+  shirt?: string; skin?: string; hair?: string; coffee?: boolean; vape?: boolean;
+  pants?: string; shoes?: string;
+  /** Long sleeves run to the wrist; shorts stop above the knee. */
+  sleeves?: "short" | "long"; shorts?: boolean;
+  /** Oversized tops widen the torso and sleeves and drop the hem over the belt. */
+  oversized?: boolean; pocket?: boolean;
+  /** Replaces the default hair cap; head-local, face toward +z. */
+  head?: Part[];
+  /** Added to the shirt; torso-local, neck at y ≈ 0.4. */
+  torso?: Part[];
+};
+type Vec = [number, number, number];
+export type Part = { data: VertexData; at: Vec; scale: Vec; color: string; rot?: Vec };
+export const box = (at: Vec, scale: Vec, color: string, rot?: Vec): Part =>
+  ({ data: CreateBoxVertexData({ size: 1 }), at, scale, color, rot });
+export const round = (at: Vec, scale: Vec, color: string, rot?: Vec): Part =>
+  ({ data: CreateSphereVertexData({ diameter: 1, segments: 3 }), at, scale, color, rot });
+export const taper = (at: Vec, scale: Vec, color: string, top = 0.85, rot?: Vec): Part =>
+  ({ data: CreateCylinderVertexData({ height: 1, diameterBottom: 1, diameterTop: top, tessellation: 8 }), at, scale, color, rot });
+/** Thin ring facing +z, for glasses frames. */
+export const ring = (at: Vec, diameter: number, color: string): Part =>
+  ({ data: CreateTorusVertexData({ diameter: 1, thickness: 0.14, tessellation: 10 }), at, scale: [diameter, diameter, diameter], color, rot: [Math.PI / 2, 0, 0] });
 
 /** Small articulated lo-fi person. Shared world material, no textures or animation assets. */
 export class CharacterVisual {
@@ -31,17 +47,24 @@ export class CharacterVisual {
   private phase = 0;
   private time = 0;
   private weight = 0;
+  private readonly head: Mesh;
   private readonly cup: Mesh | null;
+  private readonly vape: Mesh | null;
 
   constructor(scene: Scene, material: Material, height: number, appearance: CharacterAppearance = {}) {
     const shirt = appearance.shirt ?? SHIRT;
     const skin = appearance.skin ?? SKIN;
+    const pants = appearance.pants ?? JEANS;
+    const shoes = appearance.shoes ?? "#c7c2b5";
+    const sleeve = appearance.sleeves === "long" ? shirt : skin;
+    const w = appearance.oversized ? 1.1 : 1;
     this.root = new Mesh("player:walker", scene);
     this.root.isPickable = false;
     this.root.scaling.setAll(height / 1.7);
     const joint = (name: string, parent: TransformNode, at: Part["at"], parts: Part[]): Mesh => {
       const data = parts.map((part) => {
-        part.data.transform(Matrix.Compose(new Vector3(...part.scale), Quaternion.Identity(), new Vector3(...part.at)));
+        const rot = part.rot ? Quaternion.FromEulerAngles(...part.rot) : Quaternion.Identity();
+        part.data.transform(Matrix.Compose(new Vector3(...part.scale), rot, new Vector3(...part.at)));
         const c = Color3.FromHexString(part.color);
         part.data.colors = Array.from({ length: part.data.positions!.length / 3 * 4 }, (_, i) => [c.r, c.g, c.b, 1][i % 4]);
         return part.data;
@@ -58,17 +81,20 @@ export class CharacterVisual {
     this.hips.parent = this.root;
     this.hips.position.y = 0.88;
     joint("pelvis", this.hips, [0, 0, 0], [
-      taper([0, 0.01, 0], [0.32, 0.19, 0.22], JEANS, 0.95),
+      taper([0, 0.01, 0], [0.32, 0.19, 0.22], pants, 0.95),
       taper([0, 0.1, 0], [0.31, 0.035, 0.22], "#302d2b", 1),
     ]);
     this.torso = joint("shirt", this.hips, [0, 0.12, 0], [
-      taper([0, 0.18, 0], [0.33, 0.38, 0.23], shirt, 1.25),
-      box([-0.09, 0.25, 0.119], [0.075, 0.075, 0.014], "#b3a68c"),
+      appearance.oversized
+        ? taper([0, 0.16, 0], [0.36, 0.42, 0.25], shirt, 1.22)
+        : taper([0, 0.18, 0], [0.33, 0.38, 0.23], shirt, 1.25),
+      ...(appearance.pocket ?? !appearance.torso ? [box([-0.09, 0.25, 0.119], [0.075, 0.075, 0.014], "#b3a68c")] : []),
       taper([0, 0.41, 0], [0.12, 0.1, 0.12], skin, 1),
+      ...(appearance.torso ?? []),
     ]);
-    joint("head", this.torso, [0, 0.54, 0], [
+    this.head = joint("head", this.torso, [0, 0.54, 0], [
       round([0, 0, 0], [0.205, 0.26, 0.21], skin),
-      round([0, 0.075, -0.025], [0.214, 0.145, 0.2], appearance.hair ?? "#252321"),
+      ...(appearance.head ?? [round([0, 0.075, -0.025], [0.214, 0.145, 0.2], appearance.hair ?? "#252321")]),
       round([-0.106, -0.005, 0], [0.04, 0.065, 0.05], skin),
       round([0.106, -0.005, 0], [0.04, 0.065, 0.05], skin),
       box([0, -0.013, 0.104], [0.034, 0.05, 0.04], skin),
@@ -77,21 +103,25 @@ export class CharacterVisual {
       box([0, -0.063, 0.093], [0.047, 0.009, 0.01], "#785040"),
     ]);
     for (const side of [-1, 1]) {
-      const hip = joint(`thigh:${side}`, this.hips, [side * 0.095, -0.025, 0], [
-        taper([0, -0.18, 0], [0.15, 0.36, 0.18], JEANS, 1.12),
+      const hip = joint(`thigh:${side}`, this.hips, [side * 0.095, -0.025, 0], appearance.shorts ? [
+        taper([0, -0.13, 0], [0.165, 0.27, 0.195], pants, 1.08),
+        taper([0, -0.3, 0], [0.11, 0.13, 0.125], skin, 1.1),
+      ] : [
+        taper([0, -0.18, 0], [0.15, 0.36, 0.18], pants, 1.12),
       ]);
       const knee = joint(`shin:${side}`, hip, [0, -0.36, 0], [
-        taper([0, -0.19, 0], [0.115, 0.38, 0.13], JEANS, 1.2),
-        round([0, -0.42, 0.045], [0.145, 0.13, 0.28], "#c7c2b5"),
+        taper([0, -0.19, 0], [0.115, 0.38, 0.13], appearance.shorts ? skin : pants, 1.2),
+        round([0, -0.42, 0.045], [0.145, 0.13, 0.28], shoes),
         box([0, -0.463, 0.045], [0.14, 0.03, 0.265], "#484843"),
       ]);
-      const shoulder = joint(`upperArm:${side}`, this.torso, [side * 0.215, 0.32, 0], [
-        round([0, -0.035, 0], [0.16, 0.17, 0.17], shirt),
-        taper([0, -0.1, 0], [0.13, 0.19, 0.14], shirt, 1.12),
-        taper([0, -0.205, 0], [0.095, 0.12, 0.1], skin, 1.1),
+      const shoulder = joint(`upperArm:${side}`, this.torso, [side * 0.215 * w, 0.32, 0], [
+        round([0, -0.035, 0], [0.16 * w, 0.17 * w, 0.17 * w], shirt),
+        taper([0, -0.1, 0], [0.13 * w, 0.19, 0.14 * w], shirt, 1.12),
+        taper([0, -0.205, 0], [0.095 * w, 0.12, 0.1 * w], sleeve, 1.1),
       ]);
       const elbow = joint(`forearm:${side}`, shoulder, [0, -0.265, 0], [
-        taper([0, -0.105, 0], [0.075, 0.21, 0.085], skin, 1.2),
+        taper([0, -0.105, 0], [0.075 * w, 0.21, 0.085 * w], sleeve, 1.2),
+        ...(appearance.sleeves === "long" ? [taper([0, -0.2, 0], [0.085, 0.04, 0.09], shirt, 1)] : []),
         round([0, -0.25, 0.005], [0.085, 0.115, 0.07], skin),
       ]);
       this.legs.push({ hip, knee });
@@ -101,6 +131,11 @@ export class CharacterVisual {
       taper([0, 0, 0], [.10, .14, .10], '#ead9b8', 1.15),
       taper([0, .073, 0], [.12, .018, .12], '#302a25', 1),
       taper([0, -.01, 0], [.105, .04, .105], '#98734c', 1),
+    ]) : null;
+    this.vape = appearance.vape ? joint('vape', this.arms[1].elbow, [0, -.25, .055], [
+      box([0, .01, 0], [.034, .085, .02], '#2b2e36'),
+      box([0, .062, 0], [.02, .022, .014], '#141518'),
+      box([0, -.01, .011], [.012, .012, .003], '#6fc3e8'),
     ]) : null;
     this.update(0, 0, false);
   }
@@ -126,6 +161,32 @@ export class CharacterVisual {
     this.arms[0].elbow.rotation.x = -.45;
     this.torso.rotation.y = Math.sin((this.time + phase) * .5) * .07;
     if (this.cup) this.cup.rotation.x = -(right.shoulder.rotation.x + right.elbow.rotation.x + this.torso.rotation.x);
+  }
+
+  /**
+   * Seated/standing hit-and-exhale loop on the café rig; returns exhale strength 0..1 so the
+   * caller can emit vapour at `mouth()`. Hand to mouth, hold, lower, tip the head back and blow.
+   */
+  vapeIdle(dt: number, phase: number, seated: boolean): number {
+    this.cafeIdle(dt, phase, seated);
+    const cycle = (this.time + phase) % 11;
+    const lift = Math.max(0, Math.min(1, cycle / .7, (3 - cycle) / .6));
+    const exhale = cycle > 3.1 && cycle < 5.6 ? Math.sin((cycle - 3.1) / 2.5 * Math.PI) : 0;
+    const right = this.arms[1];
+    right.shoulder.rotation.x = -.35 - lift * .75;
+    right.shoulder.rotation.z = -.3;
+    right.elbow.rotation.x = -.95 - lift * .85;
+    this.head.rotation.x = -exhale * .28;
+    if (this.vape) this.vape.rotation.x = -(right.shoulder.rotation.x + right.elbow.rotation.x + this.torso.rotation.x);
+    return exhale;
+  }
+
+  /** World-space mouth, a touch in front of the lips. */
+  mouth(out = new Vector3()): Vector3 {
+    this.root.computeWorldMatrix(true);
+    this.hips.computeWorldMatrix(true);
+    this.torso.computeWorldMatrix(true);
+    return Vector3.TransformCoordinatesFromFloatsToRef(0, -0.06, 0.14, this.head.computeWorldMatrix(true), out);
   }
 
   reset(): void {

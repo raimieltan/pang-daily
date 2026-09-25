@@ -308,6 +308,16 @@ function talyer() {
       interaction: { action: "talk_mechanic", label: "Inspect car · Mang Boy", dialogueId: "talyer_mang_boy" },
     });
   }
+  // Corkboard on the waiting-area side of the bay wall: Mang Boy's errands (see game/jobs/hubJobs).
+  a.block({ center: [40.38, 1.55, 154], size: [0.06, 0.8, 1.1], color: "#9a6b3f" });
+  for (const [z, y] of [[153.75, 1.65], [154.25, 1.5]] as const) a.block({ center: [40.42, y, z], size: [0.02, 0.3, 0.24], color: "#f1ece0" });
+  a.zone({
+    id: "talyer_job_board",
+    kind: "interact",
+    rect: rect(40.4, 153.2, 41.3, 154.8),
+    locationId: "talyer",
+    interaction: { action: "browse_jobs", label: "Check Mang Boy's errands", reach: 1.2, priority: 1 },
+  });
   a.zone({ id: "talyer_apron", kind: "parking", rect: rect(5, 145, 40, 150), locationId: "talyer" });
 
   // Neighbours: sari-sari store house and a vacant lot with tall grass.
@@ -545,6 +555,16 @@ function gasStation() {
   a.prop("plastic_chair", [55.5, 14], { rotDeg: 250, tint: "#e7e4dc" });
   a.prop("plastic_chair", [54.2, 12.6], { rotDeg: 300, tint: "#2a5cb0" });
 
+  // Hatid board by the kiosk door: riders pin up where they need to go (see game/jobs/hubJobs).
+  a.block({ center: [54, 1.55, 34.44], size: [1.1, 0.8, 0.06], color: "#9a6b3f" });
+  for (const [x, y] of [[53.75, 1.65], [54.25, 1.5]] as const) a.block({ center: [x, y, 34.4], size: [0.24, 0.3, 0.02], color: "#f1ece0" });
+  a.zone({
+    id: "fuel_job_board",
+    kind: "interact",
+    rect: rect(53.2, 33.5, 54.8, 34.4),
+    locationId: "gas_station",
+    interaction: { action: "browse_jobs", label: "Check hatid requests", reach: 1.2, priority: 1 },
+  });
   a.zone({ id: "fuel_kiosk_walk", kind: "walk", rect: rect(44.5, 31, 56, 34.4), locationId: "gas_station" });
   a.zone({ id: "fuel_meet", kind: "walk", rect: rect(52.5, 11, 57, 16), locationId: "gas_station" });
   for (const [x, z] of [[15, 19], [35, 19], [15, 29], [35, 29]] as const) {

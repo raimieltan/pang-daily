@@ -7,7 +7,7 @@ import { GameBridge } from '@/game/bridge';
 import { VehicleSession } from '@/game-core/maintenance/VehicleSession';
 import { JobSession } from '@/game-core/jobs/JobSession';
 import { JobSystem } from '@/game/jobs/JobSystem';
-import { HUB_JOBS, KYO_ICE_RUN, KYO_JOB_BOARD } from '@/game/jobs/hubJobs';
+import { FUEL_JOB_BOARD, HATID_SUKI_HOME, HUB_JOBS, KYO_ICE_RUN, KYO_JOB_BOARD } from '@/game/jobs/hubJobs';
 import type { InteractionHandler } from '@/game/interaction/InteractionSystem';
 import type { PlayerMode } from '@/game/player/PlayerMode';
 import { bindGameUiStore } from '@/state/gameUiStore';
@@ -16,21 +16,22 @@ import { JobBoardPanel, JobTracker } from './JobPanels';
 
 const cleanup: (() => void)[] = [];
 afterEach(() => { cleanup.splice(0).reverse().forEach(off => off()); vi.unstubAllGlobals(); });
-const board = { id: KYO_JOB_BOARD, action: 'browse_jobs' as const, label: 'Check odd jobs', area: { kind: 'circle' as const, x: 0, z: 0, radius: 2 } };
-function setup() {
+const boardAt = (id: string) => ({ id, action: 'browse_jobs' as const, label: 'Check odd jobs', area: { kind: 'circle' as const, x: 0, z: 0, radius: 2 } });
+const board = boardAt(KYO_JOB_BOARD);
+function setup(job = KYO_ICE_RUN, at = board) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const bridge = new GameBridge(), wallet = new VehicleSession(), jobs = new JobSession(wallet, HUB_JOBS);
   const player = { position: new Vector3(0, 0, 0), mode: 'walking' as PlayerMode };
   const handlers = new Map<string, InteractionHandler>();
   const div = document.createElement('div'); document.body.append(div); const root = createRoot(div);
   const unbind = bindJobStore(bridge.ui.events), unbindUi = bindGameUiStore(bridge.ui);
-  const system = new JobSystem(bridge.runtime, jobs, { player, vehicle: { speedKmh: 0, impactSerial: 0, impactStrength: 0 }, racing: () => false, boards: [board] });
+  const system = new JobSystem(bridge.runtime, jobs, { player, vehicle: { speedKmh: 0, impactSerial: 0, impactStrength: 0 }, racing: () => false, boards: [at] });
   system.connect({ handle: (action, handler) => { handlers.set(action, handler); return () => {}; } });
   act(() => { root.render(<><JobTracker /><JobBoardPanel /></>); });
   cleanup.push(() => { act(() => root.unmount()); system.dispose(); unbind(); unbindUi(); bridge.dispose(); div.remove(); });
   const button = (prefix: string) => Array.from(div.querySelectorAll('button')).find(b => b.textContent?.startsWith(prefix));
   const stop = (id: string) => act(() => {
-    const area = KYO_ICE_RUN.objectives.find(o => o.id === id)!.area;
+    const area = job.objectives.find(o => o.id === id)!.area;
     player.position.set(area.x, 0, area.z);
     handlers.get('job_objective')!({ id, action: 'job_objective', label: id, target: id, area: { kind: 'circle', ...area } });
   });
@@ -65,4 +66,19 @@ it('abandons from the tracker without pay', () => {
   act(() => s.button('Abandon job')!.click());
   expect(s.div.querySelector('[data-testid="job-result"]')?.textContent).toBe('Ice & milk run abandoned · No pay');
   expect(s.wallet.snapshot().walletPhp).toBe(5000);
+});
+
+it('shows a hatid passenger and the tip it paid', () => {
+  const fuelBoard = boardAt(FUEL_JOB_BOARD), s = setup(HATID_SUKI_HOME, fuelBoard);
+  act(() => { s.handlers.get('browse_jobs')!(fuelBoard); });
+  expect(s.div.textContent).toContain('Suki 24 → Home · Passenger: Manang Lorna');
+  expect(s.div.textContent).toContain('+₱100 tip for a quick, smooth ride under 2:00');
+  act(() => s.button('Take the job')!.click());
+  act(() => { s.player.mode = 'driving'; s.system.update(.1); });
+  expect(s.div.textContent).toContain('Manang Lorna: waiting for pickup');
+  s.stop('pickup');
+  expect(s.div.textContent).toContain('Manang Lorna: aboard · 0% annoyed (gets out over 60%)');
+  s.stop('dropoff');
+  expect(s.div.querySelector('[data-testid="job-result"]')?.textContent).toBe('Hatid: Manang Lorna done · +₱480 (incl. ₱100 bonus) in 0:00');
+  expect(s.wallet.snapshot().walletPhp).toBe(5480);
 });

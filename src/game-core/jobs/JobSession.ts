@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { VehicleSession } from '../maintenance/VehicleSession';
 import {
-  abandonJob, acceptJob, advanceTime, beginJob, completeObjective, damageCargo, failJob, jobRunSchema,
+  abandonJob, acceptJob, advanceTime, beginJob, completeObjective, damageCargo, failJob, jobPayout, jobRunSchema,
   type JobContext, type JobDefinition, type JobRun, type Rejection,
 } from './jobs';
 
@@ -10,8 +10,8 @@ const jobSaveSchema = z.object({ version: z.literal(1), serial: z.number().int()
   current: jobRunSchema.nullable(), history: z.record(z.string(), outcomesSchema) });
 export type JobSave = z.infer<typeof jobSaveSchema>;
 export type JobOutcomes = z.infer<typeof outcomesSchema>;
-/** A run that just ended. Only `completed` carries a payout. */
-export type JobEnded = JobRun & { status: 'completed' | 'failed' | 'abandoned'; payoutPhp: number };
+/** A run that just ended. Only `completed` carries a payout (`bonusPhp` of it from the job's bonus). */
+export type JobEnded = JobRun & { status: 'completed' | 'failed' | 'abandoned'; payoutPhp: number; bonusPhp: number };
 export type JobStep = { run: JobRun; ended: JobEnded | null };
 type Wallet = Pick<VehicleSession, 'earn' | 'snapshot'>;
 
@@ -77,7 +77,7 @@ export class JobSession {
     if ('rejected' in next) return next;
     if (next.status !== 'completed') return this.settle(next);
     // Pay before recording completion: a refused payment leaves the run open at its last step.
-    const payment = this.wallet.earn(job.payoutPhp, { kind: 'job_payout', description: `Job: ${job.title}`, source: `job:${job.type}`, relatedEntityId: run.runId });
+    const payment = this.wallet.earn(jobPayout(next, job), { kind: 'job_payout', description: `Job: ${job.title}`, source: `job:${job.type}`, relatedEntityId: run.runId });
     if ('rejected' in payment) return { rejected: payment.rejected };
     return this.settle({ ...next, transactionId: payment.id });
   }
@@ -107,8 +107,9 @@ export class JobSession {
     }
     const status = next.status as JobEnded['status'];
     this.state.current = null; this.count(next.jobId, status); this.changed();
-    const payoutPhp = status === 'completed' ? this.byId.get(next.jobId)!.payoutPhp : 0;
-    const ended = { ...next, status, payoutPhp };
+    const job = this.byId.get(next.jobId)!;
+    const payoutPhp = status === 'completed' ? jobPayout(next, job) : 0;
+    const ended = { ...next, status, payoutPhp, bonusPhp: payoutPhp && payoutPhp - job.payoutPhp };
     return { run: { ...ended }, ended };
   }
   private count(jobId: string, status: keyof JobOutcomes) {

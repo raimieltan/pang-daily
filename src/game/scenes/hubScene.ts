@@ -8,6 +8,7 @@ import { RoadsideAnimals } from "../traffic/RoadsideAnimals";
 import { RoadsidePeople } from "../traffic/RoadsidePeople";
 import { CafeCustomers } from "../traffic/CafeCustomers";
 import { CafeParkedCars } from "../traffic/CafeParkedCars";
+import { CafeCrew } from "../traffic/CafeCrew";
 import { NeighborhoodLife } from "../traffic/NeighborhoodLife";
 import { NEIGHBORHOOD_CARS } from "../world/population";
 import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
@@ -162,6 +163,7 @@ export const hubScene: SceneDefinition = {
     const npcSound = (sound: import('../traffic/RoadsidePeople').NpcSound) => bridge.emit('npcSound', sound);
     addSystem(new CafeCustomers(scene, kit, listener, npcSound));
     addSystem(new CafeParkedCars(scene, player.visual.model, listener));
+    addSystem(new CafeCrew(scene, kit, listener, npcSound));
     addSystem(new NeighborhoodLife(scene, kit, listener, npcSound));
     addSystem(new CafeParkedCars(scene, player.visual.model, listener, NEIGHBORHOOD_CARS, 'neighborhood-parked'));
     addSystem(new RoadsidePeople(scene, kit, [

@@ -23,7 +23,8 @@ export function JobBoardPanel() {
       <p className="text-[10px] tracking-widest text-white/50">{job.type.toUpperCase()}{job.completedCount > 0 && ` · DONE ×${job.completedCount}`}</p>
       <h3 className="text-lg">{job.title} <span className="text-emerald-200">{pesos(job.payoutPhp)}</span></h3>
       <p className="mt-1 text-white/70">{job.description}</p>
-      <p className="mt-2 text-white/60">{job.stops.join(' → ')}{job.timeLimitSeconds && ` · ${clock(job.timeLimitSeconds)} limit`}{job.cargo && ` · Fragile: ${job.cargo}`}</p>
+      <p className="mt-2 text-white/60">{job.stops.join(' → ')}{job.timeLimitSeconds && ` · ${clock(job.timeLimitSeconds)} limit`}{job.cargo && (job.cargo.kind === 'passenger' ? ` · Passenger: ${job.cargo.label}` : ` · Fragile: ${job.cargo.label}`)}</p>
+      {job.bonus && <p className="text-emerald-200/80">+{pesos(job.bonus.php)} {job.bonus.label}{job.bonus.withinSeconds && ` under ${clock(job.bonus.withinSeconds)}`}</p>}
       {job.status === 'available'
         ? <button className="tape-button mt-3" disabled={!commands || busy} onClick={() => commands?.acceptJob(job.id)}>{busy ? 'Finish your current job first' : 'Take the job'}</button>
         : <p role="status" className="mt-3 text-amber-200">In progress</p>}
@@ -44,7 +45,7 @@ export function JobTracker() {
   }, [result]);
 
   if (!job) return result ? <p role="status" data-testid="job-result" className={`max-w-md self-center bg-black/65 px-4 py-2 text-sm ${result.status === 'completed' ? 'text-emerald-200' : 'text-amber-200'}`}>
-    {result.status === 'completed' ? `${result.title} done · +${pesos(result.payoutPhp)} in ${clock(result.elapsedSeconds)}`
+    {result.status === 'completed' ? `${result.title} done · +${pesos(result.payoutPhp)}${result.bonusPhp > 0 ? ` (incl. ${pesos(result.bonusPhp)} bonus)` : ''} in ${clock(result.elapsedSeconds)}`
       : `${result.title} ${result.status === 'failed' ? 'failed' : 'abandoned'}${result.reason && result.status === 'failed' ? ` · ${result.reason}` : ''} · No pay`}
   </p> : null;
 
@@ -61,8 +62,11 @@ export function JobTracker() {
     </ol>
     <p className="mt-2 text-amber-200" data-testid="job-hint">{job.hint}</p>
     {job.cargo && <p className={`mt-1 ${job.cargo.damagePct > 0 ? 'text-amber-200' : 'text-white/60'}`}>
-      {job.cargo.label}: {job.cargo.loaded ? `${job.cargo.damagePct}% damaged (fails over ${job.cargo.maxDamagePct}%)` : 'not loaded'}
+      {job.cargo.label}: {job.cargo.kind === 'passenger'
+        ? job.cargo.loaded ? `aboard · ${job.cargo.damagePct}% annoyed (gets out over ${job.cargo.maxDamagePct}%)` : 'waiting for pickup'
+        : job.cargo.loaded ? `${job.cargo.damagePct}% damaged (fails over ${job.cargo.maxDamagePct}%)` : 'not loaded'}
     </p>}
+    {job.bonus && <p data-testid="job-bonus" className={job.bonus.onTrack ? 'text-emerald-200' : 'text-white/40 line-through'}>+{pesos(job.bonus.php)} {job.bonus.label}</p>}
     <button className="tape-button mt-2" onClick={() => commands?.abandonJob()}>Abandon job</button>
   </section>;
 }

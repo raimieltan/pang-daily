@@ -139,8 +139,8 @@ export class JobSystem implements GameSystem {
 
   private stopRejection(objective: JobObjective): string | null {
     const { player, vehicle } = this.world;
-    if (player.mode !== objective.mode) return objective.mode === 'driving' ? 'Bring your car to the stop.' : 'Get out of the car here.';
     if (!areaContains({ kind: 'circle', ...objective.area }, player.position.x, player.position.z)) return `Go to ${objective.locationName}.`;
+    if (player.mode !== objective.mode) return objective.mode === 'driving' ? 'Bring your car to the stop.' : 'Get out of the car here.';
     if (objective.mode === 'driving' && vehicle.speedKmh > objective.maxSpeedKmh) return 'Stop the car first.';
     return null;
   }
@@ -187,6 +187,7 @@ export class JobSystem implements GameSystem {
     if (!objective) return '';
     const rejection = this.stopRejection(objective);
     if (!rejection) return `${objective.prompt}: press F`;
-    return rejection === 'Stop the car first.' ? 'Stop here to ' + objective.prompt.toLowerCase() : `Head to ${objective.locationName}`;
+    if (rejection === 'Stop the car first.') return 'Stop here to ' + objective.prompt.toLowerCase();
+    return rejection.startsWith('Go to') ? `Head to ${objective.locationName}` : rejection;
   }
 }
