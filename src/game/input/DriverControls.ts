@@ -8,6 +8,7 @@ import type { InputManager } from "./InputManager";
 const PARKED: DriverInput = { throttle: 0, brake: 0, steer: 0, handbrake: true };
 
 export type DriverControlsOptions = {
+  onHorn?(): void;
   onRecover?(): void;
   onResetToSpawn?(): void;
   onRecenterCamera?(): void;
@@ -54,6 +55,7 @@ export class DriverControls implements GameSystem, DriverInputSource, ChaseCamer
     this.enterExitPressed = input.pressed("enterExit");
 
     if (input.pressed("recover")) options.onRecover?.();
+    if (input.pressed("horn")) options.onHorn?.();
     if (input.pressed("resetToSpawn")) options.onResetToSpawn?.();
     if (input.pressed("recenterCamera")) options.onRecenterCamera?.();
   }

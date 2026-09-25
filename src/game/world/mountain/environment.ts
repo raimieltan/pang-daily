@@ -6,6 +6,8 @@ import { pixelText } from '../pixelFont';
 export const MOUNTAIN_LAMPS:LampData[]=[];
 export const MOUNTAIN_ZONES:ZoneData[]=[];
 export const MOUNTAIN_CHUNKS:ChunkData[]=[];
+/** Share actual house aprons with ambient residents, so population follows authored settlements. */
+export const MOUNTAIN_HOMES: { s: number; side: number; x: number; y: number; z: number; heading: number }[] = [];
 const N=Math.ceil(ROUTE_LENGTH/220);
 let lastPole:{x:number;y:number;z:number;s:number;heading:number}|null=null;
 for(let c=0;c<N;c++) {
@@ -17,6 +19,13 @@ for(let c=0;c<N;c++) {
   p.y=onApron?OVERLOOK.y:p.y-roadsideDrop(p.width,offset);
   props.push({prop,at:[p.x,p.z],y:p.y,rotDeg:p.heading*180/Math.PI+turn,scale});return p;
  };
+ // Continuous roadside fixtures, with poles outside the driving surface.
+ for(let s=Math.ceil(from/30)*30;s<to;s+=30){
+  const road=roadAt(s), offset=road.width/2+1.8;
+  const p=add('street_lamp',s,offset,1,-90);
+  const light=roadAt(s,offset-2.2);
+  lamps.push({id:`road-lamp-${s}`,at:[light.x,p.y+6.6,light.z],profile:'sodium'});
+ }
  // Deliberately sparser settlements with increasing height, then houses return on descent.
  for(let s=from+24;s<to;s+=38) {
   const sector=sectorAt(s).id, i=Math.floor(s/38),side=i%2?1:-1;
@@ -25,6 +34,7 @@ for(let c=0;c<N;c++) {
    const p=add(i%3?'rural_house':'timber_house',s,side*11,1,side>0?-90:90);
    // Level house apron and narrow driveway entering directly onto the road.
    const d=roadAt(s,side*7.2);
+   MOUNTAIN_HOMES.push({ s, side, x: d.x, y: d.y - .005, z: d.z, heading: d.heading });
    blocks.push({center:[d.x,d.y-.18,d.z],size:[9,.35,5],rotDeg:d.heading*180/Math.PI,color:'#887d65',collide:true});
    add('motorcycle_parked',s+4,side*7,1,55);add('water_tank',s-4,side*12);
    add('dog_sleeping',s-3,side*6.2);

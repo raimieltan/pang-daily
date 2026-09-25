@@ -12,7 +12,7 @@ import type { GameSystem } from '../engine/types';
 import type { WorldKit } from '../world/WorldChunk';
 import { CollisionGroup, type PhysicsWorld } from '../physics/PhysicsWorld';
 import type { VehicleModel } from '../vehicles/VehicleModel';
-import { TrafficFlow, type RoadUser } from './TrafficFlow';
+import { TrafficFlow, TRAFFIC_DRAW_DISTANCE, type RoadUser } from './TrafficFlow';
 import type { Waypoint } from '../races/Race';
 import { CharacterVisual } from '../characters/CharacterVisual';
 import { TrafficLights } from './TrafficLights';
@@ -34,7 +34,7 @@ export class TrafficSystem implements GameSystem {
 
  constructor(scene: Scene, kit: WorldKit, world: PhysicsWorld, model: VehicleModel,
   lanes: readonly (readonly Waypoint[])[], private player: () => RoadUser, night: () => number = () => 0) {
-  this.flow = new TrafficFlow(lanes, player());
+  this.flow = new TrafficFlow(lanes, player(), 24);
   for (const [i, actor] of this.flow.actors.entries()) {
    const root = new TransformNode(`traffic-${i}-${actor.kind.id}`, scene);
    this.nodes.push(root);
@@ -122,7 +122,7 @@ export class TrafficSystem implements GameSystem {
  update() {
   const player = this.player();
   this.flow.actors.forEach((a, i) => this.nodes[i].setEnabled(a.active &&
-   Math.hypot(a.follower.position.x - player.x, a.follower.position.z - player.z) < 650));
+   Math.hypot(a.follower.position.x - player.x, a.follower.position.z - player.z) < TRAFFIC_DRAW_DISTANCE));
   this.lights.update();
  }
 

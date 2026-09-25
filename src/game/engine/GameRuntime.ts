@@ -2,6 +2,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { GameBridge, type GameCommands, type GameEventSource } from "../bridge";
 import { INITIAL_SCENE, scenes, type SceneId } from "../scenes";
 import { SceneManager } from "./SceneManager";
+import { GameAudio } from "../audio/GameAudio";
 
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
@@ -24,6 +25,7 @@ export class GameRuntime {
   readonly commands: GameCommands = this.bridge.ui.commands;
 
   private readonly engine: Engine;
+  private readonly audio: GameAudio;
   private readonly scenes: SceneManager<SceneId>;
   private readonly resizeObserver: ResizeObserver;
   private readonly initialScene: SceneId;
@@ -35,6 +37,7 @@ export class GameRuntime {
   constructor(canvas: HTMLCanvasElement, options: GameRuntimeOptions = {}) {
     this.initialScene = options.initialScene ?? INITIAL_SCENE;
     this.engine = new Engine(canvas, true, { stencil: true, powerPreference: "high-performance" }, true);
+    this.audio = new GameAudio(this.events);
 
     const { emit, handle } = this.bridge.runtime;
 
@@ -68,6 +71,7 @@ export class GameRuntime {
     if (this.disposed) return;
     this.disposed = true;
     this.resizeObserver.disconnect();
+    this.audio.dispose();
     this.engine.stopRenderLoop();
     this.scenes.dispose();
     this.engine.dispose();

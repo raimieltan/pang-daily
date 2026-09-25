@@ -68,7 +68,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       const deltaV = Math.abs(event.impulse) / controller.model.config.chassis.massKg;
       if (deltaV < 2.4 || this.impactCooldown > 0) return;
       this.impactStrength = Math.min(1, (deltaV - 2.4) / 7 + 0.2);
-      this.impactSerial++;
+        this.impactSerial++;
+        bridge.emit("vehicleImpact", { strength: this.impactStrength });
       this.impactCooldown = 0.32;
     });
     this.releaseImpact = () => impacts.remove(observer);

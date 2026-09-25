@@ -26,6 +26,11 @@ import type {
 
 export type GameEventMap = {
   ready: void;
+  /** Ground distance travelled on foot, sampled at 10 Hz for footsteps. */
+  footsteps: { distance: number };
+  npcSound: import('../traffic/RoadsidePeople').NpcSound;
+  vehicleImpact: { strength: number };
+  horn: void;
   error: { message: string };
   paused: { paused: boolean };
   statsUpdated: { fps: number };

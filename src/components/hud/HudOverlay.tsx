@@ -13,6 +13,7 @@ import { GraphicsDebugPanel } from "./GraphicsDebugPanel";
 import { HandlingDebugPanel } from "./HandlingDebugPanel";
 import { LocationToast } from "./LocationToast";
 import { InteractionPrompt } from "./InteractionPrompt";
+import { AudioPanel, SoundButton } from "./AudioPanel";
 
 const buttonClass = "tape-button";
 const SCENES: { id: SceneId; label: string }[] = [
@@ -45,6 +46,7 @@ export function HudOverlay() {
         <div className="pointer-events-auto flex items-center gap-4">
           {settings?.analog && settings.analogPreset !== "CLEAN" && <span className="tape-rec hidden sm:inline"><i /> REC</span>}
           {status === "ready" && <>
+            <SoundButton />
             <button type="button" className={buttonClass} onClick={() => setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen}>{toolsOpen ? "Close settings" : "Settings"}</button>
             <button type="button" className={buttonClass} onClick={() => paused ? commands?.resume() : commands?.pause()}>{paused ? "Resume" : "Menu"}</button>
           </>}
@@ -64,6 +66,7 @@ export function HudOverlay() {
 
       {status === "ready" && toolsOpen && <div className="pointer-events-auto absolute top-24 right-4 z-30 flex max-h-[76dvh] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-auto sm:right-8">
         <GraphicsDebugPanel />
+        <AudioPanel />
         <details className="bg-black/80 p-3 text-xs"><summary className="cursor-pointer tracking-widest">DEVELOPMENT / {fps} FPS</summary>
           <HandlingDebugPanel />
           <div className="mt-3 flex flex-wrap gap-3">

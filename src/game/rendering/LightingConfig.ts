@@ -20,12 +20,12 @@ export type LightProfile = {
 
 export const LIGHT_PROFILES = {
   sodium: {
-    description: "Road: sodium orange street lamp. Sparse and dim on purpose; roads stay darker than shops.",
+    description: "Road: sodium orange street lamp. Overlapping warm pools keep the road readable.",
     color: "#ff9a3c",
-    intensity: 1.1,
-    range: 24,
-    poolRadius: 9,
-    poolStrength: 0.22,
+    intensity: 1.5,
+    range: 32,
+    poolRadius: 18,
+    poolStrength: 0.3,
   },
   cafe: {
     description: "Coffee shop: warm café yellow from the shopfront and string lights.",
@@ -173,7 +173,7 @@ export const MOODS: Record<TimeOfDay, SceneMood> = {
   night: {
     clearColor: "#0e1118",
     fog: { color: "#10131a", density: 0.0065 },
-    ambient: { sky: "#59647c", ground: "#17191d", intensity: 0.27 },
+    ambient: { sky: "#59647c", ground: "#252934", intensity: 0.4 },
     key: { color: "#93a3bf", intensity: 0.18, direction: [0.35, -1, 0.45] },
     carRim: { color: "#adb9cd", intensity: 0.12, direction: [-0.3, -0.6, -0.75] },
     lamps: 1,

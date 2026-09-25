@@ -47,6 +47,7 @@ export const drivingScene: SceneDefinition = {
     const input = addSystem(new InputManager(window));
     const controls = addSystem(
       new DriverControls(input, {
+        onHorn: () => bridge.emit("horn"),
         onRecover: () => player?.recover(),
         onResetToSpawn: () => player?.reset(),
         onRecenterCamera: () => camera?.recenter(),

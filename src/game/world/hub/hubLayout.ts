@@ -1,4 +1,4 @@
-import { filletPolyline, LayoutAuthor, rect } from "../layoutTools";
+import { filletPolyline, LayoutAuthor, rect, pointAlong, polylineLength } from "../layoutTools";
 import { pixelText } from "../pixelFont";
 import type { Vec3Tuple } from "../props/PropDefinition";
 import type { LocationData, RoadPoint, Vec2, WorldLayout } from "../WorldLayout";
@@ -94,11 +94,11 @@ for (let x = -148; x < 240; x += 4) a.prop("canal_4m", [x, -9.2], { rotDeg: 90 }
 a.poleLine(range(-148, 244, 36).map((x): Vec2 => [x, -12.5]), 3);
 a.poleLine(range(-80, 95, 30).map((x): Vec2 => [x, 134]), 4, 1.1);
 a.poleLine(range(40, 100, 30).map((z): Vec2 => [113.5, z]), 3);
-for (const x of [-140, -95, -50, -5, 40, 85, 130, 175, 215]) a.streetLamp(`lamp_main_${x}`, [x, -7.5], 0);
-for (const z of [45, 100]) a.streetLamp(`lamp_west_${z}`, [-116.5, z], 90);
-for (const z of [40, 70]) a.streetLamp(`lamp_east_${z}`, [114, z], 90);
-a.streetLamp("lamp_north_-40", [-40, 145.5], 180);
-a.streetLamp("lamp_north_60", [60, 145.5], 180);
+for (let x = -140; x <= 240; x += 28) a.streetLamp(`lamp_main_${x}`, [x, -7.5], 0);
+for (let s = 100; s < polylineLength(loop) - 110; s += 28) {
+  const p = pointAlong(loop, s);
+  a.streetLamp(`lamp_loop_${s}`, [p.x + p.dirZ * 6, p.z - p.dirX * 6], Math.atan2(-p.dirZ, p.dirX) * 180 / Math.PI);
+}
 
 a.wallRun([-158, -58], [248, -58]);
 a.wallRun([248, 198], [-158, 198]);

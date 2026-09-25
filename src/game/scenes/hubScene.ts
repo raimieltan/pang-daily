@@ -1,9 +1,14 @@
+import { TRAFFIC_LANES } from "../traffic/trafficRoutes";
 import { TrafficSystem } from "../traffic/TrafficSystem";
 import { RoadsideAnimals } from "../traffic/RoadsideAnimals";
 import { RoadsidePeople } from "../traffic/RoadsidePeople";
+import { CafeCustomers } from "../traffic/CafeCustomers";
+import { CafeParkedCars } from "../traffic/CafeParkedCars";
+import { NeighborhoodLife } from "../traffic/NeighborhoodLife";
+import { NEIGHBORHOOD_CARS } from "../world/population";
 import { WeatherSystem } from "../weather/WeatherSystem";
 import { WEATHER_TYPES, type WeatherType } from "../weather/Weather";
-import { laneWaypoints, roadAt, ROUTE_LENGTH, OVERLOOK_S } from "../world/mountain/route";
+import { roadAt, ROUTE_LENGTH, OVERLOOK_S } from "../world/mountain/route";
 import { MountainWorld } from "../world/mountain/MountainWorld";
 import { MOUNTAIN_LAMPS, MOUNTAIN_ZONES } from "../world/mountain/environment";
 import { CONNECTED_LAYOUT } from "../world/mountain/layout";
@@ -59,6 +64,7 @@ export const hubScene: SceneDefinition = {
     const input = addSystem(new InputManager(window));
     const controls = addSystem(
       new DriverControls(input, {
+        onHorn: () => bridge.emit("horn"),
         onRecover: () => player?.recover(),
         onResetToSpawn: () => player?.reset(),
         onRecenterCamera: () => camera?.recenter(),
@@ -116,17 +122,33 @@ export const hubScene: SceneDefinition = {
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, race.interactions]));
     modes.useInteractions(interactions);
     race.connect(interactions);
+    let footstepTime = 0;
+    let footstepDistance = 0;
+    addSystem({ name: "footstepAudio", update(dt) {
+      footstepDistance += character.speed * dt;
+      footstepTime += dt;
+      if (footstepTime >= .1) {
+        if (footstepDistance > 0) bridge.emit("footsteps", { distance: footstepDistance });
+        footstepTime = footstepDistance = 0;
+      }
+    }, dispose() {} });
     const car = player;
     const roadUser = () => ({ x: car.position.x, y: car.position.y, z: car.position.z, speed: car.speed, heading: Math.atan2(car.forward.x, car.forward.z) });
-    const traffic = addSystem(new TrafficSystem(scene, kit, world, player.visual.model, [laneWaypoints(1), laneWaypoints(-1)], roadUser, () => lighting.mood.headlight));
+    const traffic = addSystem(new TrafficSystem(scene, kit, world, player.visual.model, TRAFFIC_LANES, roadUser, () => lighting.mood.headlight));
+    const listener = () => modes.position;
+    const npcSound = (sound: import('../traffic/RoadsidePeople').NpcSound) => bridge.emit('npcSound', sound);
+    addSystem(new CafeCustomers(scene, kit, listener, npcSound));
+    addSystem(new CafeParkedCars(scene, player.visual.model, listener));
+    addSystem(new NeighborhoodLife(scene, kit, listener, npcSound));
+    addSystem(new CafeParkedCars(scene, player.visual.model, listener, NEIGHBORHOOD_CARS, 'neighborhood-parked'));
     addSystem(new RoadsidePeople(scene, kit, [
       { from: 100, to: 125, side: 1 }, { from: 390, to: 415, side: -1 },
       { from: OVERLOOK_S - 55, to: OVERLOOK_S - 30, side: -1 },
       { from: ROUTE_LENGTH - 230, to: ROUTE_LENGTH - 205, side: 1 },
-    ], roadAt, roadUser));
+    ], roadAt, listener, false, npcSound));
     addSystem(new RoadsidePeople(scene, kit, [
       { from: 25, to: 48, side: 1 }, { from: 115, to: 138, side: -1 },
-    ], (s, offset) => ({ x: s, y: -.03, z: -offset, heading: Math.PI / 2, width: 12 }), roadUser, true));
+    ], (s, offset) => ({ x: s, y: -.03, z: -offset, heading: Math.PI / 2, width: 12 }), listener, true, npcSound));
     addSystem(new RoadsideAnimals(scene, kit, [
       {s:230,kind:"dog",side:1,crosses:false}, {s:550,kind:"cat",side:-1,crosses:true},
       {s:OVERLOOK_S-40,kind:"dog",side:1,crosses:true}, {s:ROUTE_LENGTH-420,kind:"cat",side:1,crosses:true},

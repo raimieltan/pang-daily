@@ -23,6 +23,7 @@ export const AXIS_ACTIONS = {
 } as const;
 
 export const BUTTON_ACTIONS = [
+  "horn",
   /** Held: rear loosens so the car rotates into hairpins (see `HandlingConfig.handbrake`). */
   "handbrake",
   /** Put the car back on its wheels where it is. */
@@ -105,6 +106,7 @@ export const DEFAULT_INPUT_CONFIG: InputConfig = {
     moveY: { positive: ["ArrowUp", "KeyW"], negative: ["ArrowDown", "KeyS"], pad: [{ stick: PadAxis.LEFT_Y, invert: true }] },
   },
   buttons: {
+    horn: { keys: ["KeyH"], pad: [PadButton.L3] },
     handbrake: { keys: ["Space"], pad: [PadButton.B] },
     recover: { keys: ["KeyR"], pad: [PadButton.Y] },
     resetToSpawn: { keys: ["Backspace"], pad: [PadButton.BACK] },
