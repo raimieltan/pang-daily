@@ -132,6 +132,11 @@ export class VehicleModel {
     return this.rideHeightM;
   }
 
+  /** A material of the loaded model by its GLB name (e.g. `taillight`). Frozen: unfreeze before editing. */
+  material(name: string): Material | undefined {
+    return this.container.materials.find((m) => m.name === name);
+  }
+
   /** Recolours the paint material. `hex` is sRGB `#rrggbb`. */
   setPaint(hex: string): void {
     if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error(`Invalid paint colour "${hex}", expected #rrggbb`);

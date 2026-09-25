@@ -4,12 +4,16 @@
  * Carries derived, low-frequency state only (see TECH_ARCHITECTURE §4–5).
  * Never emit per-frame physics or transform data through here.
  */
+import type { GraphicsSettings } from "../rendering/LightingConfig";
 import type { SceneId } from "../scenes";
 import type { GameCommandName } from "./GameCommands";
 import type {
   DialogueId,
+  FrameCost,
+  LocationChange,
   RaceResult,
   RaceStanding,
+  RenderStats,
   SpawnPointId,
   VehicleDebugInfo,
   VehicleSummary,
@@ -31,6 +35,23 @@ export type GameEventMap = {
   /** Handling debug readout, ~10 Hz while a car is driving. */
   vehicleTelemetry: VehicleTelemetry;
   vehicleDebugInfo: VehicleDebugInfo;
+  /** Entered or left a hub location's area. */
+  locationEntered: LocationChange;
+  locationExited: LocationChange;
+  /** The car left the playable area (or fell through) and was put back on the road. */
+  playerReturned: LocationChange;
+  /** Current graphics settings; sent on scene setup and after every change. */
+  graphicsState: GraphicsSettings;
+  /** ~1 Hz frame cost readout while a night scene runs. */
+  renderStats: RenderStats;
+  /** Result of `runGraphicsBenchmark`: frame cost with post effects off vs the current settings. */
+  graphicsBenchmark: {
+    settings: GraphicsSettings;
+    off: FrameCost;
+    on: FrameCost;
+    postCostMs: number;
+    postGpuCostMs: number | null;
+  };
   raceStarted: RaceStanding;
   /** Emitted when the player's position changes, not every frame. */
   raceStandingChanged: RaceStanding;

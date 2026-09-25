@@ -111,6 +111,14 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     return placed;
   }
 
+  /** At rest at an arbitrary pose (e.g. a hub return point), in drive. The spawn point is unchanged. */
+  placeAt(pose: VehiclePose): boolean {
+    this.controller.reset();
+    const placed = this.body.place(pose);
+    if (placed) this.onPlaced?.();
+    return placed;
+  }
+
   /**
    * Back on its wheels where it is (rolled, beached, stuck on a wall), facing the same way.
    * Falls back to the spawn point when there is no road underneath.

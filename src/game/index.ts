@@ -17,15 +17,19 @@ export function createGame(canvas: HTMLCanvasElement): GameHandle {
 }
 
 export type {
+  FrameCost,
   GameCommands,
   GameEventMap,
   GameEventName,
   GameEventSource,
   HandlingPresetInfo,
+  LocationChange,
   RaceResult,
   RaceStanding,
+  RenderStats,
   VehicleDebugInfo,
   VehicleSummary,
   VehicleTelemetry,
 } from "./bridge";
 export type { SceneId } from "./scenes";
+export type { GraphicsQuality, GraphicsSettings } from "./rendering/LightingConfig";

@@ -4,6 +4,8 @@
  */
 export type RaceId = string;
 export type SpawnPointId = string;
+/** A named place in an open-world scene (hub locations: "coffee_shop", "talyer", ...). */
+export type LocationId = string;
 export type DialogueId = string;
 
 /** HUD-level vehicle readout. Derived values only — never wheel/suspension/transform data. */
@@ -69,3 +71,19 @@ export type RaceStanding = {
 export type RaceResult = RaceStanding & {
   timeMs: number;
 };
+
+/** Where the player is in the hub. Sent on arrival/departure, not continuously. */
+export type LocationChange = { locationId: LocationId; name: string };
+
+/** Frame cost readout, ~1 Hz. `gpuMs` is null where the browser has no GPU timer query. */
+export type RenderStats = {
+  fps: number;
+  /** CPU time spent rendering the scene, averaged over the last second. */
+  frameMs: number;
+  gpuMs: number | null;
+  drawCalls: number;
+  activeMeshes: number;
+  lights: number;
+};
+
+export type FrameCost = { frames: number; frameMs: number; gpuMs: number | null };

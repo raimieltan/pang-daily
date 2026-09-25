@@ -6,6 +6,7 @@
  * outcomes come back as events (`commandRejected`, `raceStarted`, ...), so React
  * never depends on engine internals or synchronous return values.
  */
+import type { GraphicsSettings } from "../rendering/LightingConfig";
 import type { SceneId } from "../scenes";
 import type { RaceId, SpawnPointId } from "./types";
 
@@ -19,6 +20,10 @@ export type GameCommandMap = {
   /** Put the player car back on its current spawn point, at rest. */
   resetVehicle: void;
   setHandlingPreset: { presetId: string };
+  /** Applies `quality`'s preset (if given), then any individual overrides. */
+  setGraphics: Partial<GraphicsSettings>;
+  /** Measures frame cost with post effects off, then on, for `seconds` each (default 4). */
+  runGraphicsBenchmark: { seconds?: number };
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -72,6 +77,8 @@ export interface GameCommands {
   startRace(raceId: RaceId): void;
   resetVehicle(): void;
   setHandlingPreset(presetId: string): void;
+  setGraphics(settings: Partial<GraphicsSettings>): void;
+  runGraphicsBenchmark(seconds?: number): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -85,5 +92,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     startRace: (raceId) => dispatch("startRace", { raceId }),
     resetVehicle: () => dispatch("resetVehicle"),
     setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
+    setGraphics: (settings) => dispatch("setGraphics", settings),
+    runGraphicsBenchmark: (seconds) => dispatch("runGraphicsBenchmark", { seconds }),
   };
 }

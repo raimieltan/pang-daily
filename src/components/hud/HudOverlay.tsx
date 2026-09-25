@@ -3,10 +3,18 @@
 import { useGameUiStore } from "@/state/gameUiStore";
 import { CommandNotice } from "./CommandNotice";
 import { DialogueBox } from "./DialogueBox";
+import type { SceneId } from "@/game";
 import { DrivingHud } from "./DrivingHud";
+import { GraphicsDebugPanel } from "./GraphicsDebugPanel";
 import { HandlingDebugPanel } from "./HandlingDebugPanel";
+import { LocationToast } from "./LocationToast";
 
 const buttonClass = "rounded border border-amber-200/30 px-2 py-1 hover:bg-amber-200/10";
+const SCENES: { id: SceneId; label: string }[] = [
+  { id: "hub", label: "Hub" },
+  { id: "driving", label: "Handling track" },
+  { id: "debug", label: "Bridge demo" },
+];
 
 /** Presentation-only overlay. Reads the UI store and sends intents via commands. */
 export function HudOverlay() {
@@ -38,13 +46,11 @@ export function HudOverlay() {
                     </button>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={() => commands?.switchScene(activeScene === "debug" ? "driving" : "debug")}
-                  className={buttonClass}
-                >
-                  {activeScene === "debug" ? "Driving scene" : "Bridge demo scene"}
-                </button>
+                {SCENES.filter((s) => s.id !== activeScene).map((s) => (
+                  <button key={s.id} type="button" onClick={() => commands?.switchScene(s.id)} className={buttonClass}>
+                    {s.label}
+                  </button>
+                ))}
                 <button type="button" onClick={() => commands?.switchScene(activeScene)} className={buttonClass}>
                   Reload scene
                 </button>
@@ -70,7 +76,13 @@ export function HudOverlay() {
         </div>
       )}
       {status === "ready" && (
+        <div className="absolute top-12 right-4">
+          <GraphicsDebugPanel />
+        </div>
+      )}
+      {status === "ready" && (
         <div className="flex flex-col gap-3">
+          <LocationToast />
           <CommandNotice />
           <DialogueBox />
           <DrivingHud />

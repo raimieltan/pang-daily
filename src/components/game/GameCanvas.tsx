@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { bindGameUiStore, useGameUiStore } from "@/state/gameUiStore";
+import { bindGraphicsStore } from "@/state/graphicsStore";
 import { bindHudStore } from "@/state/hudStore";
 import { bindVehicleDebugStore } from "@/state/vehicleDebugStore";
 
@@ -25,7 +26,12 @@ export function GameCanvas() {
 
         const game = createGame(canvas);
         // Bind before start() so no early event is missed.
-        const unbinders = [bindGameUiStore(game), bindHudStore(game.events), bindVehicleDebugStore(game.events)];
+        const unbinders = [
+          bindGameUiStore(game),
+          bindHudStore(game.events),
+          bindVehicleDebugStore(game.events),
+          bindGraphicsStore(game.events),
+        ];
         game.start();
 
         teardown = () => {
