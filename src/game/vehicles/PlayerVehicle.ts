@@ -1,3 +1,4 @@
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import {
   SummaryPublisher,
@@ -6,13 +7,14 @@ import {
   type VehicleSummary,
   type VehicleTelemetry,
 } from "../bridge";
+import type { ChaseTarget } from "../cameras/ChaseCamera";
 import type { GameSystem } from "../engine/types";
 import type { PhysicsWorld } from "../physics/PhysicsWorld";
 import { resolveHandlingPreset } from "./handling/HandlingConfig";
 import { HANDLING_PRESETS, isHandlingPresetId, type HandlingPresetId } from "./handling/presets";
 import { VehicleBody, type VehiclePose } from "./VehicleBody";
 import { VehicleController, type DriverInputSource } from "./VehicleController";
-import type { VehicleDefinition } from "./VehicleDefinition";
+import type { VehicleRuntimeDefinition } from "./VehicleDefinition";
 import { VehicleVisual } from "./VehicleVisual";
 
 const G = 9.81;
@@ -20,7 +22,7 @@ const DEG = 180 / Math.PI;
 const TELEMETRY_INTERVAL_SECONDS = 0.1;
 
 export type PlayerVehicleOptions = {
-  definition: VehicleDefinition;
+  definition: VehicleRuntimeDefinition;
   spawnPoints: Readonly<Record<SpawnPointId, VehiclePose>>;
   initialSpawn: SpawnPointId;
   /** Overrides the definition's preset (e.g. from `?handling=`). */
@@ -35,7 +37,7 @@ const PRESET_INFO = Object.entries(HANDLING_PRESETS).map(([id, { name, descripti
  * the throttled HUD summary / tuning telemetry. Physics state never leaves this system;
  * React only ever sees the published summaries.
  */
-export class PlayerVehicle implements GameSystem {
+export class PlayerVehicle implements GameSystem, ChaseTarget {
   readonly name = "playerVehicle";
   private presetId: HandlingPresetId;
   private spawnId: SpawnPointId;
@@ -49,7 +51,7 @@ export class PlayerVehicle implements GameSystem {
     private readonly options: PlayerVehicleOptions,
     readonly body: VehicleBody,
     readonly controller: VehicleController,
-    private readonly visual: VehicleVisual,
+    readonly visual: VehicleVisual,
     presetId: HandlingPresetId,
   ) {
     this.presetId = presetId;
@@ -86,10 +88,10 @@ export class PlayerVehicle implements GameSystem {
     const { definition } = options;
     const presetId = options.presetId ?? definition.handlingPreset;
     const config = resolveHandlingPreset(HANDLING_PRESETS, presetId);
-    const body = new VehicleBody(world, definition.collision, config.chassis.massKg, definition.id);
+    const body = new VehicleBody(world, definition.collision, config.chassis.massKg, definition.spec.id);
     const controller = new VehicleController(world, body, config, input);
     try {
-      const visual = await VehicleVisual.load(scene, definition.modelUrl, body.node, definition.collision.wheels.radius);
+      const visual = await VehicleVisual.load(scene, definition.spec, body.node);
       const vehicle = new PlayerVehicle(bridge, options, body, controller, visual, presetId);
       vehicle.reset();
       vehicle.publishDebugInfo();
@@ -107,6 +109,31 @@ export class PlayerVehicle implements GameSystem {
     const placed = this.body.place(this.options.spawnPoints[this.spawnId]);
     if (placed) this.onPlaced?.();
     return placed;
+  }
+
+  /**
+   * Back on its wheels where it is (rolled, beached, stuck on a wall), facing the same way.
+   * Falls back to the spawn point when there is no road underneath.
+   */
+  recover(): boolean {
+    const { position, forward } = this.body;
+    const pose: VehiclePose = { position: position.clone(), headingRad: Math.atan2(forward.x, forward.z) };
+    this.controller.reset();
+    if (!this.body.place(pose)) return this.reset();
+    this.onPlaced?.();
+    return true;
+  }
+
+  get position(): Vector3 {
+    return this.body.position;
+  }
+
+  get forward(): Vector3 {
+    return this.body.forward;
+  }
+
+  get speed(): number {
+    return this.controller.model.state.vx;
   }
 
   update(dt: number): void {

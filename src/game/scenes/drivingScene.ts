@@ -4,8 +4,10 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import { ChaseCamera } from "../cameras/ChaseCamera";
+import { DEFAULT_CHASE_CAMERA } from "../cameras/ChaseCameraConfig";
 import type { SceneDefinition } from "../engine/types";
 import { DriverControls } from "../input/DriverControls";
+import { InputManager } from "../input/InputManager";
 import { loadHavok } from "../physics/havok";
 import { PhysicsWorld } from "../physics/PhysicsWorld";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
@@ -15,7 +17,8 @@ import { buildDebugRoad } from "../world/debugRoad";
 
 /**
  * Handling sandbox: the starter sedan on the debug road with a chase camera.
- * Keyboard (arrows/WASD, R to reset) or a standard gamepad (RT/LT/left stick, Back to reset).
+ * Bindings live in `input/InputActions.ts`: arrows/WASD or RT/LT/left stick to drive,
+ * R/Y to recover in place, Backspace/Back to reset to spawn, Q/E or right stick to look, C/R3 to recenter.
  * `?handling=<presetId>` picks the starting preset; the debug panel can swap it live.
  * Palette follows ART_DIRECTION §5: charcoal night, asphalt, sodium-orange fill.
  */
@@ -40,7 +43,15 @@ export const drivingScene: SceneDefinition = {
     // Registered up front so the scene manager tears them down even if setup fails or is aborted.
     // Order matters: sample input → step physics (runs the controller) → visuals/telemetry → camera.
     let player: PlayerVehicle | null = null;
-    const controls = addSystem(new DriverControls(window, { onReset: () => player?.reset() }));
+    let camera: ChaseCamera | null = null;
+    const input = addSystem(new InputManager(window));
+    const controls = addSystem(
+      new DriverControls(input, {
+        onRecover: () => player?.recover(),
+        onResetToSpawn: () => player?.reset(),
+        onRecenterCamera: () => camera?.recenter(),
+      }),
+    );
     const world = addSystem(new PhysicsWorld(scene, havok));
     const road = buildDebugRoad(scene);
 
@@ -54,9 +65,10 @@ export const drivingScene: SceneDefinition = {
     // Superseded while the model loaded: the scene (and the car in it) is already gone.
     if (signal.aborted) return;
 
-    const camera = new ChaseCamera(scene, player.body);
-    player.onPlaced = () => camera.snap();
+    const chase = new ChaseCamera(scene, player, DEFAULT_CHASE_CAMERA, controls);
+    camera = chase;
+    player.onPlaced = () => chase.snap();
     addSystem(player);
-    addSystem(camera);
+    addSystem(chase);
   },
 };

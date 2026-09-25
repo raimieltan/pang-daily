@@ -1,3 +1,4 @@
+import { BANWA_DALAGAN_1996, type VehicleDefinition } from "@/game-core/vehicles";
 import type { HandlingPresetId } from "./handling/presets";
 
 /**
@@ -25,20 +26,20 @@ export type VehicleCollisionConfig = {
   suspensionTravel: number;
 };
 
-export type VehicleDefinition = {
-  id: string;
-  name: string;
-  modelUrl: string;
+/**
+ * A game-core `VehicleDefinition` (identity, specs, model contract, condition hooks) bound to
+ * the Babylon runtime's tuning: handling preset, collision shapes, HUD gearing.
+ */
+export type VehicleRuntimeDefinition = {
+  spec: VehicleDefinition;
   handlingPreset: HandlingPresetId;
   collision: VehicleCollisionConfig;
   /** HUD-only gear readout: gear = number of thresholds passed. */
   gearThresholdsKmh: readonly number[];
 };
 
-export const STARTER_SEDAN: VehicleDefinition = {
-  id: "starter_sedan",
-  name: "Starter sedan",
-  modelUrl: "/model/starter_sedan.glb",
+export const STARTER_SEDAN: VehicleRuntimeDefinition = {
+  spec: BANWA_DALAGAN_1996,
   handlingPreset: "fwd_worn_sedan",
   collision: {
     // Matches starter_sedan.glb: body 1.69 × 4.33 m, roof at 1.40 m, wheels r 0.30 at ±0.728.
