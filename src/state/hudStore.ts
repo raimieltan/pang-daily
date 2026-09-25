@@ -1,3 +1,4 @@
+import type { RaceProgress } from "@/game/races/Race";
 import { create } from "zustand";
 import type { GameEventSource, InteractionPrompt, PlayerMode, RaceResult, RaceStanding, VehicleSummary } from "@/game";
 
@@ -11,10 +12,11 @@ type HudState = {
   interaction: InteractionPrompt | null;
   vehicle: VehicleSummary | null;
   race: RaceStanding | null;
+  raceProgress: RaceProgress | null;
   lastResult: RaceResult | null;
 };
 
-const initialState: HudState = { playerMode: "driving", interaction: null, vehicle: null, race: null, lastResult: null };
+const initialState: HudState = { playerMode: "driving", interaction: null, vehicle: null, raceProgress: null, race: null, lastResult: null };
 
 export const useHudStore = create<HudState>(() => initialState);
 
@@ -25,6 +27,7 @@ export function bindHudStore(events: GameEventSource): () => void {
     events.on("playerModeChanged", ({ mode }) => set({ playerMode: mode })),
     events.on("interactionPromptChanged", ({ prompt }) => set({ interaction: prompt })),
     events.on("vehicleStateUpdated", (vehicle) => set({ vehicle })),
+    events.on("raceProgress", (raceProgress) => set({ raceProgress, ...(raceProgress.phase === "RESET" ? { race: null, lastResult: null } : {}) })),
     events.on("raceStarted", (race) => set({ race, lastResult: null })),
     events.on("raceStandingChanged", (race) => set({ race })),
     events.on("raceFinished", (lastResult) => set({ race: null, lastResult })),

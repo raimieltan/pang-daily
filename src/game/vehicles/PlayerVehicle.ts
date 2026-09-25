@@ -45,6 +45,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private readonly telemetry: SummaryPublisher<VehicleTelemetry>;
   /** Runs after `place`, e.g. to snap the camera. */
   onPlaced?: () => void;
+  canReposition?: () => boolean;
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -63,6 +64,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     );
 
     bridge.handle("spawnAt", ({ spawnPointId }) => {
+      if (this.canReposition?.() === false) return { rejected: "Reset the race before teleporting" };
       if (!(spawnPointId in options.spawnPoints)) return { rejected: `Unknown spawn point "${spawnPointId}"` };
       this.spawnId = spawnPointId;
       if (!this.reset()) return { rejected: `No road under spawn point "${spawnPointId}"` };
@@ -105,6 +107,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   /** Back to the current spawn point, at rest, in drive. */
   reset(): boolean {
+    if (this.canReposition?.() === false) return false;
     this.controller.reset();
     const placed = this.body.place(this.options.spawnPoints[this.spawnId]);
     if (placed) this.onPlaced?.();
@@ -124,6 +127,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
    * Falls back to the spawn point when there is no road underneath.
    */
   recover(): boolean {
+    if (this.canReposition?.() === false) return false;
     const { position, forward } = this.body;
     const pose: VehiclePose = { position: position.clone(), headingRad: Math.atan2(forward.x, forward.z) };
     this.controller.reset();

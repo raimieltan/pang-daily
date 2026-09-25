@@ -57,6 +57,7 @@ export type GameEventMap = {
     postCostMs: number;
     postGpuCostMs: number | null;
   };
+  raceProgress: import("../races/Race").RaceProgress;
   raceStarted: RaceStanding;
   /** Emitted when the player's position changes, not every frame. */
   raceStandingChanged: RaceStanding;

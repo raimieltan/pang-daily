@@ -19,6 +19,7 @@ export type GameCommandMap = {
   startRace: { raceId: RaceId };
   /** Put the player car back on its current spawn point, at rest. */
   resetVehicle: void;
+  resetRace: void;
   setHandlingPreset: { presetId: string };
   /** Applies `quality`'s preset (if given), then any individual overrides. */
   setGraphics: Partial<GraphicsSettings>;
@@ -84,6 +85,7 @@ export interface GameCommands {
   spawnAt(spawnPointId: SpawnPointId): void;
   startRace(raceId: RaceId): void;
   resetVehicle(): void;
+  resetRace(): void;
   setHandlingPreset(presetId: string): void;
   setGraphics(settings: Partial<GraphicsSettings>): void;
   runGraphicsBenchmark(seconds?: number): void;
@@ -102,6 +104,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     switchScene: (sceneId) => dispatch("switchScene", { sceneId }),
     spawnAt: (spawnPointId) => dispatch("spawnAt", { spawnPointId }),
     startRace: (raceId) => dispatch("startRace", { raceId }),
+    resetRace: () => dispatch("resetRace"),
     resetVehicle: () => dispatch("resetVehicle"),
     setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
     setGraphics: (settings) => dispatch("setGraphics", settings),

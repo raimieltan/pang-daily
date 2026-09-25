@@ -56,6 +56,7 @@ export type PlayerModeParts = {
  */
 export class PlayerModes implements GameSystem {
   readonly name = "playerModes";
+  canExit?: () => boolean;
   private current: PlayerMode = "driving";
   private interactions: InteractionSystem | null = null;
   private readonly releases: (() => void)[] = [];
@@ -124,13 +125,17 @@ export class PlayerModes implements GameSystem {
 
   update(): void {
     const { driverControls, walkControls } = this.parts;
-    if (this.current === "driving" && driverControls.enterExitPressed) this.report("exitVehicle", this.exit());
+    if (this.current === "driving" && driverControls.enterExitPressed) {
+      if (this.interactions?.current?.action === "start_race") this.report("interact", this.interactions.trigger());
+      else this.report("exitVehicle", this.exit());
+    }
     else if (this.current === "walking" && walkControls.interactPressed && this.interactions) {
       this.report("interact", this.interactions.trigger());
     }
   }
 
   exit(): CommandOutcome {
+    if (this.canExit?.() === false) return { rejected: "Reset the race before getting out" };
     const { vehicle, character, world } = this.parts;
     if (this.current !== "driving") return { rejected: "Already on foot" };
     if (!this.safeSpeed()) return { rejected: "Stop the car to get out" };

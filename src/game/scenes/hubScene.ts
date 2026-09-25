@@ -1,3 +1,4 @@
+import { RaceSystem } from "../races/RaceSystem";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RenderingGroup } from "@babylonjs/core/Rendering/renderingGroup";
 import { ChaseCamera } from "../cameras/ChaseCamera";
@@ -86,11 +87,10 @@ export const hubScene: SceneDefinition = {
     camera = chase;
     addSystem(player);
     // The two rigs share one camera. The walker reads its heading without owning input.
-    let walkCamera: WalkCamera;
     const character = addSystem(new WalkingCharacter(scene, world, kit.lit, walkControls, {
-      get yaw() { return walkCamera?.yaw ?? 0; },
+      get yaw(): number { return walkCamera?.yaw ?? 0; },
     }));
-    walkCamera = new WalkCamera(chase.camera, character, world, walkControls);
+    const walkCamera: WalkCamera = new WalkCamera(chase.camera, character, world, walkControls);
     const modes = addSystem(new PlayerModes(bridge, {
       vehicle: player, character, driverControls: controls, walkControls,
       chaseCamera: chase, walkCamera, world,
@@ -98,9 +98,11 @@ export const hubScene: SceneDefinition = {
     player.onPlaced = () => modes.vehiclePlaced();
     lighting.attachCar(modes, [...player.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
     addSystem(new HubLocations(HUB_LAYOUT, modes, bridge));
+    const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes));
     const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones));
-    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables]));
+    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, race.interactions]));
     modes.useInteractions(interactions);
+    race.connect(interactions);
     addSystem(new VehicleLights(scene, player, lighting));
     addSystem(chase);
     addSystem(walkCamera);
