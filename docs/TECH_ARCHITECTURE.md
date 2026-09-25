@@ -805,7 +805,7 @@ vehicle.glb
 └── lights
 ```
 
-This allows exterior customization.
+This allows exterior customization. The enforced contract (scale, pivots, naming, ride height, attachment points, budget) is in `docs/VEHICLE_ASSETS.md`.
 
 ---
 
