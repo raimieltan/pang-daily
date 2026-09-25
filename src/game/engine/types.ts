@@ -3,6 +3,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { RuntimePort } from "../bridge";
 import type { VehicleSession } from "../../game-core/maintenance/VehicleSession";
 import type { JobSession } from "../../game-core/jobs/JobSession";
+import type { Workshop } from "../marketplace/MarketplaceService";
 
 /**
  * A unit of frame-level logic that lives inside one scene
@@ -27,6 +28,8 @@ export interface SceneContext {
   readonly bridge: RuntimePort;
   readonly session: VehicleSession;
   readonly jobs: JobSession;
+  /** Lend the scene's talyer to the phone marketplace for part inspections; release on teardown. */
+  readonly market: { useWorkshop(workshop: Workshop): () => void };
   addSystem<T extends GameSystem>(system: T): T;
 }
 

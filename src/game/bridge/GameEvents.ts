@@ -35,6 +35,10 @@ export type GameEventMap = {
   jobState: import('../jobs/jobViews').JobView | null;
   /** A run ended: completed (paid), failed or abandoned. */
   jobEnded: import('../jobs/jobViews').JobResult;
+  /** Buy & sell board while the phone app is open; null closes it. Never carries hidden condition. */
+  marketplace: import('../../game-core/marketplace/MarketplaceSession').MarketplaceView | null;
+  partPurchased: import('../../game-core/marketplace/MarketplaceSession').PartPurchase;
+  partInspected: import('../../game-core/marketplace/MarketplaceSession').PartInspection;
   maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
   repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;
   repairCompleted: import('../../game-core/maintenance/VehicleSession').RepairReceipt;

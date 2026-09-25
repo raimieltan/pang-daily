@@ -17,6 +17,8 @@ import { AudioPanel, SoundButton } from "./AudioPanel";
 import { FuelPanel } from "./FuelPanel";
 import { ConditionHud, RepairPanel } from "./RepairPanel";
 import { JobBoardPanel, JobTracker } from "./JobPanels";
+import { MarketplaceApp } from "./MarketplaceApp";
+import { useMarketStore } from "@/state/marketStore";
 
 const buttonClass = "tape-button";
 const SCENES: { id: SceneId; label: string }[] = [
@@ -38,6 +40,7 @@ export function HudOverlay() {
   const commands = useGameUiStore((s) => s.commands);
   const activeScene = useGameUiStore((s) => s.activeScene);
   const loadingScene = useGameUiStore((s) => s.loadingScene);
+  const marketOpen = useMarketStore((s) => s.view !== null);
 
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
@@ -50,6 +53,7 @@ export function HudOverlay() {
           {settings?.analog && settings.analogPreset !== "CLEAN" && <span className="tape-rec hidden sm:inline"><i /> REC</span>}
           {status === "ready" && <>
             <SoundButton />
+            <button type="button" className={buttonClass} onClick={() => marketOpen ? commands?.closeMarketplace() : commands?.openMarketplace()} aria-expanded={marketOpen}>{marketOpen ? "Close phone" : "Phone · Baligya"}</button>
             <button type="button" className={buttonClass} onClick={() => setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen}>{toolsOpen ? "Close settings" : "Settings"}</button>
             <button type="button" className={buttonClass} onClick={() => paused ? commands?.resume() : commands?.pause()}>{paused ? "Resume" : "Menu"}</button>
           </>}
@@ -82,7 +86,7 @@ export function HudOverlay() {
       {status === "ready" && !paused && !intro && <div className="flex flex-col gap-3">
         <LocationToast /><CommandNotice /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
       </div>}
-      {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /></>}
+      {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /><MarketplaceApp /></>}
       <RaceIntro />
     </div>
   );

@@ -47,6 +47,12 @@ export type GameCommandMap = {
   acceptJob: { jobId: string };
   abandonJob: void;
   dismissJobBoard: void;
+  /** The phone's buy & sell app; open anywhere. */
+  openMarketplace: void;
+  closeMarketplace: void;
+  buyListing: { listingId: string };
+  /** Pay the mechanic to reveal an owned part's true condition (talyer only). */
+  inspectPart: { partId: string };
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -117,6 +123,10 @@ export interface GameCommands {
   acceptJob(jobId: string): void;
   abandonJob(): void;
   dismissJobBoard(): void;
+  openMarketplace(): void;
+  closeMarketplace(): void;
+  buyListing(listingId: string): void;
+  inspectPart(partId: string): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -147,5 +157,9 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     acceptJob: jobId => dispatch("acceptJob", { jobId }),
     abandonJob: () => dispatch("abandonJob"),
     dismissJobBoard: () => dispatch("dismissJobBoard"),
+    openMarketplace: () => dispatch("openMarketplace"),
+    closeMarketplace: () => dispatch("closeMarketplace"),
+    buyListing: listingId => dispatch("buyListing", { listingId }),
+    inspectPart: partId => dispatch("inspectPart", { partId }),
   };
 }

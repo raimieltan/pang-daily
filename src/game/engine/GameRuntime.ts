@@ -6,6 +6,8 @@ import { GameAudio } from "../audio/GameAudio";
 import { loadVehicleSession } from "../maintenance/sessionStorage";
 import { loadJobSession } from "../jobs/jobStorage";
 import { HUB_JOBS } from "../jobs/hubJobs";
+import { loadInventorySession, loadMarketplaceSession } from "../marketplace/marketStorage";
+import { MarketplaceService } from "../marketplace/MarketplaceService";
 
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
@@ -32,6 +34,7 @@ export class GameRuntime {
   private readonly engine: Engine;
   private readonly audio: GameAudio;
   private readonly scenes: SceneManager<SceneId>;
+  private readonly market: MarketplaceService;
   private readonly resizeObserver: ResizeObserver;
   private readonly initialScene: SceneId;
   private paused = false;
@@ -53,6 +56,8 @@ export class GameRuntime {
       session.earn(Math.round(devTopUp * 100) / 100, { kind: "dev_grant", description: "Dev cash top-up", source: "dev" });
     }
 
+    // The phone outlives scenes, so the marketplace is runtime-wide like pause.
+    this.market = new MarketplaceService(this.bridge.runtime, loadMarketplaceSession(session, loadInventorySession(storage), storage));
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),
       onReady: (sceneId) => emit("sceneReady", { sceneId }),
@@ -60,7 +65,7 @@ export class GameRuntime {
         const reason = error instanceof Error ? error.message : String(error);
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
-    }, session, loadJobSession(session, HUB_JOBS, storage));
+    }, session, loadJobSession(session, HUB_JOBS, storage), this.market);
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);
@@ -84,6 +89,7 @@ export class GameRuntime {
     this.disposed = true;
     this.resizeObserver.disconnect();
     this.audio.dispose();
+    this.market.dispose();
     this.engine.stopRenderLoop();
     this.scenes.dispose();
     this.engine.dispose();
@@ -99,6 +105,7 @@ export class GameRuntime {
     if (!this.paused) {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, MAX_FRAME_DT_SECONDS);
       this.scenes.update(dt);
+      this.market.update(dt);
     }
     // Keep rendering while paused so resizes and camera orbit still draw; systems stay frozen.
     this.scenes.render();

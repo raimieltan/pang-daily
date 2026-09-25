@@ -38,6 +38,7 @@ export class SceneManager<Id extends string> {
     private readonly hooks: SceneManagerHooks<Id> = {},
     private readonly session = new VehicleSession(),
     private readonly jobs = new JobSession(session, HUB_JOBS),
+    private readonly market: SceneContext["market"] = { useWorkshop: () => () => {} },
   ) {}
 
   get activeId(): Id | null {
@@ -70,6 +71,13 @@ export class SceneManager<Id extends string> {
       signal: slot.controller.signal,
       session: this.session,
       jobs: this.jobs,
+      market: {
+        useWorkshop: (workshop) => {
+          const release = this.market.useWorkshop(workshop);
+          slot.releases.push(release);
+          return release;
+        },
+      },
       bridge: {
         // A superseded scene (e.g. still finishing async setup) must not leak events.
         emit: (event, ...args) => {
