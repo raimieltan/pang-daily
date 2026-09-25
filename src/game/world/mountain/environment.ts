@@ -106,7 +106,7 @@ for(let c=0;c<N;c++) {
   blocks.push({center:[p.x,p.y-.35,p.z],size:[26,.7,46],rotDeg:p.heading*180/Math.PI,color:'#938b76',collide:true});
   add('sari_store',OVERLOOK_S+8,22,1.3,180);
   add('utility_pole_transformer',OVERLOOK_S-16,30);
-  for(const [ds,off] of [[-6,20],[0,24],[5,17]]){add('plastic_table',OVERLOOK_S+ds,off);add('plastic_chair',OVERLOOK_S+ds+1.2,off);add('plastic_chair',OVERLOOK_S+ds-1.2,off,1,180);}
+  for(const [ds,off] of [[-6,20],[0,24],[5,17]]){add('plastic_table',OVERLOOK_S+ds,off);add('plastic_chair',OVERLOOK_S+ds+1.2,off,1,180);add('plastic_chair',OVERLOOK_S+ds-1.2,off);}
   for(let j=0;j<3;j++)add('motorcycle_parked',OVERLOOK_S-11+j*2,12,1,80);
   add('tricycle_parked',OVERLOOK_S-13,24,1,80);
   add('store_rack',OVERLOOK_S+9,18);add('ice_cooler',OVERLOOK_S+7,18);

@@ -17,6 +17,7 @@ export const INTERACTION_ACTIONS = [
   "order_coffee",
   "hang_out",
   "talk_mechanic",
+  "refuel",
 ] as const;
 
 export type InteractionAction = (typeof INTERACTION_ACTIONS)[number];

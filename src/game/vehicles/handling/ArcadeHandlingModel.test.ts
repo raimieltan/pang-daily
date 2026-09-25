@@ -316,3 +316,16 @@ describe("handling presets", () => {
     expect(m.state).toEqual(before);
   });
 });
+
+it('an empty tank disables forward and reverse propulsion but keeps braking and restores drive after refueling', () => {
+  const m = car();
+  drive(m, 2, { ...input(1, 0, 0), engineAvailable: false });
+  expect(kmh(m)).toBe(0);
+  drive(m, 2, { ...input(0, 1, 0), engineAvailable: false });
+  expect(kmh(m)).toBe(0);
+  m.state.vx = 15;
+  drive(m, 3, { ...input(1, 1, .2), engineAvailable: false });
+  expect(Math.abs(kmh(m))).toBeLessThan(1);
+  drive(m, 2, { ...input(1, 0, 0), engineAvailable: true });
+  expect(kmh(m)).toBeGreaterThan(1);
+});

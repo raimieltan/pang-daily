@@ -59,10 +59,10 @@ function overlook(ds: number, offset: number, heading: number, activity: Residen
   const p = roadAt(OVERLOOK_S + ds, offset);
   resident('overlook', p.x, p.z, p.heading * 180 / Math.PI + heading, activity, { y: OVERLOOK.y });
 }
-overlook(-4.8, 20, 0, 'sit');
-overlook(-7.2, 20, 180, 'sit');
-overlook(1.2, 24, 0, 'sit');
-overlook(-1.2, 24, 180, 'sit');
+overlook(-4.8, 20, 180, 'sit');
+overlook(-7.2, 20, 0, 'sit');
+overlook(1.2, 24, 180, 'sit');
+overlook(-1.2, 24, 0, 'sit');
 overlook(5, 26, 90, 'watch');
 overlook(7, 26, 90, 'coffee');
 overlook(-10, 15, 220, 'chat');

@@ -14,10 +14,10 @@ export function InteractionPrompt() {
   if (scene !== "hub" || paused) return null;
 
   return (
-    <div className="self-center text-center" data-testid="player-controls">
-      <p className="mb-2">{mode === "walking" ? "WASD / left stick · Walk — Q/E / right stick · Look" : racing ? "WASD / left stick · Drive — Space / B · Handbrake" : "Stop the car to get out"}</p>
+    <div className="flex flex-wrap items-center gap-2 self-start text-left text-xs text-white/60" data-testid="player-controls">
+      <p>{mode === "walking" ? "WASD / left stick · Walk — Q/E / right stick · Look" : racing ? "WASD / left stick · Drive — Space / B · Handbrake" : "Stop to exit"}</p>
       {!racing && (mode === "driving" || prompt) && (
-        <button type="button" className="pointer-events-auto rounded border border-white/40 bg-black/70 px-4 py-2 text-sm text-white/90"
+        <button type="button" className="pointer-events-auto rounded border border-white/20 bg-black/50 px-2 py-1 text-xs text-white/70"
           onClick={() => mode === "driving" && !prompt ? commands?.exitVehicle() : commands?.interact()}
           data-testid="interaction-prompt">
           F / RB · {prompt?.label ?? "Get out"}

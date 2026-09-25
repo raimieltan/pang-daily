@@ -20,6 +20,9 @@ export function ConditionHud() {
         <span data-testid={`condition-${key}`}>{Math.floor(summary.condition[key] * 100)}%</span>
       </div>)}
     </div>
+    <p className="mt-2 text-white/60">Fuel: {summary.fuelLiters?.toFixed(1)} / {summary.fuelCapacityLiters} L</p>
+    {(summary.fuelLiters ?? 45) <= 5 && <p role="status" className="mt-2 text-amber-200">{summary.fuelLiters === 0 ? 'Tank empty · Engine drive unavailable' : 'Low fuel · Visit the gas station'}</p>}
+    <p className="mt-2 text-white/40">Refuel: park beside a gas-station pump · Exit · F at the pump</p>
     <p className="mt-2 text-white/40">Park at the talyer · F to exit · F near Mang Boy to inspect</p>
   </section>;
 }

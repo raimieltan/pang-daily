@@ -1,3 +1,4 @@
+import { drivingFuelLiters } from '../../game-core/economy/economy';
 import type { VehicleCondition, VehicleDefinition } from '../../game-core/vehicles/VehicleDefinition';
 import { drivingWear, emptyLoss, impactWear, SERVICE_COMPONENTS, type WearSample } from '../../game-core/maintenance/condition';
 import { VehicleSession, type RepairQuote } from '../../game-core/maintenance/VehicleSession';
@@ -11,6 +12,7 @@ export interface MaintenanceVehicle {
   readonly impactStrength: number;
   maintenanceSample(racing: boolean): WearSample;
   setCondition(condition: VehicleCondition): void;
+  setFuelAvailable?(available: boolean): void;
 }
 export type WorkshopAccess = { rejection(): string | null; interactions: Pick<InteractionSystem, 'handle'> };
 
@@ -19,6 +21,8 @@ export class MaintenanceSystem implements GameSystem {
   readonly name = 'maintenance';
   private pending = emptyLoss();
   private elapsed = 0;
+  private pendingFuel = 0;
+  private fuelRemaining = 0;
   private lastImpact: number;
   private quote: RepairQuote | null = null;
   private disposed = false;
@@ -34,6 +38,8 @@ export class MaintenanceSystem implements GameSystem {
     const publish = () => {
       const summary = session.summary(this.definition);
       vehicle.setCondition(summary.condition);
+      this.fuelRemaining = summary.fuelLiters ?? 0;
+      vehicle.setFuelAvailable?.(this.fuelRemaining > this.pendingFuel);
       bridge.emit('maintenanceState', summary);
     };
     this.release.push(session.subscribe(publish)); publish();
@@ -66,8 +72,12 @@ export class MaintenanceSystem implements GameSystem {
 
   update(dt: number) {
     if (this.disposed) return;
+    if (!Number.isFinite(dt) || dt <= 0) return;
     if (this.driving()) {
-      const loss = drivingWear(this.vehicle.maintenanceSample(this.racing()), dt, this.definition.reliability.wearRate);
+      const sample = this.vehicle.maintenanceSample(this.racing());
+      this.pendingFuel += drivingFuelLiters(sample.speedMps, sample.throttle, dt);
+      if (this.pendingFuel >= this.fuelRemaining) this.vehicle.setFuelAvailable?.(false);
+      const loss = drivingWear(sample, dt, this.definition.reliability.wearRate);
       for (const key of SERVICE_COMPONENTS) this.pending[key] += loss[key];
     }
     if (this.vehicle.impactSerial !== this.lastImpact) {
@@ -82,6 +92,8 @@ export class MaintenanceSystem implements GameSystem {
   }
 
   private flush() {
+    const fuel = this.pendingFuel; this.pendingFuel = 0;
+    this.session.consumeFuel(this.definition, fuel);
     this.session.wear(this.definition, this.pending);
     this.pending = emptyLoss(); this.elapsed = 0;
   }

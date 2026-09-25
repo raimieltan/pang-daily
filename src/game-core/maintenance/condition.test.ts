@@ -42,7 +42,8 @@ describe('lightweight wear and repairs', () => {
   });
   it('rejects insufficient funds, invalid choices and stale inspections atomically', () => {
     const session = new VehicleSession(); session.ensureVehicle(car);
-    const save = session.snapshot(); save.walletPhp = 0;
+    session.spend(5000, { kind: "fee", description: "Test expense", source: "test" });
+    const save = session.snapshot();
     const poor = new VehicleSession(save), quote = poor.quote(car), before = poor.snapshot();
     expect(poor.repair(car, quote, ['engine'])).toHaveProperty('rejected'); expect(poor.snapshot()).toEqual(before);
     expect(poor.repair(car, quote, [])).toHaveProperty('rejected');

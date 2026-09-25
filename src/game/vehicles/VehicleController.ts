@@ -23,6 +23,7 @@ export interface DriverInputSource {
  */
 export class VehicleController {
   readonly model: ArcadeHandlingModel;
+  fuelAvailable = true;
   private readonly release: () => void;
   private readonly linear = new Vector3();
   private readonly angular = new Vector3();
@@ -53,7 +54,7 @@ export class VehicleController {
 
     const vUp = Vector3.Dot(linear, up);
     model.syncMotion(Vector3.Dot(linear, forward), Vector3.Dot(linear, right), Vector3.Dot(angular, up));
-    model.step(dt, this.input.read(), vehicle.contact);
+    model.step(dt, { ...this.input.read(), engineAvailable: this.fuelAvailable }, vehicle.contact);
     const { vx, vy, yawRate } = model.state;
 
     // The model integrates in the car's frame, which Havok is about to rotate by yawRate·dt.

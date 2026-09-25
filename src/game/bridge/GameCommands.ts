@@ -1,3 +1,4 @@
+import type { FuelRequest } from '../../game-core/economy/economy';
 import type { WeatherType } from "../weather/Weather";
 /**
  * React → Game command surface.
@@ -39,6 +40,9 @@ export type GameCommandMap = {
   inspectVehicle: void;
   repairVehicle: { quoteId: string; components: ServiceComponent[] };
   dismissRepair: void;
+  quoteFuel: FuelRequest;
+  purchaseFuel: { quoteId: string };
+  dismissFuel: void;
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -103,6 +107,9 @@ export interface GameCommands {
   inspectVehicle(): void;
   repairVehicle(quoteId: string, components: ServiceComponent[]): void;
   dismissRepair(): void;
+  quoteFuel(request: FuelRequest): void;
+  purchaseFuel(quoteId: string): void;
+  dismissFuel(): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -127,5 +134,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     inspectVehicle: () => dispatch("inspectVehicle"),
     repairVehicle: (quoteId, components) => dispatch("repairVehicle", { quoteId, components }),
     dismissRepair: () => dispatch("dismissRepair"),
+    quoteFuel: request => dispatch("quoteFuel", request),
+    purchaseFuel: quoteId => dispatch("purchaseFuel", { quoteId }),
+    dismissFuel: () => dispatch("dismissFuel"),
   };
 }

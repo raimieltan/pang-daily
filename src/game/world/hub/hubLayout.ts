@@ -538,7 +538,7 @@ function gasStation() {
   a.zone({ id: "fuel_kiosk_walk", kind: "walk", rect: rect(44.5, 31, 56, 34.4), locationId: "gas_station" });
   a.zone({ id: "fuel_meet", kind: "walk", rect: rect(52.5, 11, 57, 16), locationId: "gas_station" });
   for (const [x, z] of [[15, 19], [35, 19], [15, 29], [35, 29]] as const) {
-    a.zone({ id: `pump_${x}_${z}`, kind: "interact", rect: rect(x - 3, z - 3.5, x + 3, z + 3.5), locationId: "gas_station" });
+    a.zone({ id: `pump_${x}_${z}`, kind: "interact", rect: rect(x - 3, z - 3.5, x + 3, z + 3.5), locationId: "gas_station", interaction: { action: "refuel", label: "Refuel car", priority: 2 } });
   }
   a.zone({ id: "fuel_forecourt", kind: "parking", rect: rect(-5, 7, 44, 43), locationId: "gas_station" });
 

@@ -8,6 +8,8 @@ import { loadVehicleSession } from "../maintenance/sessionStorage";
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
 const MAX_FRAME_DT_SECONDS = 0.1;
+/** `next dev` only: keep the wallet topped up so paid features can be tried freely. */
+const DEV_WALLET_PHP = 1_000_000;
 
 export type GameRuntimeOptions = {
   initialScene?: SceneId;
@@ -44,6 +46,10 @@ export class GameRuntime {
     let storage: Storage | undefined;
     try { storage = window.sessionStorage; } catch { /* The runtime still keeps session state in memory. */ }
     const session = loadVehicleSession(storage);
+    const devTopUp = DEV_WALLET_PHP - session.snapshot().walletPhp;
+    if (process.env.NODE_ENV === "development" && devTopUp > 0) {
+      session.earn(Math.round(devTopUp * 100) / 100, { kind: "dev_grant", description: "Dev cash top-up", source: "dev" });
+    }
 
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),

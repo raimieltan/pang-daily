@@ -14,6 +14,7 @@ import { HandlingDebugPanel } from "./HandlingDebugPanel";
 import { LocationToast } from "./LocationToast";
 import { InteractionPrompt } from "./InteractionPrompt";
 import { AudioPanel, SoundButton } from "./AudioPanel";
+import { FuelPanel } from "./FuelPanel";
 import { ConditionHud, RepairPanel } from "./RepairPanel";
 
 const buttonClass = "tape-button";
@@ -78,9 +79,9 @@ export function HudOverlay() {
         </details>
       </div>}
       {status === "ready" && !paused && !intro && <div className="flex flex-col gap-3">
-        <LocationToast /><CommandNotice /><DialogueBox /><InteractionPrompt /><ConditionHud /><DrivingHud />
+        <LocationToast /><CommandNotice /><DialogueBox /><ConditionHud /><DrivingHud /><InteractionPrompt />
       </div>}
-      {status === "ready" && !paused && !intro && <RepairPanel />}
+      {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /></>}
       <RaceIntro />
     </div>
   );

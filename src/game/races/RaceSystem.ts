@@ -102,6 +102,7 @@ export class RaceSystem implements GameSystem {
     this.introRemaining = 0;
     this.bridge.emit("raceIntro", null);
     this.race.reset(); this.controls.enabled = this.modes.mode === "driving";
+    this.gates.forEach(gate => gate.setEnabled(false));
     this.root.setEnabled(false); this.resultSent = false;
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
@@ -130,6 +131,7 @@ export class RaceSystem implements GameSystem {
     }
     if (this.race.phase === "FINISHED" && !this.resultSent) {
       this.resultSent = true;
+      this.gates.forEach(gate => gate.setEnabled(false));
       this.bridge.emit("raceFinished", { ...this.standing(), timeMs: Math.round(this.race.playerTime! * 1000) });
     }
     if (phase !== this.race.phase) this.publisher.flush(this.race.snapshot());

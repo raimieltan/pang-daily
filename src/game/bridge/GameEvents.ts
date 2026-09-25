@@ -25,6 +25,9 @@ import type {
 } from "./types";
 
 export type GameEventMap = {
+  fuelPanel: boolean;
+  fuelQuote: import('../maintenance/FuelSystem').FuelQuote | null;
+  fuelPurchased: import('../maintenance/FuelSystem').FuelReceipt;
   ready: void;
   maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
   repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;

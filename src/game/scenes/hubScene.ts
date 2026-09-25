@@ -1,3 +1,5 @@
+import { FuelSystem } from "../maintenance/FuelSystem";
+import { fuelRejection } from "../maintenance/fuelAccess";
 import { TRAFFIC_LANES } from "../traffic/trafficRoutes";
 import { TrafficSystem } from "../traffic/TrafficSystem";
 import { RoadsideAnimals } from "../traffic/RoadsideAnimals";
@@ -130,6 +132,10 @@ export const hubScene: SceneDefinition = {
         mode: modes.mode, player: modes.position, car: maintainedCar.position,
         speedKmh: maintainedCar.speedKmh, racing: race.active,
       }) }));
+    addSystem(new FuelSystem(bridge, session, maintainedCar.definition.spec, {
+      interactions, rejection: () => fuelRejection({ mode: modes.mode, player: modes.position,
+        car: maintainedCar.position, speedKmh: maintainedCar.speedKmh, racing: race.active }, zones),
+    }));
     let footstepTime = 0;
     let footstepDistance = 0;
     addSystem({ name: "footstepAudio", update(dt) {

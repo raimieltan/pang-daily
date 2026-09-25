@@ -32,6 +32,8 @@ const FRONT_DRIVE_SHARE: Record<HandlingConfig["drive"]["drivetrain"], number> =
 export type DriverInput = {
   /** 0..1 */
   throttle: number;
+  /** False disables propulsion in either gear while preserving braking. */
+  engineAvailable?: boolean;
   /** 0..1. Held at a standstill, selects reverse. */
   brake: number;
   /** -1 (left) .. 1 (right) */
@@ -213,7 +215,9 @@ export class ArcadeHandlingModel {
     } else if (s.reversing && input.throttle > 0.5 && input.brake < 0.1 && speed < d.reverseEngageBelow) {
       s.reversing = false;
     }
-    const driveInput = clamp01(s.reversing ? input.brake : input.throttle);
+    const engineAvailable = input.engineAvailable !== false;
+    const driveInput = engineAvailable ? clamp01(s.reversing ? input.brake : input.throttle) : 0;
+    if (!engineAvailable) s.throttle = 0;
     const brakeInput = clamp01(s.reversing ? input.throttle : input.brake);
     s.throttle = approach(s.throttle, driveInput, driveInput > s.throttle ? c.pedals.throttleRise : c.pedals.throttleFall, dt);
     s.brake = approach(s.brake, brakeInput, brakeInput > s.brake ? c.pedals.brakeRise : c.pedals.brakeFall, dt);
