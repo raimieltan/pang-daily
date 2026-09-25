@@ -17,7 +17,7 @@ export type Vec2 = readonly [x: number, z: number];
 export type Rect = { readonly minX: number; readonly minZ: number; readonly maxX: number; readonly maxZ: number };
 
 /** Where to put a car. Heading 0 faces +z (north), 90 faces +x (east). */
-export type Pose = { readonly x: number; readonly z: number; readonly headingDeg: number };
+export type Pose = { readonly x: number; readonly z: number; readonly headingDeg: number; readonly y?: number };
 
 export type RoadKind = "main" | "connector" | "street" | "driveway";
 
@@ -47,6 +47,7 @@ export type BlockData = {
   readonly center: Vec3Tuple;
   readonly size: Vec3Tuple;
   readonly rotDeg?: number;
+  readonly pitchDeg?: number;
   /** sRGB hex. */
   readonly color: string;
   /** Emissive (shopfront glass, lit interiors). Glow blocks never collide. */
@@ -107,7 +108,7 @@ export type ChunkData = {
   readonly zones: readonly ZoneData[];
 };
 
-export type LocationId = "home" | "coffee_shop" | "talyer" | "gas_station" | "convenience_store" | "main_road";
+export type LocationId = "alimodian" | "maasin" | "overlook" | "home" | "coffee_shop" | "talyer" | "gas_station" | "convenience_store" | "main_road";
 
 export type LocationData = {
   readonly id: LocationId;

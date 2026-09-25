@@ -17,3 +17,61 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Video-composited type: narrow system faces avoid a blocking remote font request. */
+.tape-hud {
+  padding: clamp(18px, 3vw, 42px);
+  color: #e4e5e3;
+  font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  font-stretch: condensed;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 6px #000, 0 0 18px #0008;
+  background: linear-gradient(#02040765, transparent 18%, transparent 76%, #02040785);
+}
+.tape-brand { font-size: 17px; font-weight: 300; letter-spacing: 0.3em; }
+.tape-button {
+  padding: 6px 0;
+  color: #d8dad8;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #ffffff35;
+  cursor: pointer;
+}
+.tape-button:hover, .tape-button:focus-visible { color: white; border-color: white; }
+.tape-hud button:focus-visible, .tape-hud select:focus-visible, .tape-hud input:focus-visible, .tape-hud summary:focus-visible { outline: 1px solid #dce4e7; outline-offset: 4px; }
+.tape-hud input { accent-color: #a3adae; }
+.tape-rec { font-size: 10px; letter-spacing: 0.2em; color: #c3c7c7; }
+.tape-rec i { display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: #a7635e; }
+.tape-eyebrow { font-size: 10px; letter-spacing: 0.32em; color: #adb3b6; }
+.tape-menu { position: absolute; top: 28%; left: max(7vw, 24px); }
+.tape-menu h1 { margin: 16px 0 30px; font-size: clamp(50px, 10vw, 150px); font-weight: 200; line-height: 1; letter-spacing: 0.035em; }
+.tape-menu > button { display: block; min-width: 220px; padding: 10px 0; text-align: left; font-size: 19px; letter-spacing: 0.23em; opacity: 0.7; cursor: pointer; }
+.tape-menu > button:first-of-type, .tape-menu > button:hover { opacity: 1; }
+.tape-menu button span { margin-left: 40px; font-size: 15px; }
+.tape-loading { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #080b0f; }
+.speed-number { font-size: clamp(52px, 7vw, 92px); font-weight: 200; line-height: 1; letter-spacing: -0.06em; }
+.speed-readout { padding-top: 15px; }
+.race-readout { max-width: 350px; border-right: 1px solid #ffffff50; padding: 10px 16px; font-size: 11px; line-height: 1.8; background: linear-gradient(90deg, transparent, #05070965); }
+.tape-settings { text-shadow: none; letter-spacing: 0.025em; }
+.tape-settings summary, .tape-settings label { line-height: 1.5; }
+.race-intro { position: absolute; inset: 0; z-index: 10; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.race-intro-fade { position: absolute; inset: 0; background: #000; animation: tape-arrival 3.2s linear both; }
+.race-intro-title { position: relative; width: 100%; text-align: center; animation: tape-title 3.2s linear both; }
+.race-intro h1 { font-size: clamp(64px, 15vw, 250px); font-weight: 200; line-height: 1.1; letter-spacing: 0.025em; white-space: nowrap; text-shadow: -1px 0 #96b8c755, 1px 0 #b78ca455, 0 3px 32px #000; }
+.race-intro.is-paused *, .race-intro.is-paused { animation-play-state: paused; }
+@keyframes tape-arrival { 0% { opacity: 1; } 23%, 94% { opacity: 0; } 100% { opacity: 0.7; } }
+@keyframes tape-title { 0%, 43% { opacity: 0; } 51%, 91% { opacity: 1; } 100% { opacity: 0; } }
+.is-steady .race-intro-title { animation: none; }
+.is-steady .race-intro-fade { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .race-intro-title { animation: none; }
+  .race-intro-fade { display: none; }
+}
+@media (max-width: 600px) {
+  .tape-hud { font-size: 10px; }
+  .tape-brand { font-size: 13px; }
+  .race-readout { max-width: 270px; }
+}

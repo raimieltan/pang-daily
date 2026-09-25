@@ -101,6 +101,22 @@ export class CharacterVisual {
     this.update(0, 0, false);
   }
 
+  /** Static riding pose in the parked underbone's local coordinates (+z forward). */
+  sitOnMotorcycle(): void {
+    this.hips.position.set(0, .91, -.1);
+    this.torso.rotation.x = .35;
+    this.legs.forEach(({ hip, knee }, i) => {
+      hip.rotation.x = -1.15;
+      hip.rotation.z = i === 0 ? -.28 : .28;
+      knee.rotation.x = 1.35;
+    });
+    this.arms.forEach(({ shoulder, elbow }, i) => {
+      shoulder.rotation.x = -1.05;
+      shoulder.rotation.z = i === 0 ? -.12 : .12;
+      elbow.rotation.x = -.45;
+    });
+  }
+
   /** Gait follows actual travel so pushing against a wall doesn't run in place. */
   update(dt: number, speed: number, grounded: boolean): void {
     this.time += dt;

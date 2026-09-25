@@ -12,6 +12,7 @@ export type ChaseTarget = {
   readonly forward: Vector3;
   /** Signed forward speed, m/s. */
   readonly speed: number;
+  readonly recordingMotion?: { rpm: number; suspension: number };
 };
 
 export interface ChaseCameraInput {
@@ -33,6 +34,10 @@ export class ChaseCamera implements GameSystem {
   readonly name = "chaseCamera";
   readonly camera: UniversalCamera;
   active = true;
+  analogIntensity = 1;
+  reducedMotion = false;
+  private recordingTime = 0;
+  private enginePhase = 0;
   private config: ChaseCameraConfig;
   private yaw = 0;
   private pitch = 0;
@@ -75,6 +80,8 @@ export class ChaseCamera implements GameSystem {
 
   update(dt: number): void {
     if (!this.active) return;
+    this.recordingTime += dt;
+    this.enginePhase = (this.enginePhase + (this.target.recordingMotion?.rpm ?? 0) / 60 * 0.12 * Math.PI * 2 * dt) % (Math.PI * 2);
     const c = this.config;
     const p = this.target.position;
 
@@ -123,6 +130,14 @@ export class ChaseCamera implements GameSystem {
       this.focusY + sinPitch * ahead + c.lookHeight,
       p.z + Math.cos(aimYaw) * cosPitch * ahead,
     );
+    if (this.target.recordingMotion && !this.reducedMotion && this.analogIntensity > 0) {
+      const t = this.recordingTime;
+      const side = (Math.sin(t * 0.69) * 0.005 + Math.sin(this.enginePhase) * (0.002 + s * 0.009)) * this.analogIntensity;
+      this.camera.position.x += Math.cos(yaw) * side;
+      this.camera.position.z -= Math.sin(yaw) * side;
+      this.camera.position.y += (Math.sin(t * 0.93) * 0.004 + Math.cos(this.enginePhase * 1.7) * 0.003 * s
+        + Math.max(-1, Math.min(1, this.target.recordingMotion.suspension)) * 0.012) * this.analogIntensity;
+    }
     this.camera.setTarget(this.aim);
 
     this.camera.fov = blend(c.fovDeg, s) * DEG;

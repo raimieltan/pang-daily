@@ -1,7 +1,19 @@
+import { TrafficSystem } from "../traffic/TrafficSystem";
+import { RoadsideAnimals } from "../traffic/RoadsideAnimals";
+import { RoadsidePeople } from "../traffic/RoadsidePeople";
+import { WeatherSystem } from "../weather/WeatherSystem";
+import { WEATHER_TYPES, type WeatherType } from "../weather/Weather";
+import { laneWaypoints, roadAt, ROUTE_LENGTH, OVERLOOK_S } from "../world/mountain/route";
+import { MountainWorld } from "../world/mountain/MountainWorld";
+import { MOUNTAIN_LAMPS, MOUNTAIN_ZONES } from "../world/mountain/environment";
+import { CONNECTED_LAYOUT } from "../world/mountain/layout";
+import { MOUNTAIN_RACES } from "../world/mountain/route";
+import { LOCAL_ROUTE } from "../races/localRoute";
 import { RaceSystem } from "../races/RaceSystem";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RenderingGroup } from "@babylonjs/core/Rendering/renderingGroup";
 import { ChaseCamera } from "../cameras/ChaseCamera";
+import { RaceIntroduction } from "../cameras/RaceIntroduction";
 import { WalkCamera } from "../cameras/WalkCamera";
 import { WalkingCharacter } from "../characters/WalkingCharacter";
 import { WalkControls } from "../input/WalkControls";
@@ -59,20 +71,21 @@ export const hubScene: SceneDefinition = {
     const chunks = HUB_LAYOUT.chunks.map((chunk) => buildChunk(scene, chunk, kit));
     addSystem({ name: "hubChunks", dispose: () => (chunks.forEach((c) => c.dispose()), kit.dispose()) });
 
+    const mountain = addSystem(new MountainWorld(scene, kit));
     const quality = params.get("quality");
     const preset = GRAPHICS_PRESETS[quality && quality in GRAPHICS_PRESETS ? (quality as GraphicsQuality) : "high"];
-    const lamps = HUB_LAYOUT.chunks.flatMap((c) => c.lamps);
+    const lamps = [...HUB_LAYOUT.chunks.flatMap((c) => c.lamps), ...MOUNTAIN_LAMPS];
     const time = params.get("time");
     const timeOfDay = TIMES_OF_DAY.includes(time as TimeOfDay) ? (time as TimeOfDay) : DEFAULT_TIME_OF_DAY;
     const lighting = addSystem(new SceneLighting(scene, lamps, kit.litMaterials, [kit.glow], preset.lightPoolSize, timeOfDay));
-    const sky = addSystem(new Sky(scene, lighting));
+    const sky = addSystem(new Sky(scene, lighting, true));
     // All world meshes share one material, so Babylon's default order (material, then creation)
     // draws far chunks first and the car last, lighting every covered pixel and then painting
     // over it. Nearest-first lets the depth test skip hidden pixels before they are shaded.
     // The sky goes after everything, so its shader only runs where nothing else covered the pixel.
     scene.setRenderingOrder(0, skyLast(sky.mesh, RenderingGroup.frontToBackSortCompare));
 
-    const spawnPoints = Object.fromEntries(HUB_LAYOUT.locations.map((l) => [l.id, toVehiclePose(l.spawn)]));
+    const spawnPoints = Object.fromEntries(CONNECTED_LAYOUT.locations.map((l) => [l.id, toVehiclePose(l.spawn)]));
     const requestedSpawn = params.get("spawn");
     const handling = params.get("handling");
     player = await PlayerVehicle.create(scene, world, controls, bridge, {
@@ -97,16 +110,44 @@ export const hubScene: SceneDefinition = {
     }));
     player.onPlaced = () => modes.vehiclePlaced();
     lighting.attachCar(modes, [...player.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
-    addSystem(new HubLocations(HUB_LAYOUT, modes, bridge));
-    const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes));
-    const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones));
+    addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
+    const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES]));
+    const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, race.interactions]));
     modes.useInteractions(interactions);
     race.connect(interactions);
+    const car = player;
+    const roadUser = () => ({ x: car.position.x, y: car.position.y, z: car.position.z, speed: car.speed, heading: Math.atan2(car.forward.x, car.forward.z) });
+    const traffic = addSystem(new TrafficSystem(scene, kit, world, player.visual.model, [laneWaypoints(1), laneWaypoints(-1)], roadUser, () => lighting.mood.headlight));
+    addSystem(new RoadsidePeople(scene, kit, [
+      { from: 100, to: 125, side: 1 }, { from: 390, to: 415, side: -1 },
+      { from: OVERLOOK_S - 55, to: OVERLOOK_S - 30, side: -1 },
+      { from: ROUTE_LENGTH - 230, to: ROUTE_LENGTH - 205, side: 1 },
+    ], roadAt, roadUser));
+    addSystem(new RoadsidePeople(scene, kit, [
+      { from: 25, to: 48, side: 1 }, { from: 115, to: 138, side: -1 },
+    ], (s, offset) => ({ x: s, y: -.03, z: -offset, heading: Math.PI / 2, width: 12 }), roadUser, true));
+    addSystem(new RoadsideAnimals(scene, kit, [
+      {s:230,kind:"dog",side:1,crosses:false}, {s:550,kind:"cat",side:-1,crosses:true},
+      {s:OVERLOOK_S-40,kind:"dog",side:1,crosses:true}, {s:ROUTE_LENGTH-420,kind:"cat",side:1,crosses:true},
+    ], roadAt, () => [roadUser(), ...traffic.flow.actors.filter(a=>a.active).map(a=>({...a.follower.position,speed:a.follower.speed,heading:a.follower.heading}))]));
+    const weather = params.get("weather") as WeatherType;
+    addSystem(new WeatherSystem(scene, kit, lighting, player, bridge, WEATHER_TYPES.includes(weather) ? weather : "clear"));
     addSystem(new VehicleLights(scene, player, lighting));
     addSystem(chase);
     addSystem(walkCamera);
-    const pools = chunks.map((c) => c.pools).filter((m): m is Mesh => m !== null);
-    addSystem(new GraphicsSystem(scene, engine, chase.camera, bridge, lighting, pools, preset.quality));
+    addSystem(new RaceIntroduction(race, player, chase));
+    const pools = [...chunks, ...mountain.chunks].map((c) => c.pools).filter((m): m is Mesh => m !== null);
+    const graphics = addSystem(new GraphicsSystem(scene, engine, chase.camera, bridge, lighting, pools, preset.quality, {
+      get speedKmh() { return modes.mode === "driving" ? car.speedKmh : 0; },
+      get gear() { return car.gear; },
+      get impactSerial() { return car.impactSerial; },
+      get impactStrength() { return modes.mode === "driving" ? car.impactStrength : 0; },
+      get intro() { return race.introRemaining > 0; },
+    }));
+    addSystem({ name: "recordingCameraSettings", update() {
+      chase.analogIntensity = graphics.current.analog && graphics.current.analogPreset !== "CLEAN" ? graphics.current.analogIntensity : 0;
+      chase.reducedMotion = graphics.current.reducedMotion;
+    } });
   },
 };

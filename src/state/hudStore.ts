@@ -14,9 +14,10 @@ type HudState = {
   race: RaceStanding | null;
   raceProgress: RaceProgress | null;
   lastResult: RaceResult | null;
+  raceIntro: { title: string } | null;
 };
 
-const initialState: HudState = { playerMode: "driving", interaction: null, vehicle: null, raceProgress: null, race: null, lastResult: null };
+const initialState: HudState = { playerMode: "driving", interaction: null, vehicle: null, raceProgress: null, race: null, lastResult: null, raceIntro: null };
 
 export const useHudStore = create<HudState>(() => initialState);
 
@@ -24,6 +25,7 @@ export const useHudStore = create<HudState>(() => initialState);
 export function bindHudStore(events: GameEventSource): () => void {
   const set = useHudStore.setState;
   const unsubscribers = [
+    events.on("raceIntro", (raceIntro) => set({ raceIntro })),
     events.on("playerModeChanged", ({ mode }) => set({ playerMode: mode })),
     events.on("interactionPromptChanged", ({ prompt }) => set({ interaction: prompt })),
     events.on("vehicleStateUpdated", (vehicle) => set({ vehicle })),

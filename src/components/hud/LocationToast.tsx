@@ -20,7 +20,7 @@ export function LocationToast() {
 
   if (!text) return null;
   return (
-    <p className="self-center text-sm tracking-widest text-amber-100 uppercase" data-testid="location-toast">
+    <p className="self-center text-sm tracking-widest text-white/90 uppercase" data-testid="location-toast">
       {text}
     </p>
   );

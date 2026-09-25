@@ -1,3 +1,4 @@
+import type { WeatherType } from "../weather/Weather";
 /**
  * React → Game command surface.
  *
@@ -27,6 +28,7 @@ export type GameCommandMap = {
   runGraphicsBenchmark: { seconds?: number };
   /** Switches the lighting mood (morning, afternoon, night). */
   setTimeOfDay: { time: TimeOfDay };
+  setWeather: { weather: WeatherType };
   /** Get in `vehicleId` (must be owned and within reach of the player on foot). */
   enterVehicle: { vehicleId: string };
   /** Get out beside the car (only when it is stopped or crawling). */
@@ -90,6 +92,7 @@ export interface GameCommands {
   setGraphics(settings: Partial<GraphicsSettings>): void;
   runGraphicsBenchmark(seconds?: number): void;
   setTimeOfDay(time: TimeOfDay): void;
+  setWeather(weather: WeatherType): void;
   enterVehicle(vehicleId: string): void;
   exitVehicle(): void;
   interact(): void;
@@ -109,6 +112,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
     setGraphics: (settings) => dispatch("setGraphics", settings),
     runGraphicsBenchmark: (seconds) => dispatch("runGraphicsBenchmark", { seconds }),
+    setWeather: (weather) => dispatch("setWeather", { weather }),
     setTimeOfDay: (time) => dispatch("setTimeOfDay", { time }),
     enterVehicle: (vehicleId) => dispatch("enterVehicle", { vehicleId }),
     exitVehicle: () => dispatch("exitVehicle"),

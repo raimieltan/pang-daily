@@ -20,10 +20,12 @@ import {
   type GraphicsSettings,
 } from "./LightingConfig";
 import type { SceneLighting } from "./SceneLighting";
+import { AnalogPostProcess, type AnalogSource } from "./AnalogPostProcess";
+import { ANALOG_KEYS, ANALOG_LIMITS, ANALOG_PRESET_NAMES } from "./AnalogConfig";
 
 const STATS_INTERVAL_SECONDS = 1;
 const BENCHMARK_WARMUP_SECONDS = 1;
-const POST_OFF = { bloom: false, grain: false, vignette: false, chromaticAberration: false, fxaa: false } as const;
+const POST_OFF = { analog: false, bloom: false, grain: false, vignette: false, chromaticAberration: false, fxaa: false } as const;
 
 type Benchmark = { phase: "off" | "on"; elapsed: number; samples: { off: FrameSample[]; on: FrameSample[] }; seconds: number; restore: GraphicsSettings };
 type FrameSample = { frameMs: number; gpuMs: number | null };
@@ -50,6 +52,7 @@ export class GraphicsSystem implements GameSystem {
   readonly name = "graphics";
   /** Null while no pipeline effect is on. */
   pipeline: DefaultRenderingPipeline | null = null;
+  analog!: AnalogPostProcess;
   private settings: GraphicsSettings;
   private readonly sceneStats: SceneInstrumentation;
   private readonly engineStats: EngineInstrumentation;
@@ -66,6 +69,7 @@ export class GraphicsSystem implements GameSystem {
     private readonly lighting: SceneLighting,
     private readonly pools: readonly Mesh[],
     quality: GraphicsQuality = DEFAULT_GRAPHICS_QUALITY,
+    source?: AnalogSource,
   ) {
     this.baseScaling = engine.getHardwareScalingLevel();
     configureImageProcessing(scene.imageProcessingConfiguration);
@@ -76,13 +80,23 @@ export class GraphicsSystem implements GameSystem {
 
     this.settings = { ...GRAPHICS_PRESETS[quality] };
     this.apply(this.settings);
+    this.analog = new AnalogPostProcess(scene, camera, this.settings, source);
 
     bridge.handle("setGraphics", (patch) => {
       if (patch.quality && !(patch.quality in GRAPHICS_PRESETS)) return { rejected: `Unknown quality "${patch.quality}"` };
       if (this.benchmark) return { rejected: "A graphics benchmark is running" };
+      if (patch.analogPreset && !ANALOG_PRESET_NAMES.includes(patch.analogPreset)) return { rejected: "Unknown analog preset" };
+      if (patch.analogIntensity !== undefined && (!Number.isFinite(patch.analogIntensity) || patch.analogIntensity < 0 || patch.analogIntensity > 1)) return { rejected: "Analog intensity must be between 0 and 1" };
+      if (patch.analogOverrides) {
+        for (const [key, value] of Object.entries(patch.analogOverrides)) {
+          if (!ANALOG_KEYS.includes(key as typeof ANALOG_KEYS[number])) return { rejected: `Unknown analog parameter: ${key}` };
+          const [min, max] = ANALOG_LIMITS[key as typeof ANALOG_KEYS[number]];
+          if (!Number.isFinite(value) || value < min || value > max) return { rejected: `Analog ${key} must be between ${min} and ${max}` };
+        }
+      }
       const base = patch.quality ? GRAPHICS_PRESETS[patch.quality] : this.settings;
       // The GPU timer is a debug choice, not part of a preset: switching preset keeps it.
-      this.apply({ ...base, gpuTimer: this.settings.gpuTimer, ...patch, quality: patch.quality ?? this.settings.quality });
+      this.apply({ ...base, gpuTimer: this.settings.gpuTimer, reducedMotion: this.settings.reducedMotion, ...patch, quality: patch.quality ?? this.settings.quality });
     });
     bridge.handle("runGraphicsBenchmark", ({ seconds = 4 }) => {
       if (this.benchmark) return { rejected: "A graphics benchmark is already running" };
@@ -113,6 +127,7 @@ export class GraphicsSystem implements GameSystem {
   }
 
   dispose(): void {
+    this.analog.dispose();
     this.setPipeline(false);
     this.sceneStats.dispose();
     this.engineStats.dispose();
@@ -145,16 +160,17 @@ export class GraphicsSystem implements GameSystem {
   }
 
   private apply(settings: GraphicsSettings, publish = true): void {
-    const p = this.setPipeline(settings.bloom || settings.grain || settings.chromaticAberration || settings.fxaa);
+    const p = this.setPipeline(settings.bloom || settings.fxaa);
     const mood = this.lighting.mood;
     if (p) {
       p.bloomThreshold = mood.bloomThreshold;
       p.bloomEnabled = settings.bloom;
-      p.grainEnabled = settings.grain;
-      p.chromaticAberrationEnabled = settings.chromaticAberration;
+      // The final analog pass owns grain and channel alignment; don't double the effect.
+      p.grainEnabled = false;
+      p.chromaticAberrationEnabled = false;
       p.fxaaEnabled = settings.fxaa;
     }
-    this.scene.imageProcessingConfiguration.vignetteEnabled = settings.vignette;
+    this.scene.imageProcessingConfiguration.vignetteEnabled = settings.vignette && !settings.analog;
     this.scene.imageProcessingConfiguration.exposure = mood.exposure;
     this.engineStats.captureGPUFrameTime = settings.gpuTimer;
     for (const pool of this.pools) pool.setEnabled(settings.lightPools && mood.lamps > 0);
@@ -162,6 +178,7 @@ export class GraphicsSystem implements GameSystem {
     const level = this.baseScaling * settings.hardwareScaling;
     if (level !== this.engine.getHardwareScalingLevel()) this.engine.setHardwareScalingLevel(level);
     this.settings = settings;
+    this.analog?.configure(settings);
     if (publish) this.bridge.emit("graphicsState", { ...settings });
   }
 

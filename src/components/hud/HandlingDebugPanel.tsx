@@ -5,7 +5,7 @@ import type { VehicleTelemetry } from "@/game";
 import { useGameUiStore } from "@/state/gameUiStore";
 import { useVehicleDebugStore } from "@/state/vehicleDebugStore";
 
-const buttonClass = "rounded border border-amber-200/30 px-2 py-0.5 hover:bg-amber-200/10";
+const buttonClass = "rounded border border-white/30 px-2 py-0.5 hover:bg-white/10";
 
 /**
  * Handling tuning panel: preset swap, spawn/reset, and the live telemetry the
@@ -22,7 +22,7 @@ export function HandlingDebugPanel() {
 
   return (
     <div
-      className="pointer-events-auto w-72 rounded border border-amber-200/20 bg-black/70 p-2 text-[11px] leading-tight"
+      className="pointer-events-auto w-72 rounded border border-white/20 bg-black/70 p-2 text-[11px] leading-tight"
       data-testid="handling-debug"
     >
       <div className="flex items-center justify-between">
@@ -35,7 +35,7 @@ export function HandlingDebugPanel() {
         <div className="mt-2 flex flex-col gap-2">
           <label className="flex flex-col gap-1">
             <select
-              className="rounded border border-amber-200/30 bg-black px-1 py-0.5"
+              className="rounded border border-white/30 bg-black px-1 py-0.5"
               value={info.presetId}
               onChange={(e) => {
                 commands?.setHandlingPreset(e.target.value);
@@ -49,7 +49,7 @@ export function HandlingDebugPanel() {
                 </option>
               ))}
             </select>
-            {preset && <span className="text-amber-200/60">{preset.description}</span>}
+            {preset && <span className="text-white/55">{preset.description}</span>}
           </label>
           <div className="flex flex-wrap gap-1">
             <button type="button" className={buttonClass} onClick={() => commands?.resetVehicle()}>
@@ -89,7 +89,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
       <Row label="g long/lat" value={`${t.longAccelG.toFixed(2)} / ${t.latAccelG.toFixed(2)}`} />
       <Row label="load shift" value={`${(t.loadShift * 100).toFixed(1)}% front`} />
       <Row label="stability" value={t.stabilityYaw.toFixed(2)} />
-      {state && <span className="text-amber-100">{state}</span>}
+      {state && <span className="text-white/90">{state}</span>}
     </div>
   );
 }
@@ -97,7 +97,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
-      <span className="text-amber-200/60">{label}</span>
+      <span className="text-white/55">{label}</span>
       <span>{value}</span>
     </div>
   );
@@ -110,9 +110,9 @@ function Bar({ label, value, signed = false, hint }: { label: string; value: num
   const left = signed ? (clamped < 0 ? `${50 - Math.abs(clamped) * 50}%` : "50%") : "0%";
   return (
     <div className="flex items-center gap-2" title={hint}>
-      <span className="w-20 shrink-0 text-amber-200/60">{label}</span>
-      <div className="relative h-1.5 flex-1 bg-amber-200/10">
-        {signed && <div className="absolute top-0 left-1/2 h-full w-px bg-amber-200/30" />}
+      <span className="w-20 shrink-0 text-white/55">{label}</span>
+      <div className="relative h-1.5 flex-1 bg-white/10">
+        {signed && <div className="absolute top-0 left-1/2 h-full w-px bg-white/30" />}
         <div className="absolute top-0 h-full bg-amber-300/80" style={{ left, width }} />
       </div>
       <span className="w-9 text-right">{value.toFixed(2)}</span>

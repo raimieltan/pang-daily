@@ -1,3 +1,4 @@
+import type { WeatherType } from "../weather/Weather";
 /**
  * Game → React event channel.
  *
@@ -47,6 +48,7 @@ export type GameEventMap = {
   graphicsState: GraphicsSettings;
   /** Current lighting mood; sent on scene setup and after every change. */
   timeOfDay: { time: TimeOfDay };
+  weatherChanged: { weather: WeatherType };
   /** ~1 Hz frame cost readout while a lit scene runs. */
   renderStats: RenderStats;
   /** Result of `runGraphicsBenchmark`: frame cost with post effects off vs the current settings. */
@@ -58,6 +60,7 @@ export type GameEventMap = {
     postGpuCostMs: number | null;
   };
   raceProgress: import("../races/Race").RaceProgress;
+  raceIntro: { title: string } | null;
   raceStarted: RaceStanding;
   /** Emitted when the player's position changes, not every frame. */
   raceStandingChanged: RaceStanding;

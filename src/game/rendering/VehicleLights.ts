@@ -12,7 +12,7 @@ import type { SceneLighting } from "./SceneLighting";
 
 const DEG = Math.PI / 180;
 /** Car materials see the headlight, rim, sun/moon, ambient and the whole light pool. */
-const CAR_MAX_LIGHTS = 14;
+const CAR_MAX_LIGHTS = 18;
 
 /**
  * Car Rule (ART_DIRECTION §2.3): the player's car is always readable at night. One spot light
@@ -49,7 +49,7 @@ export class VehicleLights implements GameSystem {
     this.headlight.diffuse = Color3.FromHexString(h.color);
     // Black specular keeps the SPECULARTERM define (a per-light, per-pixel cost) out of every
     // world shader; the vertex-coloured world has no specular anyway.
-    this.headlight.specular = Color3.Black();
+    this.headlight.specular = new Color3(0.28, 0.26, 0.22);
     this.headlight.intensity = h.intensity;
     this.headlight.range = h.range;
 

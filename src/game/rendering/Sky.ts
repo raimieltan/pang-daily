@@ -36,6 +36,7 @@ uniform vec3 zenith, horizon, fogColor, bodyColor, bodyDir, cloudLit, cloudShade
 uniform float bodyCos, bodyGlow, bodyIsMoon, cloudCover, stars, glowStrength, time;
 uniform vec2 wind;
 uniform float toneMap, exposure, contrast;
+uniform float mountainBackdrop, mountainHaze;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec3 hash3(vec3 p) {
@@ -107,6 +108,23 @@ void main() {
 
   vec3 c = mix(fogColor, sky, smoothstep(-0.015, 0.1, h));
 
+  // Circular noise keeps the ridgelines continuous across the sky dome's seam.
+  // These distant silhouettes share the sky draw call and cannot clip the road.
+  if (mountainBackdrop > 0.5) {
+    vec2 bearing = normalize(d.xz + vec2(0.00001));
+    for (int layer = 0; layer < 3; layer++) {
+      float band = float(layer);
+      vec2 p = bearing * (3.1 + band * 1.4) + vec2(17.0 + band * 11.0, 8.0);
+      float ridge = noise(p) * 0.65 + noise(p * 2.7) * 0.25 + noise(p * 6.1) * 0.1;
+      float height = (0.075 + ridge * 0.19) * (1.0 - band * 0.27) - band * 0.016;
+      float silhouette = 1.0 - smoothstep(height - 0.0015, height + 0.0015, h);
+      float haze = clamp(0.76 - band * 0.18 + mountainHaze, 0.0, 0.98);
+      vec3 shade = fogColor * vec3(0.30, 0.44, 0.43);
+      vec3 ridgeColor = mix(shade, fogColor, haze);
+      c = mix(c, ridgeColor, silhouette);
+    }
+  }
+
   vec3 graded = pow(clamp(aces(c * exposure), 0.0, 1.0), vec3(1.0 / 2.2));
   vec3 hi = graded * graded * (3.0 - 2.0 * graded);
   graded = contrast < 1.0 ? mix(vec3(0.5), graded, contrast) : mix(graded, hi, contrast - 1.0);
@@ -130,6 +148,7 @@ export class Sky implements GameSystem {
   constructor(
     private readonly scene: Scene,
     private readonly lighting: SceneLighting,
+    mountainBackdrop = false,
   ) {
     this.mesh = CreateSphere("sky", { diameter: DOME_RADIUS * 2, segments: 24 }, scene);
     this.mesh.infiniteDistance = true;
@@ -144,12 +163,14 @@ export class Sky implements GameSystem {
         ...["zenith", "horizon", "fogColor", "bodyColor", "bodyDir", "cloudLit", "cloudShade", "glowColor"],
         ...["bodyCos", "bodyGlow", "bodyIsMoon", "cloudCover", "stars", "glowStrength", "time", "wind"],
         ...["toneMap", "exposure", "contrast"],
+        "mountainBackdrop", "mountainHaze",
       ],
     });
     this.material.backFaceCulling = false;
     this.material.disableDepthWrite = true;
     this.material.depthFunction = Constants.LEQUAL;
     this.material.setVector2("wind", new Vector2(...WIND));
+    this.material.setFloat("mountainBackdrop", mountainBackdrop ? 1 : 0);
     this.mesh.material = this.material;
     this.update(0);
   }
@@ -163,6 +184,7 @@ export class Sky implements GameSystem {
     m.setFloat("toneMap", ip.isEnabled && !ip.applyByPostProcess ? 1 : 0);
     m.setFloat("exposure", ip.exposure);
     m.setFloat("contrast", ip.contrast);
+    m.setFloat("mountainHaze", Math.min(0.8, this.scene.fogDensity * 65));
   }
 
   private applyMood(mood: SceneMood): void {

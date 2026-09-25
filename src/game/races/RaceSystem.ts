@@ -12,12 +12,13 @@ import type { InteractionSystem } from "../interaction/InteractionSystem";
 import type { PlayerModes } from "../player/PlayerModes";
 import type { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { VehicleVisual } from "../vehicles/VehicleVisual";
-import { Race, type RaceProgress } from "./Race";
+import { Race, type RaceProgress, type RaceDefinition } from "./Race";
 import { LOCAL_ROUTE } from "./localRoute";
 
 export class RaceSystem implements GameSystem {
   readonly name = "race";
-  readonly race = new Race(LOCAL_ROUTE);
+  race = new Race(LOCAL_ROUTE);
+  private selected = LOCAL_ROUTE;
   private releases: (() => void)[] = [];
   private publisher: SummaryPublisher<RaceProgress>;
   private lastStanding = 0;
@@ -27,8 +28,9 @@ export class RaceSystem implements GameSystem {
   private gates;
   private materials: StandardMaterial[];
   private resultSent = false;
+  introRemaining = 0;
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
-    private controls: DriverControls, private modes: PlayerModes) {
+    private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE]) {
     this.publisher = new SummaryPublisher((progress) => bridge.emit("raceProgress", progress));
     this.root = new TransformNode("local-rival", scene);
     this.root.setEnabled(false);
@@ -44,18 +46,22 @@ export class RaceSystem implements GameSystem {
       const m = new StandardMaterial(`race-gate-${i}`, scene);
       m.emissiveColor = Color3.FromHexString(hex); m.disableLighting = true; m.alpha = 0.55; return m;
     });
-    this.gates = [...LOCAL_ROUTE.checkpoints, LOCAL_ROUTE.finish].map((gate) => {
+    this.gates = routes.flatMap(route => [...route.checkpoints, route.finish].map((gate) => {
       const mesh = MeshBuilder.CreateBox(gate.id, { width: gate.halfSize.x * 2, height: 0.12, depth: gate.halfSize.z * 2 }, scene);
-      mesh.position.set(gate.center.x, 0.16, gate.center.z); mesh.isPickable = false;
-      return mesh;
-    });
-    const start = MeshBuilder.CreateBox("race-start", { width: 2, height: 0.12, depth: 9 }, scene);
-    start.position.set(LOCAL_ROUTE.start.x, 0.16, 140); start.material = this.materials[0];
-    this.releases.push(() => start.dispose());
+      mesh.position.set(gate.center.x, gate.center.y + 0.06, gate.center.z); mesh.isPickable = false;
+      mesh.metadata = { routeId: route.id }; mesh.setEnabled(false); return mesh;
+    }));
+    for (const route of routes) {
+      const start = MeshBuilder.CreateBox(`race-start-${route.id}`, { width: 6, height: .06, depth: .3 }, scene);
+      start.position.set(route.start.x, route.start.y + .04, route.start.z);
+      start.rotation.y = route.heading; start.material = this.materials[0];
+      this.releases.push(() => start.dispose());
+    }
     this.releases.push(bridge.handle("startRace", ({ raceId }) => {
-      if (raceId !== LOCAL_ROUTE.id) return { rejected: "Unknown local race" };
-      if (this.race.phase !== "FINISHED" && !this.atStart()) return { rejected: "Meet the rival at the gold start line east of Home" };
-      return this.start();
+      const route = this.routes.find(r => r.id === raceId);
+      if (!route) return { rejected: "Unknown race" };
+      if (!this.atStart(route)) return { rejected: "Drive to this race's start line" };
+      return this.start(route);
     }));
     this.releases.push(bridge.handle("resetRace", () => { this.reset(); }));
     const onPlaced = player.onPlaced;
@@ -70,26 +76,44 @@ export class RaceSystem implements GameSystem {
     bridge.emit("raceProgress", this.race.snapshot());
   }
   get active() { return this.race.phase === "COUNTDOWN" || this.race.phase === "RUNNING"; }
-  private atStart() { return Math.hypot(this.modes.position.x - LOCAL_ROUTE.start.x, this.modes.position.z - 140) <= 12; }
-  readonly interactions = (): Interactable[] => this.active ? [] : [{
-    id: "local-race", action: "start_race", label: "Race the local rival · Barangay sprint", priority: 20,
-    modes: ["walking", "driving"], area: { kind: "circle", x: LOCAL_ROUTE.start.x, z: 140, radius: 12 },
-  }];
-  connect(interactions: InteractionSystem) { this.releases.push(interactions.handle("start_race", () => this.start())); }
-  private start() {
+  private atStart(route: RaceDefinition) { return Math.hypot(this.modes.position.x-route.start.x, this.modes.position.y-route.start.y, this.modes.position.z-route.start.z) <= 12; }
+  readonly interactions = (): Interactable[] => this.active ? [] : this.routes.map(route => ({
+    id: `race:${route.id}`, target: route.id, action: "start_race", label: `Race · ${route.name}`, priority: 20,
+    modes: ["driving"], area: { kind: "circle", x: route.start.x, z: route.start.z, radius: 12 },
+  }));
+  connect(interactions: InteractionSystem) { this.releases.push(interactions.handle("start_race", i => {
+    const route=this.routes.find(r=>r.id===i.target);
+    return route ? this.start(route) : { rejected: "Unknown race" };
+  })); }
+  private start(route: RaceDefinition) {
     if (this.active) return { rejected: "Race already in progress" };
-    if (!this.player.placeAt({ position: new Vector3(LOCAL_ROUTE.start.x, 0, LOCAL_ROUTE.start.z), headingRad: LOCAL_ROUTE.heading })) return { rejected: "Start grid is unavailable" };
+    if (this.modes.mode !== "driving") return { rejected: "Get into your car to race" };
+    if (!this.player.placeAt({ position: new Vector3(route.start.x, route.start.y, route.start.z), headingRad: route.heading })) return { rejected: "Start grid is unavailable" };
+    this.selected=route; this.race=new Race(route);
+    this.gates.forEach(g=>g.setEnabled(g.metadata.routeId===route.id));
     this.race.reset(); this.bridge.emit("raceProgress", this.race.snapshot());
     this.race.start(); this.resultSent = false; this.lastStanding = 0;
     this.controls.enabled = false; this.root.setEnabled(true);
+    this.introRemaining = 3.2;
+    this.bridge.emit("raceIntro", { title: route.name });
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
   private reset() {
+    this.introRemaining = 0;
+    this.bridge.emit("raceIntro", null);
     this.race.reset(); this.controls.enabled = this.modes.mode === "driving";
     this.root.setEnabled(false); this.resultSent = false;
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
   update(dt: number) {
+    if (this.introRemaining > 0) {
+      this.introRemaining = Math.max(0, this.introRemaining - dt);
+      const p = this.race.rival.position;
+      this.root.position.set(p.x, p.y + 0.1, p.z);
+      this.root.rotation.y = this.race.rival.heading;
+      if (this.introRemaining === 0) this.bridge.emit("raceIntro", null);
+      return;
+    }
     const phase = this.race.phase;
     this.race.update(dt, this.player.position);
     if (phase === "COUNTDOWN" && this.race.phase === "RUNNING") {
@@ -100,7 +124,7 @@ export class RaceSystem implements GameSystem {
     this.root.position.set(p.x, p.y + 0.1, p.z); this.root.rotation.y = this.race.rival.heading;
     if (this.race.rival.departed) this.root.setEnabled(false);
     this.visual?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
-    this.gates.forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
+    this.gates.filter(g=>g.metadata.routeId===this.selected.id).forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
       this.lastStanding = this.race.position; this.bridge.emit("raceStandingChanged", this.standing());
     }
@@ -111,7 +135,7 @@ export class RaceSystem implements GameSystem {
     if (phase !== this.race.phase) this.publisher.flush(this.race.snapshot());
     else this.publisher.tick(dt, () => this.race.snapshot());
   }
-  private standing() { return { raceId: LOCAL_ROUTE.id, position: this.race.position, racers: 2 }; }
+  private standing() { return { raceId: this.selected.id, position: this.race.position, racers: 2 }; }
   dispose() {
     this.disposed = true; this.releases.forEach((release) => release());
     this.player.canReposition = undefined; this.modes.canExit = undefined;

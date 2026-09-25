@@ -13,7 +13,7 @@ import { DEFAULT_TIME_OF_DAY, LIGHT_PROFILES, MOODS, type SceneMood, type TimeOf
 import { LightPoolSelector } from "./LightPool";
 
 /** Lights every world material always sees besides the pool: ambient, sun/moon, the car's headlight. */
-const FIXED_WORLD_LIGHTS = 3;
+const FIXED_WORLD_LIGHTS = 5; // Ambient, sun/moon, player beam and two pooled traffic beams.
 /** The pool follows a point this far ahead of the car, so lamps light up before you reach them. */
 const FOCUS_AHEAD_M = 14;
 
@@ -117,7 +117,8 @@ export class SceneLighting implements GameSystem {
     this.lights = Array.from({ length: size }, (_, i) => {
       const light = new PointLight(`scene:pool${i}`, Vector3.Zero(), this.scene);
       light.intensity = 0;
-      light.specular = Color3.Black();
+      // Sparse lamps reveal bodywork and damp asphalt as the car passes beneath them.
+      light.specular = new Color3(0.5, 0.46, 0.4);
       light.falloffType = Light.FALLOFF_STANDARD;
       return light;
     });

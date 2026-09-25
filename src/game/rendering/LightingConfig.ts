@@ -5,6 +5,8 @@
  */
 
 /** A kind of light fixture. Lamps in layouts reference one of these by id. */
+import type { AnalogParameters, AnalogPreset } from "./AnalogConfig";
+
 export type LightProfile = {
   readonly description: string;
   readonly color: string;
@@ -171,14 +173,14 @@ export const MOODS: Record<TimeOfDay, SceneMood> = {
   night: {
     clearColor: "#0e1118",
     fog: { color: "#10131a", density: 0.0065 },
-    ambient: { sky: "#5a6a8c", ground: "#1a1712", intensity: 0.32 },
-    key: { color: "#9fb2d6", intensity: 0.28, direction: [0.35, -1, 0.45] },
-    carRim: { color: "#c9d6f0", intensity: 0.55, direction: [-0.3, -0.6, -0.75] },
+    ambient: { sky: "#59647c", ground: "#17191d", intensity: 0.27 },
+    key: { color: "#93a3bf", intensity: 0.18, direction: [0.35, -1, 0.45] },
+    carRim: { color: "#adb9cd", intensity: 0.12, direction: [-0.3, -0.6, -0.75] },
     lamps: 1,
     glow: 1,
     headlight: 1,
-    exposure: 1.25,
-    bloomThreshold: 0.72,
+    exposure: 1.18,
+    bloomThreshold: 0.78,
     sky: {
       zenith: "#03050b",
       horizon: "#161b29",
@@ -221,7 +223,7 @@ export const POST_TUNING = {
   /** HDR pipeline so emissive lenses and signs can exceed the bloom threshold. */
   hdr: true,
   /** Threshold comes from the time of day's mood. */
-  bloom: { weight: 0.32, kernel: 32, scale: 0.5 },
+  bloom: { weight: 0.22, kernel: 48, scale: 0.5 },
   grain: { intensity: 9, animated: true },
   vignette: { weight: 1.8, stretch: 0.35, color: "#000000" },
   chromaticAberration: { amount: 14, radialIntensity: 0.9 },
@@ -233,6 +235,11 @@ export type GraphicsQuality = "high" | "medium" | "low";
 
 export type GraphicsSettings = PostSettings & {
   quality: GraphicsQuality;
+  analog: boolean;
+  analogPreset: AnalogPreset;
+  analogIntensity: number;
+  analogOverrides: Partial<AnalogParameters>;
+  reducedMotion: boolean;
   /**
    * Real point lights handed to the nearest lamps. Every one is evaluated for every lit pixel
    * on screen, whatever its range, so this is the main per-pixel cost. Changing it recompiles
@@ -250,10 +257,11 @@ export type GraphicsSettings = PostSettings & {
 export const GRAPHICS_PRESETS: Record<GraphicsQuality, GraphicsSettings> = {
   high: {
     quality: "high",
+    analog: true, analogPreset: "GAMEPLAY", analogIntensity: 1, analogOverrides: {}, reducedMotion: false,
     bloom: true,
     grain: true,
     vignette: true,
-    chromaticAberration: false,
+    chromaticAberration: true,
     fxaa: true,
     lightPoolSize: 4,
     lightPools: true,
@@ -262,10 +270,11 @@ export const GRAPHICS_PRESETS: Record<GraphicsQuality, GraphicsSettings> = {
   },
   medium: {
     quality: "medium",
+    analog: true, analogPreset: "GAMEPLAY", analogIntensity: 1, analogOverrides: {}, reducedMotion: false,
     bloom: true,
     grain: true,
     vignette: true,
-    chromaticAberration: false,
+    chromaticAberration: true,
     fxaa: true,
     lightPoolSize: 3,
     lightPools: true,
@@ -274,6 +283,7 @@ export const GRAPHICS_PRESETS: Record<GraphicsQuality, GraphicsSettings> = {
   },
   low: {
     quality: "low",
+    analog: false, analogPreset: "SUBTLE_VHS", analogIntensity: 1, analogOverrides: {}, reducedMotion: false,
     bloom: false,
     grain: false,
     vignette: true,

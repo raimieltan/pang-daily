@@ -22,7 +22,7 @@ export function DrivingHud() {
 
   return (
     <div className="flex flex-col items-end gap-1" data-testid="driving-hud">
-      {progress && <div className="rounded bg-black/80 p-3 text-right" aria-live="polite">
+      {progress && <div className="race-readout text-right" aria-live="polite">
         {progress.phase === "READY" && <p>Barangay sprint · Meet the rival at the gold line east of Home.</p>}
         {progress.phase === "COUNTDOWN" && <p className="text-3xl">{progress.countdown || "GO!"}</p>}
         {progress.phase === "RUNNING" && <>
@@ -37,7 +37,7 @@ export function DrivingHud() {
         </div>}
       </div>}
       {race && (
-        <span className="text-base text-amber-100" data-testid="race-position">
+        <span className="text-base text-white/90" data-testid="race-position">
           P{race.position}/{race.racers}
         </span>
       )}
@@ -47,12 +47,12 @@ export function DrivingHud() {
         </span>
       )}
       {vehicle && (
-        <div className="flex items-baseline gap-3 text-amber-100">
-          <span className="text-3xl tabular-nums" data-testid="speed">
+        <div className="speed-readout flex items-baseline gap-3 text-white/90">
+          <span className="speed-number tabular-nums" data-testid="speed">
             {vehicle.speedKmh}
           </span>
-          <span>km/h</span>
-          <span className="text-2xl" data-testid="gear">
+          <span className="text-[10px] tracking-[0.18em] text-white/50">KM/H</span>
+          <span className="ml-5 border-l border-white/25 pl-5 text-3xl font-light" data-testid="gear">
             {formatGear(vehicle.gear)}
           </span>
         </div>

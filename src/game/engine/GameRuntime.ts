@@ -75,6 +75,11 @@ export class GameRuntime {
   }
 
   private frame(): void {
+    const scene = this.scenes.activeScene;
+    if (scene) {
+      scene.metadata ??= {};
+      scene.metadata.analogPaused = this.paused;
+    }
     if (!this.paused) {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, MAX_FRAME_DT_SECONDS);
       this.scenes.update(dt);

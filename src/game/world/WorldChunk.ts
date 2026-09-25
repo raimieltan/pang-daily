@@ -100,6 +100,7 @@ export class WorldKit {
       colors.set([c.r, c.g, c.b, 1], i * 4);
     });
     const mesh = this.poolTemplate.clone(`${name}:pools`, parent, true);
+    mesh.makeGeometryUnique();
     mesh.setEnabled(true);
     mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
     mesh.thinInstanceSetBuffer("color", colors, 4, true);
@@ -133,7 +134,7 @@ export type WorldChunk = {
  * container holds the ground slab and every block/prop collider. Pass `physics: false` for
  * render-only builds.
  */
-export function buildChunk(scene: Scene, chunk: ChunkData, kit: WorldKit, { physics = true } = {}): WorldChunk {
+export function buildChunk(scene: Scene, chunk: ChunkData, kit: WorldKit, { physics = true, ground = true } = {}): WorldChunk {
   const root = new TransformNode(`chunk:${chunk.id}`, scene);
   const lit = new GeometryBatch();
   const glow = new GeometryBatch();
@@ -147,12 +148,12 @@ export function buildChunk(scene: Scene, chunk: ChunkData, kit: WorldKit, { phys
     lit.strip(road.points.map((p) => [p.x, p.z]), road.points.map((p) => p.width), LAYER_Y.road, ROAD_COLORS[road.kind]);
   }
   for (const s of chunk.surfaces) lit.quad(boxCorners(s.center, s.size, s.rotDeg ?? 0), LAYER_Y.surface, SURFACE_COLORS[s.kind]);
-  lit.quad(rectCorners(rect), LAYER_Y.ground, GROUND_COLOR);
+  if (ground) lit.quad(rectCorners(rect), LAYER_Y.ground, GROUND_COLOR);
   const colliders: PlacedCollider[] = [];
   for (const b of chunk.blocks) {
-    (b.glow ? glow : lit).box(b.center, b.size, b.rotDeg ?? 0, b.color);
+    (b.glow ? glow : lit).box(b.center, b.size, b.rotDeg ?? 0, b.color, b.pitchDeg ?? 0);
     if (b.collide && !b.glow) {
-      colliders.push({ center: new Vector3(...b.center), size: b.size, rotation: yaw(b.rotDeg ?? 0) });
+      colliders.push({ center: new Vector3(...b.center), size: b.size, rotation: Quaternion.RotationYawPitchRoll((b.rotDeg ?? 0)*DEG, (b.pitchDeg ?? 0)*DEG, 0) });
     }
   }
 
@@ -164,7 +165,7 @@ export function buildChunk(scene: Scene, chunk: ChunkData, kit: WorldKit, { phys
 
   let body: PhysicsBody | null = null;
   let shapes: PhysicsShapeContainer | null = null;
-  if (physics) [body, shapes] = staticBody(scene, chunk, root, colliders);
+  if (physics) [body, shapes] = staticBody(scene, chunk, root, colliders, ground);
 
   return {
     id: chunk.id,
@@ -180,7 +181,7 @@ export function buildChunk(scene: Scene, chunk: ChunkData, kit: WorldKit, { phys
 }
 
 /** Accumulates flat-shaded, vertex-coloured triangles and boxes, then emits one mesh. */
-class GeometryBatch {
+export class GeometryBatch {
   private readonly positions: number[] = [];
   private readonly colors: number[] = [];
   private readonly indices: number[] = [];
@@ -215,9 +216,9 @@ class GeometryBatch {
     }
   }
 
-  box(center: Vec3Tuple, size: Vec3Tuple, rotDeg: number, color: string): void {
+  box(center: Vec3Tuple, size: Vec3Tuple, rotDeg: number, color: string, pitchDeg = 0): void {
     const data = CreateBoxVertexData({ width: size[0], height: size[1], depth: size[2] });
-    data.transform(Matrix.Compose(Vector3.One(), yaw(rotDeg), new Vector3(...center)));
+    data.transform(Matrix.Compose(Vector3.One(), Quaternion.RotationYawPitchRoll(rotDeg*DEG, pitchDeg*DEG, 0), new Vector3(...center)));
     const c = Color3.FromHexString(color);
     const count = data.positions!.length / 3;
     data.colors = new Float32Array(count * 4).map((_, i) => [c.r, c.g, c.b, 1][i % 4]);
@@ -329,7 +330,7 @@ function wires(scene: Scene, chunk: ChunkData, parent: TransformNode): void {
   mesh.freezeWorldMatrix();
 }
 
-function staticBody(scene: Scene, chunk: ChunkData, root: TransformNode, colliders: readonly PlacedCollider[]) {
+function staticBody(scene: Scene, chunk: ChunkData, root: TransformNode, colliders: readonly PlacedCollider[], ground = true) {
   const { rect } = chunk;
   const container = new PhysicsShapeContainer(scene);
   const add = (center: Vector3, rotation: Quaternion, size: Vec3Tuple) => {
@@ -338,7 +339,7 @@ function staticBody(scene: Scene, chunk: ChunkData, root: TransformNode, collide
     container.addChild(box);
   };
   // Ground slab: top face exactly at y = 0 across the whole chunk, so neighbours meet without steps.
-  add(
+  if (ground) add(
     new Vector3((rect.minX + rect.maxX) / 2, -GROUND_THICKNESS / 2, (rect.minZ + rect.maxZ) / 2),
     Quaternion.Identity(),
     [rect.maxX - rect.minX, GROUND_THICKNESS, rect.maxZ - rect.minZ],

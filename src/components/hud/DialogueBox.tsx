@@ -34,10 +34,10 @@ export function DialogueBox() {
 
   return (
     <div
-      className="max-w-md self-center rounded border border-amber-200/30 bg-black/60 px-4 py-2 text-sm"
+      className="max-w-md self-center rounded border border-white/30 bg-black/60 px-4 py-2 text-sm"
       data-testid="dialogue"
     >
-      <span className="text-amber-100">{entry.speaker}:</span> {entry.line}
+      <span className="text-white/90">{entry.speaker}:</span> {entry.line}
     </div>
   );
 }

@@ -106,9 +106,8 @@ a.wallRun([-158, 198], [-158, 8]);
 a.wallRun([-158, -8], [-158, -58]);
 a.wallRun([248, -58], [248, -7]);
 a.wallRun([248, 7], [248, 198]);
-// Road ends: the city stub and the mountain exit are closed until those chunks exist.
+// The city stub is still closed. The east exit now joins the mountain route.
 roadClosure([-154, 0], 90, "city");
-roadClosure([244, 0], 270, "mountain");
 a.prop("sign_route", [226, 7.5], { rotDeg: 270 });
 a.prop("sign_route", [-146, -7.5], { rotDeg: 90 });
 a.surface({ kind: "gravel", center: [236, 0], size: [20, 24] });
@@ -703,4 +702,3 @@ function range(from: number, to: number, step: number): number[] {
   for (let v = from; v <= to; v += step) out.push(v);
   return out;
 }
-

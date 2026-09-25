@@ -111,6 +111,11 @@ describe("hub driving loop", () => {
   /** Loop sampled every 2 m, so straight legs count as passing things too. */
   const samples = Array.from({ length: Math.ceil(polylineLength(points) / 2) }, (_, i) => pointAlong(points, i * 2));
 
+  it("leaves both lanes open at the connected mountain entrance", () => {
+    const entrance = { minX: 238, maxX: 250, minZ: -5.5, maxZ: 5.5 };
+    expect(colliderFootprints().filter(c => rectsOverlap(c.rect, entrance))).toEqual([]);
+  });
+
   it("is closed and passes every location", () => {
     expect(loop[0]).toEqual(loop[loop.length - 1]);
     const near = (r: Rect, reach: number) => samples.some((p) => containsPoint(r, p.x, p.z, reach));
@@ -138,8 +143,8 @@ describe("hub driving loop", () => {
         [rect.maxX, rect.maxZ],
         [(rect.minX + rect.maxX) / 2, (rect.minZ + rect.maxZ) / 2],
       ];
-      // Road closures are meant to block their stubs.
-      if (what.startsWith("block") && corners.some(([x]) => x < -150 || x > 240)) continue;
+      // Only the unbuilt city stub is closed; the mountain route is connected.
+      if (what.startsWith("block") && corners.some(([x]) => x < -150)) continue;
       expect(corners.some(([x, z]) => onRoad(x, z, 0.3)), what).toBe(false);
     }
   });

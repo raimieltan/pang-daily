@@ -46,6 +46,10 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   /** Runs after `place`, e.g. to snap the camera. */
   onPlaced?: () => void;
   canReposition?: () => boolean;
+  impactSerial = 0;
+  impactStrength = 0;
+  private impactCooldown = 0;
+  private releaseImpact: () => void;
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -57,6 +61,17 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   ) {
     this.presetId = presetId;
     this.spawnId = options.initialSpawn;
+    body.body.setCollisionCallbackEnabled(true);
+    const impacts = body.body.getCollisionObservable();
+    const observer = impacts.add((event) => {
+      // Impulse / mass is a velocity change. Ground support and ordinary braking stay quiet.
+      const deltaV = Math.abs(event.impulse) / controller.model.config.chassis.massKg;
+      if (deltaV < 2.4 || this.impactCooldown > 0) return;
+      this.impactStrength = Math.min(1, (deltaV - 2.4) / 7 + 0.2);
+      this.impactSerial++;
+      this.impactCooldown = 0.32;
+    });
+    this.releaseImpact = () => impacts.remove(observer);
     this.hud = new SummaryPublisher((summary) => bridge.emit("vehicleStateUpdated", summary));
     this.telemetry = new SummaryPublisher(
       (sample) => bridge.emit("vehicleTelemetry", sample),
@@ -109,6 +124,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   reset(): boolean {
     if (this.canReposition?.() === false) return false;
     this.controller.reset();
+    this.impactCooldown = 0.4;
     const placed = this.body.place(this.options.spawnPoints[this.spawnId]);
     if (placed) this.onPlaced?.();
     return placed;
@@ -117,6 +133,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   /** At rest at an arbitrary pose (e.g. a hub return point), in drive. The spawn point is unchanged. */
   placeAt(pose: VehiclePose): boolean {
     this.controller.reset();
+    this.impactCooldown = 0.4;
     const placed = this.body.place(pose);
     if (placed) this.onPlaced?.();
     return placed;
@@ -131,6 +148,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     const { position, forward } = this.body;
     const pose: VehiclePose = { position: position.clone(), headingRad: Math.atan2(forward.x, forward.z) };
     this.controller.reset();
+    this.impactCooldown = 0.4;
     if (!this.body.place(pose)) return this.reset();
     this.onPlaced?.();
     return true;
@@ -157,7 +175,21 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     return this.controller.model.state.vx;
   }
 
+  get speedKmh(): number { return Math.abs(this.speed) * 3.6; }
+  get gear(): number {
+    return this.controller.model.state.reversing ? -1 : this.options.definition.gearThresholdsKmh.filter(kmh => this.speedKmh >= kmh).length;
+  }
+  /** Presentation RPM estimate: this arcade drivetrain has no simulated engine RPM. */
+  get recordingMotion(): { rpm: number; suspension: number } {
+    const thresholds = this.options.definition.gearThresholdsKmh;
+    const lower = thresholds[Math.max(0, this.gear - 1)] ?? 0;
+    const upper = thresholds[this.gear] ?? lower + 45;
+    const revs = Math.max(0, Math.min(1, (this.speedKmh - lower) / Math.max(1, upper - lower)));
+    return { rpm: 850 + revs * 4800 + this.controller.model.state.throttle * 400, suspension: this.controller.model.state.loadShift };
+  }
+
   update(dt: number): void {
+    this.impactCooldown = Math.max(0, this.impactCooldown - dt);
     const { state } = this.controller.model;
     this.visual.update(dt, state.steerAngle, state.vx);
     this.hud.tick(dt, () => this.summarize());
@@ -165,6 +197,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   }
 
   dispose(): void {
+    this.releaseImpact();
     this.controller.dispose();
     this.body.dispose();
   }

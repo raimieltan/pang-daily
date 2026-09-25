@@ -1,3 +1,4 @@
+import { RURAL_KIT } from './ruralKit';
 import type { PropDefinition, PropLayer, PropPart, Vec3Tuple } from "./PropDefinition";
 
 /**
@@ -67,6 +68,7 @@ function streetLampParts(height: number, reach: number, lens: string): PropPart[
 }
 
 export const PROP_KIT = {
+  ...RURAL_KIT,
   // ── utility ───────────────────────────────────────────────────────────────
   utility_pole: {
     category: "utility",

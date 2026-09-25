@@ -81,6 +81,9 @@ export class PropLibrary {
 
       for (const [layer, template] of Object.entries(this.template(id)) as [PropLayer, Mesh][]) {
         const mesh = template.clone(`${name}:${id}:${layer}`, parent, true);
+        // Instance attributes belong to geometry. Each chunk needs its own
+        // buffers; otherwise later chunks replace earlier chunks' placements.
+        mesh.makeGeometryUnique();
         mesh.setEnabled(true);
         mesh.isPickable = false;
         mesh.thinInstanceSetBuffer("matrix", matrices.slice(), 16, true);

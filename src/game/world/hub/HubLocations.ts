@@ -18,7 +18,7 @@ export type Locatable = {
 };
 
 export function toVehiclePose(pose: Pose): VehiclePose {
-  return { position: new Vector3(pose.x, 0, pose.z), headingRad: pose.headingDeg * DEG };
+  return { position: new Vector3(pose.x, pose.y ?? 0, pose.z), headingRad: pose.headingDeg * DEG };
 }
 
 /**

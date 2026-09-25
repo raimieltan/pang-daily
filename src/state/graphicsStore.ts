@@ -1,3 +1,4 @@
+import type { WeatherType } from "@/game/weather/Weather";
 import { create } from "zustand";
 import type { GameEventMap, GameEventSource, GraphicsSettings, RenderStats, TimeOfDay } from "@/game";
 
@@ -5,12 +6,13 @@ import type { GameEventMap, GameEventSource, GraphicsSettings, RenderStats, Time
 type GraphicsState = {
   settings: GraphicsSettings | null;
   timeOfDay: TimeOfDay | null;
+  weather: WeatherType;
   stats: RenderStats | null;
   benchmark: GameEventMap["graphicsBenchmark"] | null;
   benchmarking: boolean;
 };
 
-const initialState: GraphicsState = { settings: null, timeOfDay: null, stats: null, benchmark: null, benchmarking: false };
+const initialState: GraphicsState = { settings: null, timeOfDay: null, weather: "clear", stats: null, benchmark: null, benchmarking: false };
 
 export const useGraphicsStore = create<GraphicsState>(() => initialState);
 
@@ -19,7 +21,8 @@ export function bindGraphicsStore(events: GameEventSource): () => void {
   const set = useGraphicsStore.setState;
   const unsubscribers = [
     events.on("graphicsState", (settings) => set({ settings })),
-    events.on("timeOfDay", ({ time }) => set({ timeOfDay: time })),
+    events.on("weatherChanged", ({ weather }) => set({ weather })),
+      events.on("timeOfDay", ({ time }) => set({ timeOfDay: time })),
     events.on("renderStats", (stats) => set({ stats })),
     events.on("graphicsBenchmark", (benchmark) => set({ benchmark, benchmarking: false })),
     events.on("commandRejected", ({ command }) => {

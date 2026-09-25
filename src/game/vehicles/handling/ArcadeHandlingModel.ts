@@ -167,6 +167,9 @@ export class ArcadeHandlingModel {
   /** Seconds spent stopped with the brake held; reverse engages after `reverseDelaySeconds`. */
   private stoppedBrakeTime = 0;
 
+  /** Environmental grip; independent of handling preset and retained across resets. */
+  surfaceGrip = 1;
+
   constructor(config: HandlingConfig) {
     this.c = config;
     this.d = derive(config);
@@ -247,8 +250,8 @@ export class ArcadeHandlingModel {
     const lift = s.liftOff * c.balance.liftOffRotation;
     const frontHandbrake = lerp(1, c.handbrake.frontGripMultiplier, handbrake);
     const rearHandbrake = lerp(1, c.handbrake.rearGripMultiplier, handbrake);
-    const frontCap = c.tires.frontGrip * (1 + lift * 0.5) * frontHandbrake * d.m * G * frontShare * contact.front;
-    const rearCap = c.tires.rearGrip * (1 - lift) * rearHandbrake * d.m * G * (1 - frontShare) * contact.rear;
+    const frontCap = this.surfaceGrip * c.tires.frontGrip * (1 + lift * 0.5) * frontHandbrake * d.m * G * frontShare * contact.front;
+    const rearCap = this.surfaceGrip * c.tires.rearGrip * (1 - lift) * rearHandbrake * d.m * G * (1 - frontShare) * contact.rear;
 
     // Longitudinal requests. Retarding forces oppose motion; drive pushes in the selected direction.
     const dir = s.reversing ? -1 : 1;
