@@ -64,6 +64,7 @@ export class WaypointRival {
     this.heading = Math.atan2(points[1].x - points[0].x, points[1].z - points[0].z);
   }
   reset() { this.position = { ...this.points[0] }; this.speed = 0; this.segment = 1; this.heading = Math.atan2(this.points[1].x - this.points[0].x, this.points[1].z - this.points[0].z); }
+  get departed() { return this.segment >= this.points.length; }
   update(dt: number) {
     const target = this.points[this.segment];
     if (!target) { this.speed = 0; return; }
@@ -114,17 +115,22 @@ export class Race {
       if (this.countdown <= 1e-9) this.phase = "RUNNING";
       return;
     }
-    if (this.phase !== "RUNNING" || dt <= 0) return;
+    if ((this.phase !== "RUNNING" && this.phase !== "FINISHED") || dt <= 0) return;
     const before = this.elapsed;
     this.accumulator += dt;
     const step = 1 / 120;
     while (this.accumulator + 1e-9 >= step) {
       const a = { ...this.rival.position };
       this.rival.update(step);
-      const hit = this.opponent.advance(a, this.rival.position);
-      if (hit !== null) this.opponentTime = this.elapsed + hit * step;
-      this.elapsed += step; this.accumulator -= step;
+      if (this.phase === "RUNNING") {
+        const hit = this.opponent.advance(a, this.rival.position);
+        if (hit !== null) this.opponentTime = this.elapsed + hit * step;
+        this.elapsed += step;
+      }
+      this.accumulator -= step;
     }
+    // Keep driving after results without changing the race clock or standings.
+    if (this.phase === "FINISHED") return;
     const hit = this.player.advance(this.previous, position);
     this.previous = copyPoint(position);
     if (hit !== null) { this.playerTime = before + hit * dt; this.phase = "FINISHED"; }

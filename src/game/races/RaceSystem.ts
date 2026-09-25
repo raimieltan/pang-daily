@@ -98,7 +98,8 @@ export class RaceSystem implements GameSystem {
     }
     const p = this.race.rival.position;
     this.root.position.set(p.x, p.y + 0.1, p.z); this.root.rotation.y = this.race.rival.heading;
-    this.visual?.update(dt, 0, this.active ? this.race.rival.speed : 0);
+    if (this.race.rival.departed) this.root.setEnabled(false);
+    this.visual?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
     this.gates.forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
       this.lastStanding = this.race.position; this.bridge.emit("raceStandingChanged", this.standing());
