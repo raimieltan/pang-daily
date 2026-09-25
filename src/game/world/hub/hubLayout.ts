@@ -489,6 +489,16 @@ function coffeeShop() {
     locationId: "coffee_shop",
     interaction: { action: "order_coffee", label: "Order a coffee", reach: 1.2, priority: 1, dialogueId: "kyo_order" },
   });
+  // Corkboard by the door: odd jobs pinned up by the regulars (see game/jobs/hubJobs).
+  a.block({ center: [140.5, 1.55, 98.4], size: [0.06, 0.8, 1.1], color: "#9a6b3f" });
+  for (const [z, y] of [[98.15, 1.65], [98.65, 1.5]] as const) a.block({ center: [140.46, y, z], size: [0.02, 0.3, 0.24], color: "#f1ece0" });
+  a.zone({
+    id: "kyo_job_board",
+    kind: "interact",
+    rect: rect(139.6, 97.6, 140.5, 99.2),
+    locationId: "coffee_shop",
+    interaction: { action: "browse_jobs", label: "Check odd jobs", reach: 1.2, priority: 1 },
+  });
   a.zone({ id: "kyo_apron", kind: "parking", rect: rect(125.5, 84, 136, 112), locationId: "coffee_shop" });
   a.zone({ id: "kyo_moto_corner", kind: "parking", rect: rect(134.8, 106.6, 140.4, 111.8), locationId: "coffee_shop" });
   a.zone({ id: "kyo_lot", kind: "parking", rect: rect(128, 77, 164, 93.5), locationId: "coffee_shop" });

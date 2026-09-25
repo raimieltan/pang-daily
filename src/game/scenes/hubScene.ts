@@ -1,4 +1,6 @@
 import { FuelSystem } from "../maintenance/FuelSystem";
+import { JobMarker } from "../jobs/JobMarker";
+import { JobSystem } from "../jobs/JobSystem";
 import { fuelRejection } from "../maintenance/fuelAccess";
 import { TRAFFIC_LANES } from "../traffic/trafficRoutes";
 import { TrafficSystem } from "../traffic/TrafficSystem";
@@ -58,7 +60,7 @@ import { buildChunk, WorldKit } from "../world/WorldChunk";
  * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
-  async setup({ scene, engine, addSystem, bridge, signal, session }) {
+  async setup({ scene, engine, addSystem, bridge, signal, session, jobs }) {
     const params = new URLSearchParams(window.location.search);
     const havok = await loadHavok();
     if (signal.aborted) return;
@@ -123,10 +125,16 @@ export const hubScene: SceneDefinition = {
     addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES]));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
-    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, race.interactions]));
+    const maintainedCar = player;
+    const jobSystem = new JobSystem(bridge, jobs, {
+      player: modes, vehicle: maintainedCar, racing: () => race.active,
+      fuelLiters: () => session.summary(maintainedCar.definition.spec).fuelLiters ?? 0,
+      boards: zones.filter((zone) => zone.action === "browse_jobs"), marker: new JobMarker(scene),
+    });
+    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, race.interactions, jobSystem.interactions]));
     modes.useInteractions(interactions);
     race.connect(interactions);
-    const maintainedCar = player;
+    jobSystem.connect(interactions);
     addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
       () => race.race.phase === 'RUNNING', { interactions, rejection: () => talyerRejection({
         mode: modes.mode, player: modes.position, car: maintainedCar.position,
@@ -136,6 +144,7 @@ export const hubScene: SceneDefinition = {
       interactions, rejection: () => fuelRejection({ mode: modes.mode, player: modes.position,
         car: maintainedCar.position, speedKmh: maintainedCar.speedKmh, racing: race.active }, zones),
     }));
+    addSystem(jobSystem);
     let footstepTime = 0;
     let footstepDistance = 0;
     addSystem({ name: "footstepAudio", update(dt) {

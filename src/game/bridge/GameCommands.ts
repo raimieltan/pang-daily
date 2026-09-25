@@ -43,6 +43,10 @@ export type GameCommandMap = {
   quoteFuel: FuelRequest;
   purchaseFuel: { quoteId: string };
   dismissFuel: void;
+  /** Take a job from the open board. */
+  acceptJob: { jobId: string };
+  abandonJob: void;
+  dismissJobBoard: void;
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -110,6 +114,9 @@ export interface GameCommands {
   quoteFuel(request: FuelRequest): void;
   purchaseFuel(quoteId: string): void;
   dismissFuel(): void;
+  acceptJob(jobId: string): void;
+  abandonJob(): void;
+  dismissJobBoard(): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -137,5 +144,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     quoteFuel: request => dispatch("quoteFuel", request),
     purchaseFuel: quoteId => dispatch("purchaseFuel", { quoteId }),
     dismissFuel: () => dispatch("dismissFuel"),
+    acceptJob: jobId => dispatch("acceptJob", { jobId }),
+    abandonJob: () => dispatch("abandonJob"),
+    dismissJobBoard: () => dispatch("dismissJobBoard"),
   };
 }

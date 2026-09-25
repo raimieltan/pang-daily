@@ -18,6 +18,8 @@ export const INTERACTION_ACTIONS = [
   "hang_out",
   "talk_mechanic",
   "refuel",
+  "browse_jobs",
+  "job_objective",
 ] as const;
 
 export type InteractionAction = (typeof INTERACTION_ACTIONS)[number];

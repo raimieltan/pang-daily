@@ -3,6 +3,8 @@ import { Scene } from "@babylonjs/core/scene";
 import type { RuntimePort } from "../bridge";
 import type { GameSystem, SceneContext, SceneDefinition } from "./types";
 import { VehicleSession } from "../../game-core/maintenance/VehicleSession";
+import { JobSession } from "../../game-core/jobs/JobSession";
+import { HUB_JOBS } from "../jobs/hubJobs";
 
 export type SceneManagerHooks<Id extends string> = {
   onLoading?(id: Id): void;
@@ -35,6 +37,7 @@ export class SceneManager<Id extends string> {
     private readonly bridge: RuntimePort,
     private readonly hooks: SceneManagerHooks<Id> = {},
     private readonly session = new VehicleSession(),
+    private readonly jobs = new JobSession(session, HUB_JOBS),
   ) {}
 
   get activeId(): Id | null {
@@ -66,6 +69,7 @@ export class SceneManager<Id extends string> {
       scene: slot.scene,
       signal: slot.controller.signal,
       session: this.session,
+      jobs: this.jobs,
       bridge: {
         // A superseded scene (e.g. still finishing async setup) must not leak events.
         emit: (event, ...args) => {

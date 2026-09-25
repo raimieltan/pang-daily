@@ -4,6 +4,8 @@ import { GameBridge } from "../bridge/GameBridge";
 import { HUB_LAYOUT } from "../world/hub/hubLayout";
 import { interactablesFromZones, resolveInteraction, type Interactable } from "./Interaction";
 import { InteractionSystem } from "./InteractionSystem";
+import { containsPoint } from "../world/layoutTools";
+import { KYO_ICE_RUN } from "../jobs/hubJobs";
 
 const zone = (id: string, x = 0, priority = 0): Interactable => ({
   id, action: "order_coffee", label: id, priority, area: { kind: "circle", x, z: 0, radius: 3 },
@@ -47,5 +49,22 @@ describe("world interactions", () => {
     const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap((c) => c.zones));
     expect(zones.some((z) => z.locationId === "coffee_shop" && z.action === "order_coffee")).toBe(true);
     expect(zones.some((z) => z.locationId === "talyer" && z.action === "talk_mechanic")).toBe(true);
+  });
+
+  it("offers the job board from Kyo's terrace without taking over the counter", () => {
+    const all = HUB_LAYOUT.chunks.flatMap((c) => c.zones);
+    const zones = interactablesFromZones(all);
+    const terrace = all.find((z) => z.id === "kyo_terrace")!.rect;
+    // Terrace side of the board, between the potted plants.
+    expect(containsPoint(terrace, 139.3, 98.4)).toBe(true);
+    expect(resolveInteraction(zones, 139.3, 98.4, "walking")?.action).toBe("browse_jobs");
+    expect(resolveInteraction(zones, 139.3, 103, "walking")?.action).toBe("order_coffee");
+    expect(resolveInteraction(zones, 137.5, 105.5, "walking")?.action).toBe("hang_out");
+  });
+
+  it("puts delivery stops on parking the car can reach", () => {
+    const parking = HUB_LAYOUT.chunks.flatMap((c) => c.zones).filter((z) => z.kind === "parking");
+    for (const { area, id } of KYO_ICE_RUN.objectives)
+      expect(parking.some((z) => containsPoint(z.rect, area.x, area.z)), id).toBe(true);
   });
 });

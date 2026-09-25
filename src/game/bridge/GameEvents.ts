@@ -29,6 +29,12 @@ export type GameEventMap = {
   fuelQuote: import('../maintenance/FuelSystem').FuelQuote | null;
   fuelPurchased: import('../maintenance/FuelSystem').FuelReceipt;
   ready: void;
+  /** Open job board listings; null closes it. */
+  jobBoard: import('../jobs/jobViews').JobBoardView | null;
+  /** The job in progress (accepted or active); null when there is none. On change, ~1 Hz while timed. */
+  jobState: import('../jobs/jobViews').JobView | null;
+  /** A run ended: completed (paid), failed or abandoned. */
+  jobEnded: import('../jobs/jobViews').JobResult;
   maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
   repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;
   repairCompleted: import('../../game-core/maintenance/VehicleSession').RepairReceipt;

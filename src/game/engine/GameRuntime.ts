@@ -4,6 +4,8 @@ import { INITIAL_SCENE, scenes, type SceneId } from "../scenes";
 import { SceneManager } from "./SceneManager";
 import { GameAudio } from "../audio/GameAudio";
 import { loadVehicleSession } from "../maintenance/sessionStorage";
+import { loadJobSession } from "../jobs/jobStorage";
+import { HUB_JOBS } from "../jobs/hubJobs";
 
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
@@ -58,7 +60,7 @@ export class GameRuntime {
         const reason = error instanceof Error ? error.message : String(error);
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
-    }, session);
+    }, session, loadJobSession(session, HUB_JOBS, storage));
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);

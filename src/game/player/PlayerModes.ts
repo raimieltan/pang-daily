@@ -126,7 +126,8 @@ export class PlayerModes implements GameSystem {
   update(): void {
     const { driverControls, walkControls } = this.parts;
     if (this.current === "driving" && driverControls.enterExitPressed) {
-      if (this.interactions?.current?.action === "start_race") this.report("interact", this.interactions.trigger());
+      // Only driving-mode interactions resolve here (race starts, job stops); otherwise F gets out.
+      if (this.interactions?.current) this.report("interact", this.interactions.trigger());
       else this.report("exitVehicle", this.exit());
     }
     else if (this.current === "walking" && walkControls.interactPressed && this.interactions) {
