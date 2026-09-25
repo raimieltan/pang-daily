@@ -42,6 +42,8 @@ export type VehicleTelemetry = {
   tractionCut: number;
   /** Counter-yaw from the stability assist, rad/s². */
   stabilityYaw: number;
+  /** 0..1 handbrake effect after the speed window. */
+  handbrake: number;
   longAccelG: number;
   latAccelG: number;
   groundedWheels: number;

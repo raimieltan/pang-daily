@@ -182,6 +182,26 @@ never take all the steering away.
 | `traction` | 0.35 | Cuts some drive when the front is busy cornering, so flooring it mid-corner doesn't wash the nose out completely. Low enough that power-on understeer still shows. |
 | `stability` / `stabilityThresholdDeg` | 0.5 / 5° | Counter-yaw only once the **rear** slides past 5°. It catches lift-off overshoot and never touches tight low-speed turns, where body slip is high but nothing slides. This is a recovery aid, not a drift assist. |
 
+**Handbrake** (Space / pad B)
+
+An arcade rotation tool for hairpins, U-turns and tight town corners, not a parking brake or a
+drift button. Tap and steer to rotate; release and throttle so the front wheels pull the car
+straight. Measured on the baseline (0.5 s tap at 45 km/h, full lock, then throttle 0.6 at 0.3 lock):
+the car rotates ~28° during the tap and travels 11° further round the corner than the same inputs
+without it. Rear slip peaks at ~23° and settles within 0.5 s of release.
+
+| Param | Value | Why |
+|---|---|---|
+| `minEffectiveSpeedKmh` / `fullEffectSpeedKmh` | 18 / 45 | Linear ramp from 18 to 45: nothing when parked or crawling, full effect at hairpin-entry speed. Above 45 it fades as 45 / speed (≈ 0.4 at 110), so a highway tap nudges the car rather than spinning it. |
+| `rearGripMultiplier` / `frontGripMultiplier` | 0.55 / 0.95 | The rear lets go; the driven front barely changes, so FWD recovery still comes from the front, not a RWD-style slide. |
+| `yawAssistStrength` / `maxYawRateBonus` | 0.85 / 1.6 rad/s | Feeds yaw toward the steered yaw rate plus up to 1.6 rad/s × effect, and never beyond. Adds rotation only in the steered direction, so with no steering it does nothing. |
+| `speedBleedPerSecond` | 0.18 | Loses 18% of speed per second as body drag, not rear brake force. Braking through the loosened rear would use up its friction circle and lock the car into a spin. Holding too long scrubs the car below 18 km/h, where the handbrake switches itself off, so it can't slide forever. |
+| `engageSmoothing` / `releaseSmoothing` | 12 / 8 s⁻¹ | Exponential fade: ~0.08 s in, ~0.12 s out. A tap is a clean flick; release restores grip progressively instead of snapping. |
+
+While it acts, the stability assist runs at half strength so it doesn't cancel the rotation.
+It comes back with rear grip on release and helps the catch. The yaw feed gain (`HANDBRAKE_YAW_GAIN`)
+is a constant in the model; tune `yawAssistStrength` instead. Reversing or airborne: no effect.
+
 **Low speed**
 
 | Param | Value | Why |
@@ -222,6 +242,8 @@ and a fixed 1/120 s step; at 180 km/h the car moves 0.42 m per step, well within
 | Lift-off snaps or spins | Lower `liftOffBuildRate`, `rearSlideFalloff`, or raise `stability`. |
 | Feels twitchy on keyboard | Raise `turnInSeconds`; don't touch `unwindSeconds`. |
 | Sluggish off the line | `accelerationMps2`, then `throttleRise`. |
+| Handbrake barely rotates | Raise `yawAssistStrength` or lower `rearGripMultiplier` (0.55 → 0.45). For slow hairpins, lower `fullEffectSpeedKmh`. |
+| Handbrake spins or snaps back on release | Lower `maxYawRateBonus`, raise `rearGripMultiplier`, or lower `releaseSmoothing`. |
 | Brakes feel wooden | Raise `brakeRise`, lower `frontBias` a little. |
 
 Change one parameter at a time, check it on the skidpad and the hill, then write the new

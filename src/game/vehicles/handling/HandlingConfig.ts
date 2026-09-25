@@ -104,6 +104,31 @@ export const handlingConfigSchema = z.strictObject({
     stabilityThresholdDeg: positive,
   }),
 
+  /**
+   * Arcade rotation tool for hairpins and U-turns, not a parking brake or a drift button.
+   * Held, it loosens the rear, feeds yaw toward the steering, and bleeds speed. Released,
+   * rear grip fades back so the front can pull the car straight under throttle.
+   */
+  handbrake: z.strictObject({
+    enabled: z.boolean(),
+    /** No effect below this speed (parked, crawling in traffic). */
+    minEffectiveSpeedKmh: nonNegative,
+    /** Full effect from here; above it the effect fades as fullEffect / speed. */
+    fullEffectSpeedKmh: positive,
+    /** Axle grip at full effect. Keep the front near 1 so the driven wheels can still recover. */
+    rearGripMultiplier: unit,
+    frontGripMultiplier: unit,
+    /** How hard yaw is fed toward the steered direction (0 = grip loss only). */
+    yawAssistStrength: nonNegative,
+    /** Extra yaw rate (rad/s) the assist may add on top of what the steering asks for at full lock. */
+    maxYawRateBonus: nonNegative,
+    /** Share of current speed lost per second at full effect. */
+    speedBleedPerSecond: unit,
+    /** Per-second exponential rates the effect fades in and out at. */
+    engageSmoothing: positive,
+    releaseSmoothing: positive,
+  }),
+
   lowSpeed: z.strictObject({
     /**
      * Below `kinematicBelowKmh` the car follows its wheels exactly (no tire slip),

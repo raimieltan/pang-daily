@@ -189,6 +189,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       loadShift: round(s.loadShift, 3),
       tractionCut: round(d.tractionCut, 2),
       stabilityYaw: round(d.stabilityYaw, 2),
+      handbrake: round(d.handbrakeEffect, 2),
       longAccelG: round(s.longAccel / G, 2),
       latAccelG: round(s.latAccel / G, 2),
       groundedWheels: this.body.groundedWheels,

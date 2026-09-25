@@ -19,7 +19,7 @@ export const AXIS_ACTIONS = {
 } as const;
 
 export const BUTTON_ACTIONS = [
-  /** Bound for the handling model's future handbrake; nothing consumes it yet. */
+  /** Held: rear loosens so the car rotates into hairpins (see `HandlingConfig.handbrake`). */
   "handbrake",
   /** Put the car back on its wheels where it is. */
   "recover",

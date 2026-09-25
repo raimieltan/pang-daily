@@ -83,6 +83,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
       <Bar label="front grip" value={t.frontGripUse} />
       <Bar label="rear grip" value={t.rearGripUse} />
       <Bar label="lift-off" value={t.liftOff} />
+      <Bar label="handbrake" value={t.handbrake} />
       <Bar label="traction cut" value={t.tractionCut} />
       <Row label="slip body/F/R" value={`${t.bodySlipDeg}° / ${t.frontSlipDeg}° / ${t.rearSlipDeg}°`} />
       <Row label="g long/lat" value={`${t.longAccelG.toFixed(2)} / ${t.latAccelG.toFixed(2)}`} />

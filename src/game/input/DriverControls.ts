@@ -19,7 +19,7 @@ export type DriverControlsOptions = {
  */
 export class DriverControls implements GameSystem, DriverInputSource, ChaseCameraInput {
   readonly name = "driverControls";
-  private readonly current: DriverInput = { throttle: 0, brake: 0, steer: 0 };
+  private readonly current: DriverInput = { throttle: 0, brake: 0, steer: 0, handbrake: false };
   lookX = 0;
 
   constructor(
@@ -36,6 +36,7 @@ export class DriverControls implements GameSystem, DriverInputSource, ChaseCamer
     this.current.throttle = input.axis("throttle");
     this.current.brake = input.axis("brake");
     this.current.steer = input.axis("steer");
+    this.current.handbrake = input.held("handbrake");
     this.lookX = input.axis("lookX");
 
     if (input.pressed("recover")) options.onRecover?.();

@@ -23,6 +23,8 @@ const AIR_YAW_DAMPING = 0.8;
 const ABS_LIMIT = 0.95;
 /** Max share of static weight load transfer may move between axles. */
 const MAX_LOAD_SHIFT = 0.2;
+/** Handbrake yaw feed (rad/s² per rad/s short of its target) at yawAssistStrength = 1. */
+const HANDBRAKE_YAW_GAIN = 4;
 
 const FRONT_DRIVE_SHARE: Record<HandlingConfig["drive"]["drivetrain"], number> = { FWD: 1, RWD: 0, AWD: 0.4 };
 
@@ -34,6 +36,8 @@ export type DriverInput = {
   brake: number;
   /** -1 (left) .. 1 (right) */
   steer: number;
+  /** Held = rear loosens for rotation. Absent = released. */
+  handbrake?: boolean;
 };
 
 /** Share (0..1) of each axle's wheels touching the ground, from the physics layer. */
@@ -56,6 +60,8 @@ export type HandlingState = {
   loadShift: number;
   /** 0..1 lift-off envelope. */
   liftOff: number;
+  /** 0..1 handbrake envelope (smoothed button, before the speed window). */
+  handbrake: number;
   /** Last step's body-frame accelerations, m/s². */
   longAccel: number;
   latAccel: number;
@@ -78,6 +84,10 @@ export type HandlingDiagnostics = {
   tractionCut: number;
   /** Counter-yaw currently applied by the stability assist, rad/s². */
   stabilityYaw: number;
+  /** 0..1 handbrake effect after the speed window. */
+  handbrakeEffect: number;
+  /** Yaw fed by the handbrake, rad/s². */
+  handbrakeYaw: number;
   held: boolean;
 };
 
@@ -105,6 +115,8 @@ function derive(c: HandlingConfig) {
     transferPerAccel: (c.balance.weightTransfer * c.chassis.cgHeightM) / (L * G),
     liftOffMinSpeed: c.balance.liftOffMinSpeedKmh * KMH,
     stabilityThreshold: c.assists.stabilityThresholdDeg * DEG,
+    handbrakeMinSpeed: c.handbrake.minEffectiveSpeedKmh * KMH,
+    handbrakeFullSpeed: Math.max(c.handbrake.fullEffectSpeedKmh, c.handbrake.minEffectiveSpeedKmh + 1) * KMH,
     kinematicBelow: c.lowSpeed.kinematicBelowKmh * KMH,
     dynamicAbove: Math.max(c.lowSpeed.dynamicAboveKmh, c.lowSpeed.kinematicBelowKmh + 1) * KMH,
     holdBelow: c.lowSpeed.holdBelowKmh * KMH,
@@ -123,6 +135,7 @@ export function createHandlingState(): HandlingState {
     reversing: false,
     loadShift: 0,
     liftOff: 0,
+    handbrake: 0,
     longAccel: 0,
     latAccel: 0,
   };
@@ -141,6 +154,8 @@ export class ArcadeHandlingModel {
     rearGripUse: 0,
     tractionCut: 0,
     stabilityYaw: 0,
+    handbrakeEffect: 0,
+    handbrakeYaw: 0,
     held: false,
   };
 
@@ -217,10 +232,23 @@ export class ArcadeHandlingModel {
     const coasting = !s.reversing && s.throttle < 0.25 && s.brake < 0.25 && s.vx > d.liftOffMinSpeed && grounded;
     s.liftOff = approach(s.liftOff, coasting ? 1 : 0, coasting ? c.balance.liftOffBuildRate : c.balance.liftOffReleaseRate, dt);
 
+    // Handbrake: a smoothed envelope, windowed by speed so it does nothing parked, peaks at medium
+    // speed, and fades at high speed. Forward only: it is a cornering tool, not a J-turn button.
+    const handbrakeHeld = c.handbrake.enabled && input.handbrake === true;
+    const handbrakeRate = handbrakeHeld ? c.handbrake.engageSmoothing : c.handbrake.releaseSmoothing;
+    s.handbrake += ((handbrakeHeld ? 1 : 0) - s.handbrake) * (1 - Math.exp(-handbrakeRate * dt));
+    const handbrakeWindow =
+      s.reversing || !grounded
+        ? 0
+        : clamp01((s.vx - d.handbrakeMinSpeed) / (d.handbrakeFullSpeed - d.handbrakeMinSpeed)) * Math.min(1, d.handbrakeFullSpeed / Math.max(s.vx, 1e-3));
+    const handbrake = s.handbrake * handbrakeWindow;
+
     const frontShare = clamp(c.chassis.frontWeight + s.loadShift, 0.15, 0.85);
     const lift = s.liftOff * c.balance.liftOffRotation;
-    const frontCap = c.tires.frontGrip * (1 + lift * 0.5) * d.m * G * frontShare * contact.front;
-    const rearCap = c.tires.rearGrip * (1 - lift) * d.m * G * (1 - frontShare) * contact.rear;
+    const frontHandbrake = lerp(1, c.handbrake.frontGripMultiplier, handbrake);
+    const rearHandbrake = lerp(1, c.handbrake.rearGripMultiplier, handbrake);
+    const frontCap = c.tires.frontGrip * (1 + lift * 0.5) * frontHandbrake * d.m * G * frontShare * contact.front;
+    const rearCap = c.tires.rearGrip * (1 - lift) * rearHandbrake * d.m * G * (1 - frontShare) * contact.rear;
 
     // Longitudinal requests. Retarding forces oppose motion; drive pushes in the selected direction.
     const dir = s.reversing ? -1 : 1;
@@ -267,8 +295,23 @@ export class ArcadeHandlingModel {
     const slipExcess = Math.abs(rearSlip) - d.stabilityThreshold;
     diag.stabilityYaw = 0;
     if (grounded && slipExcess > 0) {
-      diag.stabilityYaw = c.assists.stability * STABILITY_GAIN * Math.sign(rearSlip) * slipExcess;
+      // Half-relaxed while the handbrake is doing its job; returns with rear grip to help the catch.
+      diag.stabilityYaw = c.assists.stability * (1 - 0.5 * handbrake) * STABILITY_GAIN * Math.sign(rearSlip) * slipExcess;
       yawAccel += diag.stabilityYaw;
+    }
+
+    // Handbrake yaw feed: pulls yaw rate toward what the steering asks for plus a capped bonus.
+    // It only ever adds rotation in the steered direction and stops once the target is reached,
+    // so it can't spin the car on its own and does nothing without steering.
+    diag.handbrakeYaw = 0;
+    const steerDir = Math.sign(input.steer);
+    if (handbrake > 0 && steerDir !== 0) {
+      const target = (s.vx * Math.tan(delta)) / d.L + clamp(input.steer, -1, 1) * c.handbrake.maxYawRateBonus * handbrake;
+      const shortfall = (target - s.yawRate) * steerDir;
+      if (shortfall > 0) {
+        diag.handbrakeYaw = steerDir * shortfall * HANDBRAKE_YAW_GAIN * c.handbrake.yawAssistStrength;
+        yawAccel += diag.handbrakeYaw;
+      }
     }
 
     const ax = fx / d.m;
@@ -281,6 +324,9 @@ export class ArcadeHandlingModel {
 
     const resist = (grounded ? c.drive.rollingResistanceMps2 : 0) + c.drive.aeroDrag * s.vx * s.vx;
     s.vx = towardZero(s.vx, resist * dt);
+    // Speed bleed is a body drag rather than rear brake force: braking through the already
+    // loosened rear tires would use up their friction circle and lock the car into a spin.
+    s.vx *= 1 - c.handbrake.speedBleedPerSecond * handbrake * dt;
     // Retarding forces stop the car; they never push it backwards.
     if (vxBefore !== 0 && Math.sign(s.vx) !== Math.sign(vxBefore) && drive * s.vx <= 0) s.vx = 0;
 
@@ -310,6 +356,7 @@ export class ArcadeHandlingModel {
     diag.rearSlip = rearSlip;
     diag.frontGripUse = frontCap > 0 ? Math.hypot(frontFx.force, frontFy) / frontCap : 0;
     diag.rearGripUse = rearCap > 0 ? Math.hypot(rearFx.force, rearFy) / rearCap : 0;
+    diag.handbrakeEffect = handbrake;
   }
 }
 

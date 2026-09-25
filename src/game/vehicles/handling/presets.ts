@@ -59,6 +59,18 @@ export const HANDLING_PRESETS = {
         stability: 0.5,
         stabilityThresholdDeg: 5,
       },
+      handbrake: {
+        enabled: true,
+        minEffectiveSpeedKmh: 18,
+        fullEffectSpeedKmh: 45,
+        rearGripMultiplier: 0.55,
+        frontGripMultiplier: 0.95,
+        yawAssistStrength: 0.85,
+        maxYawRateBonus: 1.6,
+        speedBleedPerSecond: 0.18,
+        engageSmoothing: 12,
+        releaseSmoothing: 8,
+      },
       lowSpeed: {
         kinematicBelowKmh: 5,
         dynamicAboveKmh: 12,

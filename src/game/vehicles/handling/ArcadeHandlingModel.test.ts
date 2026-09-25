@@ -212,6 +212,83 @@ describe("ArcadeHandlingModel — FWD balance", () => {
   });
 });
 
+describe("ArcadeHandlingModel — handbrake", () => {
+  const hb = (throttle: number, steer: number): DriverInput => ({ throttle, brake: 0, steer, handbrake: true });
+
+  /** Heading plus body slip: where the car is actually travelling, radians. */
+  function turn(kmhStart: number, phases: [number, DriverInput][]) {
+    const m = car(kmhStart);
+    let heading = 0;
+    let worstRearSlip = 0;
+    for (const [seconds, driver] of phases) {
+      drive(m, seconds, driver, (x) => {
+        heading += x.state.yawRate * DT;
+        worstRearSlip = Math.max(worstRearSlip, Math.abs(x.diagnostics.rearSlip));
+      });
+    }
+    return { m, heading, travel: heading + Math.atan2(m.state.vy, Math.max(m.state.vx, 0.1)), worstRearSlip };
+  }
+
+  it("does nothing parked or crawling", () => {
+    const parked = drive(car(), 1, hb(0, 1));
+    expect(parked.state.vx).toBe(0);
+    expect(parked.diagnostics.handbrakeEffect).toBe(0);
+
+    const plain = drive(car(12), 1, input(0.3, 0, 1)).state;
+    const pulled = drive(car(12), 1, hb(0.3, 1)).state;
+    expect(pulled).toEqual({ ...plain, handbrake: pulled.handbrake });
+  });
+
+  it("fades in rather than switching on", () => {
+    const m = drive(car(45), DT, hb(0, 1));
+    expect(m.diagnostics.handbrakeEffect).toBeGreaterThan(0);
+    expect(m.diagnostics.handbrakeEffect).toBeLessThan(0.15);
+  });
+
+  it("is strongest at medium speed and fades at high speed", () => {
+    const effect = (speed: number) => drive(car(speed), 0.3, hb(0, 0)).diagnostics.handbrakeEffect;
+    expect(effect(45)).toBeGreaterThan(effect(25));
+    expect(effect(45)).toBeGreaterThan(effect(110) * 1.5);
+  });
+
+  it("without steering it bleeds speed in a straight line and never rotates", () => {
+    const plain = drive(car(45), 1, input(0, 0, 0));
+    const pulled = drive(car(45), 1, hb(0, 0));
+    expect(pulled.state.yawRate).toBe(0);
+    expect(kmh(pulled)).toBeLessThan(kmh(plain) - 3);
+    // A rotation tool, not a brake: nowhere near a full-pedal stop.
+    expect(kmh(pulled)).toBeGreaterThan(30);
+  });
+
+  it("a tap mid-corner rotates the car into a tighter line, then the front pulls it straight", () => {
+    const entry: DriverInput = input(0, 0, 1);
+    const exit: DriverInput = input(0.6, 0, 0.3);
+    const plain = turn(45, [[0.5, entry], [1, exit]]);
+    const tapped = turn(45, [[0.5, hb(0, 1)], [1, exit]]);
+
+    expect(tapped.travel).toBeGreaterThan(plain.travel + 5 * (Math.PI / 180));
+    // Rotates properly but doesn't swap ends.
+    expect(tapped.heading).toBeLessThan(Math.PI / 2);
+    expect(tapped.worstRearSlip).toBeLessThan(30 * (Math.PI / 180));
+    // Released and on the throttle: settled again, no lingering slide.
+    expect(tapped.m.diagnostics.handbrakeEffect).toBeLessThan(0.01);
+    expect(Math.abs(tapped.m.diagnostics.rearSlip)).toBeLessThan(3 * (Math.PI / 180));
+  });
+
+  it("holding it scrubs off speed until it switches itself off, with no endless slide", () => {
+    const held = turn(45, [[3, hb(0, 1)]]);
+    expect(kmh(held.m)).toBeLessThan(held.m.config.handbrake.minEffectiveSpeedKmh);
+    expect(held.m.diagnostics.handbrakeEffect).toBe(0);
+    expect(Math.abs(held.m.diagnostics.rearSlip)).toBeLessThan(3 * (Math.PI / 180));
+  });
+
+  it("can be disabled per config", () => {
+    const off = car(45, "fwd_worn_sedan", { handbrake: { enabled: false } });
+    const plain = drive(car(45), 1, input(0, 0, 1)).state;
+    expect(drive(off, 1, hb(0, 1)).state).toEqual(plain);
+  });
+});
+
 describe("handling presets", () => {
   it("every starter preset resolves to a valid config", () => {
     for (const id of Object.keys(HANDLING_PRESETS)) {
