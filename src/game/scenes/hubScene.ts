@@ -1,6 +1,12 @@
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RenderingGroup } from "@babylonjs/core/Rendering/renderingGroup";
 import { ChaseCamera } from "../cameras/ChaseCamera";
+import { WalkCamera } from "../cameras/WalkCamera";
+import { WalkingCharacter } from "../characters/WalkingCharacter";
+import { WalkControls } from "../input/WalkControls";
+import { interactablesFromZones } from "../interaction/Interaction";
+import { InteractionSystem } from "../interaction/InteractionSystem";
+import { PlayerModes } from "../player/PlayerModes";
 import { DEFAULT_CHASE_CAMERA } from "../cameras/ChaseCameraConfig";
 import type { SceneDefinition } from "../engine/types";
 import { DriverControls } from "../input/DriverControls";
@@ -45,6 +51,7 @@ export const hubScene: SceneDefinition = {
         onRecenterCamera: () => camera?.recenter(),
       }),
     );
+    const walkControls = addSystem(new WalkControls(input));
     const world = addSystem(new PhysicsWorld(scene, havok));
 
     const kit = new WorldKit(scene);
@@ -77,14 +84,26 @@ export const hubScene: SceneDefinition = {
 
     const chase = new ChaseCamera(scene, player, DEFAULT_CHASE_CAMERA, controls);
     camera = chase;
-    player.onPlaced = () => chase.snap();
-    lighting.attachCar(player, player.visual.model.root.getChildMeshes());
-
-    // Order: car state → locations (may teleport) → lights follow → camera → graphics readout.
     addSystem(player);
-    addSystem(new HubLocations(HUB_LAYOUT, player, bridge));
+    // The two rigs share one camera. The walker reads its heading without owning input.
+    let walkCamera: WalkCamera;
+    const character = addSystem(new WalkingCharacter(scene, world, kit.lit, walkControls, {
+      get yaw() { return walkCamera?.yaw ?? 0; },
+    }));
+    walkCamera = new WalkCamera(chase.camera, character, world, walkControls);
+    const modes = addSystem(new PlayerModes(bridge, {
+      vehicle: player, character, driverControls: controls, walkControls,
+      chaseCamera: chase, walkCamera, world,
+    }));
+    player.onPlaced = () => modes.vehiclePlaced();
+    lighting.attachCar(modes, [...player.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
+    addSystem(new HubLocations(HUB_LAYOUT, modes, bridge));
+    const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones));
+    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables]));
+    modes.useInteractions(interactions);
     addSystem(new VehicleLights(scene, player, lighting));
     addSystem(chase);
+    addSystem(walkCamera);
     const pools = chunks.map((c) => c.pools).filter((m): m is Mesh => m !== null);
     addSystem(new GraphicsSystem(scene, engine, chase.camera, bridge, lighting, pools, preset.quality));
   },

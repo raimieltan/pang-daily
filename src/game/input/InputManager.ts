@@ -110,6 +110,10 @@ export class InputManager implements GameSystem {
   /** Keys released while the tab is unfocused never send keyup; drop them all. */
   private onBlur = () => {
     this.keysDown.clear();
+    this.keysTapped.clear();
+    this.axes.clear();
+    this.down.clear();
+    this.justPressed.clear();
   };
 }
 

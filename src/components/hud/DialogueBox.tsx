@@ -10,6 +10,10 @@ const DISMISS_AFTER_MS = 4000;
  * The game only says *which* dialogue fired; wording lives on the UI side.
  */
 const LINES: Record<string, { speaker: string; line: string }> = {
+  kyo_order: { speaker: "Barista", line: "Kape muna? Park ka lang, boss." },
+  kyo_tambay: { speaker: "Regular", line: "Tambay muna. May bagong project ka?" },
+  talyer_mang_boy: { speaker: "Mang Boy", line: "Kamusta ang daily? Tingnan natin mamaya." },
+  talyer_tambay: { speaker: "Friend", line: "Dito muna tayo habang nasa lift ang kotse." },
   debug_sprint_start: { speaker: "Friend", line: "Easy on the first corner, boss." },
   debug_sprint_finish: { speaker: "Friend", line: "Not bad for a daily." },
 };

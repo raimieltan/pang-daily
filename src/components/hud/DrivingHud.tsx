@@ -10,11 +10,12 @@ function formatGear(gear: number) {
 
 /** Speedo + race standing. Renders only derived HUD state from the hud store. */
 export function DrivingHud() {
+  const playerMode = useHudStore((s) => s.playerMode);
   const vehicle = useHudStore((s) => s.vehicle);
   const race = useHudStore((s) => s.race);
   const lastResult = useHudStore((s) => s.lastResult);
 
-  if (!vehicle && !lastResult) return null;
+  if (playerMode === "walking" || (!vehicle && !lastResult)) return null;
 
   return (
     <div className="flex flex-col items-end gap-1" data-testid="driving-hud">

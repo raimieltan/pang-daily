@@ -26,10 +26,13 @@ export interface ChaseCameraInput {
  * smoothed separately: heading (with a capped lag, so slides and understeer read as the car
  * turning against the frame), height (swallows bumps), road pitch (follows slopes, not kerbs),
  * and the speed-driven distance / FOV / look-ahead (a gentle pull-back as the car gets going).
+ *
+ * Only updates while `active`. On foot, `WalkCamera` drives the same Babylon camera instead.
  */
 export class ChaseCamera implements GameSystem {
   readonly name = "chaseCamera";
   readonly camera: UniversalCamera;
+  active = true;
   private config: ChaseCameraConfig;
   private yaw = 0;
   private pitch = 0;
@@ -71,6 +74,7 @@ export class ChaseCamera implements GameSystem {
   }
 
   update(dt: number): void {
+    if (!this.active) return;
     const c = this.config;
     const p = this.target.position;
 

@@ -8,6 +8,7 @@ import { DrivingHud } from "./DrivingHud";
 import { GraphicsDebugPanel } from "./GraphicsDebugPanel";
 import { HandlingDebugPanel } from "./HandlingDebugPanel";
 import { LocationToast } from "./LocationToast";
+import { InteractionPrompt } from "./InteractionPrompt";
 
 const buttonClass = "rounded border border-amber-200/30 px-2 py-1 hover:bg-amber-200/10";
 const SCENES: { id: SceneId; label: string }[] = [
@@ -85,6 +86,7 @@ export function HudOverlay() {
           <LocationToast />
           <CommandNotice />
           <DialogueBox />
+          <InteractionPrompt />
           <DrivingHud />
         </div>
       )}

@@ -3,8 +3,8 @@
  * Gameplay reads actions by name from `InputManager`; nothing outside `src/game/input`
  * sees key codes, gamepad indices or browser events.
  *
- * Walking (and anything else) adds its own actions here — e.g. `moveX`, `moveY`, `interact` —
- * and may share physical keys with driving: whichever controller is active reads its actions.
+ * Walking shares physical keys with driving (W is throttle in the car, forward on foot):
+ * only the active context (`DriverControls` or `WalkControls`) reads its actions.
  */
 
 /** Analogue actions. `unit` actions read 0..1, `signed` ones −1..1. */
@@ -14,8 +14,12 @@ export const AXIS_ACTIONS = {
   brake: "unit",
   /** −1 left .. 1 right. */
   steer: "signed",
-  /** Camera look-around, −1 left .. 1 right. Springs back when released. */
+  /** Camera look-around, −1 left .. 1 right. Springs back when driving; orbits when walking. */
   lookX: "signed",
+  /** On foot: −1 left .. 1 right, relative to the camera. */
+  moveX: "signed",
+  /** On foot: −1 back .. 1 forward, relative to the camera. */
+  moveY: "signed",
 } as const;
 
 export const BUTTON_ACTIONS = [
@@ -26,8 +30,10 @@ export const BUTTON_ACTIONS = [
   /** Back to the current spawn point, at rest. */
   "resetToSpawn",
   "recenterCamera",
-  /** Get in / out of the car. Bound now so walking can pick it up without a rebind. */
+  /** Get out of the car (driving). */
   "enterExit",
+  /** Use whatever the on-foot prompt offers, including getting back in the car. */
+  "interact",
 ] as const;
 
 export type AxisAction = keyof typeof AXIS_ACTIONS;
@@ -94,6 +100,9 @@ export const DEFAULT_INPUT_CONFIG: InputConfig = {
       curve: 1.6,
     },
     lookX: { positive: ["KeyE"], negative: ["KeyQ"], pad: [{ stick: PadAxis.RIGHT_X }] },
+    moveX: { positive: ["ArrowRight", "KeyD"], negative: ["ArrowLeft", "KeyA"], pad: [{ stick: PadAxis.LEFT_X }] },
+    // Stick y reads −1 pushed up; inverted so forward is positive.
+    moveY: { positive: ["ArrowUp", "KeyW"], negative: ["ArrowDown", "KeyS"], pad: [{ stick: PadAxis.LEFT_Y, invert: true }] },
   },
   buttons: {
     handbrake: { keys: ["Space"], pad: [PadButton.B] },
@@ -101,6 +110,7 @@ export const DEFAULT_INPUT_CONFIG: InputConfig = {
     resetToSpawn: { keys: ["Backspace"], pad: [PadButton.BACK] },
     recenterCamera: { keys: ["KeyC"], pad: [PadButton.R3] },
     enterExit: { keys: ["KeyF"], pad: [PadButton.RB] },
+    interact: { keys: ["KeyF"], pad: [PadButton.A, PadButton.RB] },
   },
   deadzones: { stick: 0.12, stickOuter: 0.04, trigger: 0.05 },
 };

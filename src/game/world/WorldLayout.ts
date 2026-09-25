@@ -1,3 +1,4 @@
+import type { ZoneInteraction } from "../interaction/Interaction";
 import type { LightProfileId } from "../rendering/LightingConfig";
 import type { PropId } from "./props/propKit";
 import type { Vec3Tuple } from "./props/PropDefinition";
@@ -79,7 +80,8 @@ export type WireSpan = { readonly from: Vec3Tuple; readonly to: Vec3Tuple; reado
 /**
  * - `walk`: pedestrian-safe ground (terraces, shop fronts). Kept clear of parking and fenced
  *   with bollards/planters where it meets a lot.
- * - `interact`: future prompt area (counter, talyer bay, pump).
+ * - `interact`: prompt area (counter, talyer bay, pump).
+ * Any zone with an `interaction` offers it to the player on foot while they stand inside it.
  * - `parking`: where cars are expected to stop.
  */
 export type ZoneKind = "walk" | "interact" | "parking";
@@ -89,6 +91,7 @@ export type ZoneData = {
   readonly kind: ZoneKind;
   readonly rect: Rect;
   readonly locationId?: LocationId;
+  readonly interaction?: ZoneInteraction;
 };
 
 export type ChunkData = {

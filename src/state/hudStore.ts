@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GameEventSource, RaceResult, RaceStanding, VehicleSummary } from "@/game";
+import type { GameEventSource, InteractionPrompt, PlayerMode, RaceResult, RaceStanding, VehicleSummary } from "@/game";
 
 /**
  * Driving HUD state: what the speedo and race tower show.
@@ -7,12 +7,14 @@ import type { GameEventSource, RaceResult, RaceStanding, VehicleSummary } from "
  * only re-render HUD components.
  */
 type HudState = {
+  playerMode: PlayerMode;
+  interaction: InteractionPrompt | null;
   vehicle: VehicleSummary | null;
   race: RaceStanding | null;
   lastResult: RaceResult | null;
 };
 
-const initialState: HudState = { vehicle: null, race: null, lastResult: null };
+const initialState: HudState = { playerMode: "driving", interaction: null, vehicle: null, race: null, lastResult: null };
 
 export const useHudStore = create<HudState>(() => initialState);
 
@@ -20,6 +22,8 @@ export const useHudStore = create<HudState>(() => initialState);
 export function bindHudStore(events: GameEventSource): () => void {
   const set = useHudStore.setState;
   const unsubscribers = [
+    events.on("playerModeChanged", ({ mode }) => set({ playerMode: mode })),
+    events.on("interactionPromptChanged", ({ prompt }) => set({ interaction: prompt })),
     events.on("vehicleStateUpdated", (vehicle) => set({ vehicle })),
     events.on("raceStarted", (race) => set({ race, lastResult: null })),
     events.on("raceStandingChanged", (race) => set({ race })),

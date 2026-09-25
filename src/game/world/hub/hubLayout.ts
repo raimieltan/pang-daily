@@ -290,9 +290,25 @@ function talyer() {
   for (const x of [41, 44, 47]) a.prop("bollard", [x, 149.2]);
   a.wallRun([40.6, 165], [49.5, 165]);
 
-  a.zone({ id: "talyer_waiting", kind: "walk", rect: rect(40.5, 150, 49.5, 164.5), locationId: "talyer" });
-  a.zone({ id: "talyer_bay_1", kind: "interact", rect: rect(8.5, 151, 23.5, 167.5), locationId: "talyer" });
-  a.zone({ id: "talyer_bay_2", kind: "interact", rect: rect(24.5, 151, 39.5, 167.5), locationId: "talyer" });
+  a.zone({
+    id: "talyer_waiting",
+    kind: "walk",
+    rect: rect(40.5, 150, 49.5, 164.5),
+    locationId: "talyer",
+    interaction: { action: "hang_out", label: "Tambay muna", dialogueId: "talyer_tambay" },
+  });
+  for (const [id, r] of [
+    ["talyer_bay_1", rect(8.5, 151, 23.5, 167.5)],
+    ["talyer_bay_2", rect(24.5, 151, 39.5, 167.5)],
+  ] as const) {
+    a.zone({
+      id,
+      kind: "interact",
+      rect: r,
+      locationId: "talyer",
+      interaction: { action: "talk_mechanic", label: "Talk to Mang Boy", dialogueId: "talyer_mang_boy" },
+    });
+  }
   a.zone({ id: "talyer_apron", kind: "parking", rect: rect(5, 145, 40, 150), locationId: "talyer" });
 
   // Neighbours: sari-sari store house and a vacant lot with tall grass.
@@ -459,8 +475,21 @@ function coffeeShop() {
   a.lamp({ id: "kyo_sign", at: [128.8, 2.6, 114.5], profile: "porch", strength: 0.6 });
   a.lamp({ id: "kyo_side", at: [141, 3, 94.8], profile: "porch", strength: 0.7 });
 
-  a.zone({ id: "kyo_terrace", kind: "walk", rect: rect(136.6, 96.5, 140, 106.2), locationId: "coffee_shop" });
-  a.zone({ id: "kyo_counter", kind: "interact", rect: rect(139.6, 102.2, 140.5, 103.8), locationId: "coffee_shop" });
+  a.zone({
+    id: "kyo_terrace",
+    kind: "walk",
+    rect: rect(136.6, 96.5, 140, 106.2),
+    locationId: "coffee_shop",
+    interaction: { action: "hang_out", label: "Tambay muna", dialogueId: "kyo_tambay" },
+  });
+  // The door is the counter for now; reach lets it work from the terrace, and it outranks tambay there.
+  a.zone({
+    id: "kyo_counter",
+    kind: "interact",
+    rect: rect(139.6, 102.2, 140.5, 103.8),
+    locationId: "coffee_shop",
+    interaction: { action: "order_coffee", label: "Order a coffee", reach: 1.2, priority: 1, dialogueId: "kyo_order" },
+  });
   a.zone({ id: "kyo_apron", kind: "parking", rect: rect(125.5, 84, 136, 112), locationId: "coffee_shop" });
   a.zone({ id: "kyo_moto_corner", kind: "parking", rect: rect(134.8, 106.6, 140.4, 111.8), locationId: "coffee_shop" });
   a.zone({ id: "kyo_lot", kind: "parking", rect: rect(128, 77, 164, 93.5), locationId: "coffee_shop" });

@@ -6,13 +6,13 @@ import { containsPoint } from "../layoutTools";
 import type { LocationData, Pose, WorldLayout } from "../WorldLayout";
 
 const DEG = Math.PI / 180;
-/** Below this the car has fallen out of the world. */
+/** Below this the player has fallen out of the world. */
 const FALL_LIMIT_Y = -5;
-/** Leeway past the layout bounds before the car counts as off the map. */
+/** Leeway past the layout bounds before the player counts as off the map. */
 const BOUNDS_MARGIN_M = 2;
 
-/** What HubLocations needs from the car: where it is, and a way to put it somewhere. */
-export type LocatableCar = {
+/** What HubLocations needs from the player (car or on foot): where they are, and a way to put them somewhere. */
+export type Locatable = {
   readonly position: Vector3;
   placeAt(pose: VehiclePose): boolean;
 };
@@ -22,9 +22,9 @@ export function toVehiclePose(pose: Pose): VehiclePose {
 }
 
 /**
- * Tracks which hub location the car is in (`locationEntered` / `locationExited`, on change only)
- * and puts the car back on the road at the nearest return point when it leaves the map or
- * falls through it (`playerReturned`).
+ * Tracks which hub location the player is in (`locationEntered` / `locationExited`, on change only)
+ * and puts the player (in the car or on foot) back at the nearest return point when they leave the map or
+ * fall through it (`playerReturned`).
  */
 export class HubLocations implements GameSystem {
   readonly name = "hubLocations";
@@ -32,7 +32,7 @@ export class HubLocations implements GameSystem {
 
   constructor(
     private readonly layout: WorldLayout,
-    private readonly car: LocatableCar,
+    private readonly player: Locatable,
     private readonly bridge: RuntimePort,
   ) {}
 
@@ -41,10 +41,10 @@ export class HubLocations implements GameSystem {
   }
 
   update(): void {
-    const { x, y, z } = this.car.position;
+    const { x, y, z } = this.player.position;
     if (y < FALL_LIMIT_Y || !containsPoint(this.layout.bounds, x, z, BOUNDS_MARGIN_M)) {
       const back = this.nearest(x, z);
-      if (this.car.placeAt(toVehiclePose(back.returnPoint))) {
+      if (this.player.placeAt(toVehiclePose(back.returnPoint))) {
         this.bridge.emit("playerReturned", { locationId: back.id, name: back.name });
       }
       return;

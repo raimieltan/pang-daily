@@ -1,3 +1,6 @@
+import type { InteractionAction, InteractionId } from "../interaction/Interaction";
+import type { PlayerMode } from "../player/PlayerMode";
+
 /**
  * Shared vocabulary of the bridge. Ids are plain strings because races, spawn
  * points, and dialogue are data-driven content (TECH_ARCHITECTURE §17).
@@ -87,3 +90,18 @@ export type RenderStats = {
 };
 
 export type FrameCost = { frames: number; frameMs: number; gpuMs: number | null };
+
+/** On foot or at the wheel. `vehicleId` is the car being driven, null on foot. */
+export type PlayerModeChange = { mode: PlayerMode; vehicleId: string | null };
+
+/** What the on-foot prompt offers right now. */
+export type InteractionPrompt = { interactionId: InteractionId; action: InteractionAction; label: string };
+
+/** The player used an interaction. Shops, dialogue and repairs hang off this on the React side. */
+export type InteractionTriggered = {
+  interactionId: InteractionId;
+  action: InteractionAction;
+  locationId: LocationId | null;
+};
+
+export type { InteractionAction, InteractionId, PlayerMode };

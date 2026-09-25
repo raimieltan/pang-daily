@@ -10,7 +10,10 @@ import type { GameCommandName } from "./GameCommands";
 import type {
   DialogueId,
   FrameCost,
+  InteractionPrompt,
+  InteractionTriggered,
   LocationChange,
+  PlayerModeChange,
   RaceResult,
   RaceStanding,
   RenderStats,
@@ -59,6 +62,11 @@ export type GameEventMap = {
   raceStandingChanged: RaceStanding;
   raceFinished: RaceResult;
   dialogueTriggered: { dialogueId: DialogueId };
+  /** Got in or out of the car. Sent on scene setup and after every change. */
+  playerModeChanged: PlayerModeChange;
+  /** The on-foot prompt changed; null hides it. Sent on change only. */
+  interactionPromptChanged: { prompt: InteractionPrompt | null };
+  interactionTriggered: InteractionTriggered;
 };
 
 export type GameEventName = keyof GameEventMap;

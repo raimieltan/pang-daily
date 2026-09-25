@@ -26,6 +26,12 @@ export type GameCommandMap = {
   runGraphicsBenchmark: { seconds?: number };
   /** Switches the lighting mood (morning, afternoon, night). */
   setTimeOfDay: { time: TimeOfDay };
+  /** Get in `vehicleId` (must be owned and within reach of the player on foot). */
+  enterVehicle: { vehicleId: string };
+  /** Get out beside the car (only when it is stopped or crawling). */
+  exitVehicle: void;
+  /** Use whatever the on-foot prompt currently offers. */
+  interact: void;
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -82,6 +88,9 @@ export interface GameCommands {
   setGraphics(settings: Partial<GraphicsSettings>): void;
   runGraphicsBenchmark(seconds?: number): void;
   setTimeOfDay(time: TimeOfDay): void;
+  enterVehicle(vehicleId: string): void;
+  exitVehicle(): void;
+  interact(): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -98,5 +107,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     setGraphics: (settings) => dispatch("setGraphics", settings),
     runGraphicsBenchmark: (seconds) => dispatch("runGraphicsBenchmark", { seconds }),
     setTimeOfDay: (time) => dispatch("setTimeOfDay", { time }),
+    enterVehicle: (vehicleId) => dispatch("enterVehicle", { vehicleId }),
+    exitVehicle: () => dispatch("exitVehicle"),
+    interact: () => dispatch("interact"),
   };
 }

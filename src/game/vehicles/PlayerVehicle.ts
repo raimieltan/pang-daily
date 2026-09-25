@@ -132,6 +132,15 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     return true;
   }
 
+  /** The owned car's id (its spec id until the garage can hold more than one). */
+  get id(): string {
+    return this.options.definition.spec.id;
+  }
+
+  get definition(): VehicleRuntimeDefinition {
+    return this.options.definition;
+  }
+
   get position(): Vector3 {
     return this.body.position;
   }

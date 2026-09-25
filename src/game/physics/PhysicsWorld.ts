@@ -17,10 +17,11 @@ export type PhysicsWorldOptions = {
 
 type StepHook = (dt: number) => void;
 
-/** Shape filter bits. Vehicle ground probes query `STATIC` only, so they never hit a car. */
+/** Shape filter bits. Vehicle ground probes query `STATIC` only, so they never hit a car or a person. */
 export const CollisionGroup = {
   STATIC: 1 << 0,
   VEHICLE: 1 << 1,
+  CHARACTER: 1 << 2,
 } as const;
 
 const DEFAULT_GRAVITY = new Vector3(0, -9.81, 0);
