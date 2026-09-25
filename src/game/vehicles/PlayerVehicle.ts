@@ -16,6 +16,11 @@ import { VehicleBody, type VehiclePose } from "./VehicleBody";
 import { VehicleController, type DriverInputSource } from "./VehicleController";
 import type { VehicleRuntimeDefinition } from "./VehicleDefinition";
 import { VehicleVisual } from "./VehicleVisual";
+import { PRISTINE_CONDITION } from "../../game-core/vehicles/vehicleStats";
+import type { VehicleCondition } from "../../game-core/vehicles/VehicleDefinition";
+import type { WearSample } from "../../game-core/maintenance/condition";
+import { conditionHandling } from "../maintenance/conditionHandling";
+import type { HandlingConfig } from "./handling/HandlingConfig";
 
 const G = 9.81;
 const DEG = 180 / Math.PI;
@@ -50,6 +55,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   impactStrength = 0;
   private impactCooldown = 0;
   private releaseImpact: () => void;
+  private baseConfig: HandlingConfig;
+  private condition: VehicleCondition = { ...PRISTINE_CONDITION };
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -60,6 +67,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     presetId: HandlingPresetId,
   ) {
     this.presetId = presetId;
+    this.baseConfig = controller.model.config;
     this.spawnId = options.initialSpawn;
     body.body.setCollisionCallbackEnabled(true);
     const impacts = body.body.getCollisionObservable();
@@ -197,6 +205,18 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.telemetry.tick(dt, () => this.sample());
   }
 
+  setCondition(condition: VehicleCondition): void {
+    this.condition = { ...condition };
+    this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition));
+  }
+
+  maintenanceSample(racing: boolean): WearSample {
+    const { state, diagnostics } = this.controller.model;
+    return { speedMps: state.vx, throttle: state.throttle, brake: state.brake,
+      slip: Math.min(1, Math.abs(diagnostics.bodySlip) / .35), handbrake: diagnostics.handbrakeEffect,
+      grounded: this.body.groundedWheels > 0 && !diagnostics.held, racing };
+  }
+
   dispose(): void {
     this.releaseImpact();
     this.controller.dispose();
@@ -206,7 +226,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private applyPreset(presetId: HandlingPresetId): void {
     const config = resolveHandlingPreset(HANDLING_PRESETS, presetId);
     this.presetId = presetId;
-    this.controller.setConfig(config);
+    this.baseConfig = config;
+    this.setCondition(this.condition);
     this.body.setMass(config.chassis.massKg);
   }
 

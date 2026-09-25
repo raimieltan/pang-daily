@@ -3,6 +3,7 @@ import { GameBridge, type GameCommands, type GameEventSource } from "../bridge";
 import { INITIAL_SCENE, scenes, type SceneId } from "../scenes";
 import { SceneManager } from "./SceneManager";
 import { GameAudio } from "../audio/GameAudio";
+import { loadVehicleSession } from "../maintenance/sessionStorage";
 
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
@@ -40,6 +41,9 @@ export class GameRuntime {
     this.audio = new GameAudio(this.events);
 
     const { emit, handle } = this.bridge.runtime;
+    let storage: Storage | undefined;
+    try { storage = window.sessionStorage; } catch { /* The runtime still keeps session state in memory. */ }
+    const session = loadVehicleSession(storage);
 
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),
@@ -48,7 +52,7 @@ export class GameRuntime {
         const reason = error instanceof Error ? error.message : String(error);
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
-    });
+    }, session);
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);

@@ -1,6 +1,7 @@
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import type { Scene } from "@babylonjs/core/scene";
 import type { RuntimePort } from "../bridge";
+import type { VehicleSession } from "../../game-core/maintenance/VehicleSession";
 
 /**
  * A unit of frame-level logic that lives inside one scene
@@ -23,6 +24,7 @@ export interface SceneContext {
   readonly signal: AbortSignal;
   /** Scene-scoped bridge access: command handlers registered here are removed on teardown. */
   readonly bridge: RuntimePort;
+  readonly session: VehicleSession;
   addSystem<T extends GameSystem>(system: T): T;
 }
 

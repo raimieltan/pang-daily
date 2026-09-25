@@ -10,6 +10,7 @@ import type { WeatherType } from "../weather/Weather";
 import type { GraphicsSettings, TimeOfDay } from "../rendering/LightingConfig";
 import type { SceneId } from "../scenes";
 import type { RaceId, SpawnPointId } from "./types";
+import type { ServiceComponent } from "../../game-core/maintenance/condition";
 
 export type GameCommandMap = {
   pause: void;
@@ -35,6 +36,9 @@ export type GameCommandMap = {
   exitVehicle: void;
   /** Use whatever the on-foot prompt currently offers. */
   interact: void;
+  inspectVehicle: void;
+  repairVehicle: { quoteId: string; components: ServiceComponent[] };
+  dismissRepair: void;
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -96,6 +100,9 @@ export interface GameCommands {
   enterVehicle(vehicleId: string): void;
   exitVehicle(): void;
   interact(): void;
+  inspectVehicle(): void;
+  repairVehicle(quoteId: string, components: ServiceComponent[]): void;
+  dismissRepair(): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -117,5 +124,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     enterVehicle: (vehicleId) => dispatch("enterVehicle", { vehicleId }),
     exitVehicle: () => dispatch("exitVehicle"),
     interact: () => dispatch("interact"),
+    inspectVehicle: () => dispatch("inspectVehicle"),
+    repairVehicle: (quoteId, components) => dispatch("repairVehicle", { quoteId, components }),
+    dismissRepair: () => dispatch("dismissRepair"),
   };
 }

@@ -2,6 +2,7 @@ import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
 import { Scene } from "@babylonjs/core/scene";
 import type { RuntimePort } from "../bridge";
 import type { GameSystem, SceneContext, SceneDefinition } from "./types";
+import { VehicleSession } from "../../game-core/maintenance/VehicleSession";
 
 export type SceneManagerHooks<Id extends string> = {
   onLoading?(id: Id): void;
@@ -33,6 +34,7 @@ export class SceneManager<Id extends string> {
     private readonly definitions: Readonly<Record<Id, SceneDefinition>>,
     private readonly bridge: RuntimePort,
     private readonly hooks: SceneManagerHooks<Id> = {},
+    private readonly session = new VehicleSession(),
   ) {}
 
   get activeId(): Id | null {
@@ -63,6 +65,7 @@ export class SceneManager<Id extends string> {
       engine: this.engine,
       scene: slot.scene,
       signal: slot.controller.signal,
+      session: this.session,
       bridge: {
         // A superseded scene (e.g. still finishing async setup) must not leak events.
         emit: (event, ...args) => {

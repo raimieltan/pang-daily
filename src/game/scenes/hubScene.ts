@@ -6,6 +6,8 @@ import { CafeCustomers } from "../traffic/CafeCustomers";
 import { CafeParkedCars } from "../traffic/CafeParkedCars";
 import { NeighborhoodLife } from "../traffic/NeighborhoodLife";
 import { NEIGHBORHOOD_CARS } from "../world/population";
+import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
+import { talyerRejection } from "../maintenance/talyerAccess";
 import { WeatherSystem } from "../weather/WeatherSystem";
 import { WEATHER_TYPES, type WeatherType } from "../weather/Weather";
 import { roadAt, ROUTE_LENGTH, OVERLOOK_S } from "../world/mountain/route";
@@ -54,7 +56,7 @@ import { buildChunk, WorldKit } from "../world/WorldChunk";
  * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
-  async setup({ scene, engine, addSystem, bridge, signal }) {
+  async setup({ scene, engine, addSystem, bridge, signal, session }) {
     const params = new URLSearchParams(window.location.search);
     const havok = await loadHavok();
     if (signal.aborted) return;
@@ -122,6 +124,12 @@ export const hubScene: SceneDefinition = {
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, race.interactions]));
     modes.useInteractions(interactions);
     race.connect(interactions);
+    const maintainedCar = player;
+    addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
+      () => race.race.phase === 'RUNNING', { interactions, rejection: () => talyerRejection({
+        mode: modes.mode, player: modes.position, car: maintainedCar.position,
+        speedKmh: maintainedCar.speedKmh, racing: race.active,
+      }) }));
     let footstepTime = 0;
     let footstepDistance = 0;
     addSystem({ name: "footstepAudio", update(dt) {

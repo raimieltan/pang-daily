@@ -5,6 +5,7 @@ import { bindGameUiStore, useGameUiStore } from "@/state/gameUiStore";
 import { bindGraphicsStore } from "@/state/graphicsStore";
 import { bindHudStore } from "@/state/hudStore";
 import { bindVehicleDebugStore } from "@/state/vehicleDebugStore";
+import { bindMaintenanceStore } from "@/state/maintenanceStore";
 
 /**
  * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
@@ -31,6 +32,7 @@ export function GameCanvas() {
           bindHudStore(game.events),
           bindVehicleDebugStore(game.events),
           bindGraphicsStore(game.events),
+          bindMaintenanceStore(game.events),
         ];
         game.start();
 

@@ -305,7 +305,7 @@ function talyer() {
       kind: "interact",
       rect: r,
       locationId: "talyer",
-      interaction: { action: "talk_mechanic", label: "Talk to Mang Boy", dialogueId: "talyer_mang_boy" },
+      interaction: { action: "talk_mechanic", label: "Inspect car · Mang Boy", dialogueId: "talyer_mang_boy" },
     });
   }
   a.zone({ id: "talyer_apron", kind: "parking", rect: rect(5, 145, 40, 150), locationId: "talyer" });

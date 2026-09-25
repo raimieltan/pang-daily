@@ -26,6 +26,9 @@ import type {
 
 export type GameEventMap = {
   ready: void;
+  maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
+  repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;
+  repairCompleted: import('../../game-core/maintenance/VehicleSession').RepairReceipt;
   /** Ground distance travelled on foot, sampled at 10 Hz for footsteps. */
   footsteps: { distance: number };
   npcSound: import('../traffic/RoadsidePeople').NpcSound;
