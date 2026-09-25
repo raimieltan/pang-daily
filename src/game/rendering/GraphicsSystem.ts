@@ -15,10 +15,11 @@ import {
   DEFAULT_GRAPHICS_QUALITY,
   GRAPHICS_PRESETS,
   POST_TUNING,
+  TIMES_OF_DAY,
   type GraphicsQuality,
   type GraphicsSettings,
 } from "./LightingConfig";
-import type { NightLighting } from "./NightLighting";
+import type { SceneLighting } from "./SceneLighting";
 
 const STATS_INTERVAL_SECONDS = 1;
 const BENCHMARK_WARMUP_SECONDS = 1;
@@ -28,7 +29,7 @@ type Benchmark = { phase: "off" | "on"; elapsed: number; samples: { off: FrameSa
 type FrameSample = { frameMs: number; gpuMs: number | null };
 
 /**
- * Post-processing and quality settings for the night scenes, plus the performance readout:
+ * Post-processing and quality settings for the lit scenes, plus the performance readout:
  *
  * - A `DefaultRenderingPipeline` (HDR, bloom, grain, chromatic aberration, FXAA), created only
  *   while one of those is on. Tone mapping, exposure, contrast and vignette live on the scene's
@@ -37,6 +38,8 @@ type FrameSample = { frameMs: number; gpuMs: number | null };
  *   offscreen targets or full-screen passes. Values from `POST_TUNING`, presets from
  *   `GRAPHICS_PRESETS`.
  * - `setGraphics` applies a preset and/or overrides; `graphicsState` reports the result.
+ * - `setTimeOfDay` switches the lighting mood; exposure and bloom threshold follow it, and the
+ *   ground pools hide while the lamps are off. `timeOfDay` reports the result.
  * - `renderStats` (1 Hz): fps, CPU frame time, draw calls, active meshes and lights, plus GPU
  *   frame time while `gpuTimer` is on and the browser exposes the timer query (null otherwise).
  *   The timer is off by default: per-frame timer queries are not free on every driver.
@@ -60,7 +63,7 @@ export class GraphicsSystem implements GameSystem {
     private readonly engine: AbstractEngine,
     private readonly camera: Camera,
     private readonly bridge: RuntimePort,
-    private readonly lighting: NightLighting,
+    private readonly lighting: SceneLighting,
     private readonly pools: readonly Mesh[],
     quality: GraphicsQuality = DEFAULT_GRAPHICS_QUALITY,
   ) {
@@ -87,6 +90,13 @@ export class GraphicsSystem implements GameSystem {
       this.benchmark = { phase: "off", elapsed: 0, samples: { off: [], on: [] }, seconds, restore };
       this.apply({ ...restore, ...POST_OFF, gpuTimer: true }, false);
     });
+    bridge.handle("setTimeOfDay", ({ time }) => {
+      if (!TIMES_OF_DAY.includes(time)) return { rejected: `Unknown time of day "${time}"` };
+      this.lighting.setTimeOfDay(time);
+      this.apply(this.settings, false);
+      bridge.emit("timeOfDay", { time });
+    });
+    bridge.emit("timeOfDay", { time: lighting.timeOfDay });
   }
 
   get current(): Readonly<GraphicsSettings> {
@@ -113,9 +123,8 @@ export class GraphicsSystem implements GameSystem {
   /** Builds or tears down the post pipeline. Only on settings changes: it recompiles shaders. */
   private setPipeline(on: boolean): DefaultRenderingPipeline | null {
     if (on && !this.pipeline) {
-      const p = new DefaultRenderingPipeline("night", POST_TUNING.hdr, this.scene, [this.camera]);
+      const p = new DefaultRenderingPipeline("post", POST_TUNING.hdr, this.scene, [this.camera]);
       const t = POST_TUNING;
-      p.bloomThreshold = t.bloom.threshold;
       p.bloomWeight = t.bloom.weight;
       p.bloomKernel = t.bloom.kernel;
       p.bloomScale = t.bloom.scale;
@@ -137,15 +146,18 @@ export class GraphicsSystem implements GameSystem {
 
   private apply(settings: GraphicsSettings, publish = true): void {
     const p = this.setPipeline(settings.bloom || settings.grain || settings.chromaticAberration || settings.fxaa);
+    const mood = this.lighting.mood;
     if (p) {
+      p.bloomThreshold = mood.bloomThreshold;
       p.bloomEnabled = settings.bloom;
       p.grainEnabled = settings.grain;
       p.chromaticAberrationEnabled = settings.chromaticAberration;
       p.fxaaEnabled = settings.fxaa;
     }
     this.scene.imageProcessingConfiguration.vignetteEnabled = settings.vignette;
+    this.scene.imageProcessingConfiguration.exposure = mood.exposure;
     this.engineStats.captureGPUFrameTime = settings.gpuTimer;
-    for (const pool of this.pools) pool.setEnabled(settings.lightPools);
+    for (const pool of this.pools) pool.setEnabled(settings.lightPools && mood.lamps > 0);
     if (settings.lightPoolSize !== this.lighting.poolSize) this.lighting.setPoolSize(settings.lightPoolSize);
     const level = this.baseScaling * settings.hardwareScaling;
     if (level !== this.engine.getHardwareScalingLevel()) this.engine.setHardwareScalingLevel(level);
@@ -204,7 +216,6 @@ function configureImageProcessing(ip: ImageProcessingConfiguration): void {
   ip.isEnabled = true;
   ip.toneMappingEnabled = t.toneMapping.aces;
   ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-  ip.exposure = t.toneMapping.exposure;
   ip.contrast = t.toneMapping.contrast;
   ip.vignetteWeight = t.vignette.weight;
   ip.vignetteStretch = t.vignette.stretch;

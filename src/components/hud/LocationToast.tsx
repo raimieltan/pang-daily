@@ -5,7 +5,7 @@ import { useGameEvent } from "@/components/game/useGameEvent";
 
 const DISMISS_AFTER_MS = 2500;
 
-/** Names the place the car just pulled into ("Tambay Coffee"), or where it was put back. */
+/** Names the place the car just pulled into ("Kyo Coffee"), or where it was put back. */
 export function LocationToast() {
   const [text, setText] = useState<string | null>(null);
 

@@ -1,6 +1,6 @@
 /**
  * Picks which lamps get one of the scene's few real point lights. Pure (no Babylon), so the
- * policy is unit-tested; `NightLighting` applies the result to actual lights.
+ * policy is unit-tested; `SceneLighting` applies the result to actual lights.
  *
  * The shader cost of forward lighting scales with lights per material, and changing the count
  * recompiles every lit shader, so the pool size is fixed and lamps take turns: the nearest

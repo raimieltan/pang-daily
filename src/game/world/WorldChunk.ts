@@ -79,7 +79,7 @@ export class WorldKit {
     this.poolTemplate.setEnabled(false);
   }
 
-  /** Materials that should see the scene's pooled lights (see NightLighting). */
+  /** Materials that should see the scene's pooled lights (see SceneLighting). */
   get litMaterials(): StandardMaterial[] {
     return [this.lit];
   }

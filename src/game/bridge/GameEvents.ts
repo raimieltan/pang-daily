@@ -4,7 +4,7 @@
  * Carries derived, low-frequency state only (see TECH_ARCHITECTURE §4–5).
  * Never emit per-frame physics or transform data through here.
  */
-import type { GraphicsSettings } from "../rendering/LightingConfig";
+import type { GraphicsSettings, TimeOfDay } from "../rendering/LightingConfig";
 import type { SceneId } from "../scenes";
 import type { GameCommandName } from "./GameCommands";
 import type {
@@ -42,7 +42,9 @@ export type GameEventMap = {
   playerReturned: LocationChange;
   /** Current graphics settings; sent on scene setup and after every change. */
   graphicsState: GraphicsSettings;
-  /** ~1 Hz frame cost readout while a night scene runs. */
+  /** Current lighting mood; sent on scene setup and after every change. */
+  timeOfDay: { time: TimeOfDay };
+  /** ~1 Hz frame cost readout while a lit scene runs. */
   renderStats: RenderStats;
   /** Result of `runGraphicsBenchmark`: frame cost with post effects off vs the current settings. */
   graphicsBenchmark: {

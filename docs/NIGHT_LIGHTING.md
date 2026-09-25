@@ -8,7 +8,7 @@ tunable value lives in `src/game/rendering/LightingConfig.ts`. The systems only 
 | Profile | Where | Colour | Character |
 |---|---|---|---|
 | `sodium` | street lamps on every road | #ff9a3c | sparse and dim on purpose, so roads stay darker than shops |
-| `cafe` | Tambay Coffee shopfront and string lights | #ffc27a | warm |
+| `cafe` | Kyo Coffee shopfront and string lights | #ffc27a | warm |
 | `fluorescent` | talyer bays | #dcffe6 | flat, slightly green-white |
 | `canopy` | Bahandi Fuels canopy | #f2f6ff | brightest spot in the hub |
 | `store` | Suki 24 glass front | #f6f8f4 | bright neutral white |
@@ -24,10 +24,30 @@ The pool of real lights has a fixed size (high 4, medium 3, low 2) and follows a
 
 Pool lights are never enabled or disabled after setup; a free slot is a light at zero intensity. Babylon re-syncs every mesh's light list on `Light.setEnabled`. Doing that per frame in an early build dropped the hub to about 3 fps.
 
-## Scene mood (`NIGHT_MOOD`)
+## Time of day (`MOODS`, `SceneLighting.ts`)
+
+The hub runs at `morning`, `afternoon` or `night` (default). Choose at startup with
+`?time=morning|afternoon|night`, switch live from the time buttons at the top of the **Graphics**
+panel, or send the `setTimeOfDay` command. `timeOfDay` reports the current value.
+
+| | Sky / fog | Key light | Lamps | Exposure | Bloom threshold |
+|---|---|---|---|---|---|
+| morning | pale blue, light haze | low warm sun from the east | off | 1.15 | 0.95 |
+| afternoon | deeper blue, dusty haze | high golden sun from the west | off | 1.1 | 0.95 |
+| night | near-black blue | faint cool moon | on | 1.25 | 0.72 |
+
+By day the lamp lights sit at zero intensity, the ground pools are hidden, the headlight beam is
+off, and the glow material is dimmed so shopfronts and lenses stop glowing. Switching only changes
+light values and colours, never how many lights there are, so it recompiles no shaders.
+
+The surface colours (asphalt, grass, ground) were picked for night and read a little dark in
+daylight. Light scales with those colours, so brightening the ground means changing them in
+`WorldChunk.ts`, which also brightens night.
+
+## Night mood (`MOODS.night`)
 
 - **Ambient floor**: a hemispheric light (cool sky, warm-dark ground, intensity 0.32). It keeps unlit areas readable, so no pure black anywhere.
-- **Moonlight**: a faint cool directional light that picks out roofs, walls and trees between lamps.
+- **Moonlight** (the `key` light): a faint cool directional light that picks out roofs, walls and trees between lamps.
 - **Exp² fog**: blue-grey fog that hides the far edge of the hub. Glow materials ignore fog, so distant signs still read.
 
 ## Cars stay readable (`VEHICLE_LIGHTS`, `VehicleLights.ts`)
@@ -44,8 +64,8 @@ The effects run in one `DefaultRenderingPipeline`, with HDR on so emissive surfa
 
 | Effect | Settings |
 |---|---|
-| Tone mapping | ACES, exposure 1.25, contrast 1.12. Lifts the image so night isn't murky. |
-| Bloom | threshold 0.72, weight 0.32, kernel 32, half-resolution. Only lamps, signs and lenses bloom. |
+| Tone mapping | ACES, contrast 1.12, exposure from the mood (1.25 at night lifts the image so it isn't murky). |
+| Bloom | threshold from the mood (0.72 at night), weight 0.32, kernel 32, half-resolution. Only lamps, signs and lenses bloom. |
 | Grain | intensity 9, animated |
 | Vignette | weight 1.8, stretch 0.35 |
 | Chromatic aberration | 14, radial. Off in every preset; toggle it in the panel. |
@@ -106,6 +126,6 @@ cost down:
 
 ## Tuning tips
 
-- Too dark overall? Raise `toneMapping.exposure` or `ambient.intensity` before touching lamps. Too bright? The roads should stay the darkest thing in frame.
+- Too dark overall? Raise the mood's `exposure` or `ambient.intensity` before touching lamps. Too bright? The roads should stay the darkest thing in frame.
 - A location feels flat? Raise its profile's `poolStrength` (cheap) before `intensity` (per-pixel).
 - Too much bloom? Raise `bloom.threshold`, not just `weight`, so only real light sources bloom.

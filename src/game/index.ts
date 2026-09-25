@@ -32,4 +32,5 @@ export type {
   VehicleTelemetry,
 } from "./bridge";
 export type { SceneId } from "./scenes";
-export type { GraphicsQuality, GraphicsSettings } from "./rendering/LightingConfig";
+export type { GraphicsQuality, GraphicsSettings, TimeOfDay } from "./rendering/LightingConfig";
+export { TIMES_OF_DAY } from "./rendering/LightingConfig";

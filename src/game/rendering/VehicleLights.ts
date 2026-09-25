@@ -8,16 +8,18 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { GameSystem } from "../engine/types";
 import type { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { VEHICLE_LIGHTS } from "./LightingConfig";
+import type { SceneLighting } from "./SceneLighting";
 
 const DEG = Math.PI / 180;
-/** Car materials see the headlight, rim, moon, ambient and the whole light pool. */
+/** Car materials see the headlight, rim, sun/moon, ambient and the whole light pool. */
 const CAR_MAX_LIGHTS = 14;
 
 /**
  * Car Rule (ART_DIRECTION §2.3): the player's car is always readable at night. One spot light
  * throws the headlight beam; the lamp lenses are emissive so they bloom, and the tail lamps
  * brighten under braking and the reverse lamp comes on in reverse, straight from the handling
- * state. Nothing here feeds back into driving.
+ * state. With `lighting`, the beam follows the time of day (off in daylight). Nothing here
+ * feeds back into driving.
  */
 export class VehicleLights implements GameSystem {
   readonly name = "vehicleLights";
@@ -30,6 +32,7 @@ export class VehicleLights implements GameSystem {
   constructor(
     scene: Scene,
     private readonly player: PlayerVehicle,
+    private readonly lighting?: SceneLighting,
   ) {
     const { model } = player.visual;
     const h = VEHICLE_LIGHTS.headlight;
@@ -62,6 +65,8 @@ export class VehicleLights implements GameSystem {
   }
 
   update(): void {
+    // Zero, not disabled: `setEnabled` resyncs every mesh's light list.
+    if (this.lighting) this.headlight.intensity = VEHICLE_LIGHTS.headlight.intensity * this.lighting.mood.headlight;
     const { brake, reversing } = this.player.controller.model.state;
     // Brake pedal in reverse is the throttle; only real braking lights the lamps.
     const braking = !reversing && brake > 0.05 ? 1 : 0;

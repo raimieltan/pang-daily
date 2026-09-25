@@ -27,12 +27,12 @@ Source: `src/game/world/hub/hubLayout.ts` (data), `src/game/scenes/hubScene.ts` 
 |---|---|---|---|---|
 | `home` | Home | home | yard and gate | driveway, facing the street |
 | `talyer` | Talyer ni Mang Boy | talyer | waiting bench beside the bays | in the bay apron |
-| `coffee_shop` | Tambay Coffee | coffee_shop | terrace and side yard | café parking |
+| `coffee_shop` | Kyo Coffee | coffee_shop | terrace in front of the glass | concrete apron in front |
 | `gas_station` | Bahandi Fuels | gas_station | kiosk front | forecourt, between the pump islands |
 | `convenience_store` | Suki 24 | convenience_store | store front | store parking |
 | `main_road` | Main Road, to the mountain | main_road | none (road only) | eastbound lane near the exit |
 
-All brands are fictional. Colours suggest the category (green fuel canopy, blue and yellow
+All brands are fictional except Kyo Coffee, which is modelled on the real café (ground floor of the KLMB Bldg.) so local players recognise it. Colours suggest the category (green fuel canopy, blue and yellow
 24-hour store) without copying a real chain.
 
 Every location has:

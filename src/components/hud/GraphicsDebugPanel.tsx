@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { GraphicsQuality, GraphicsSettings } from "@/game";
+import { TIMES_OF_DAY, type GraphicsQuality, type GraphicsSettings } from "@/game";
 import { useGameUiStore } from "@/state/gameUiStore";
 import { useGraphicsStore } from "@/state/graphicsStore";
 
@@ -18,11 +18,12 @@ const TOGGLES: { key: keyof GraphicsSettings; label: string }[] = [
 ];
 
 /**
- * Night graphics panel (docs/NIGHT_LIGHTING.md): quality presets, per-effect toggles for the
- * expensive passes, the live frame cost, and the post on/off benchmark. Night scenes only.
+ * Graphics panel (docs/NIGHT_LIGHTING.md): time of day, quality presets, per-effect toggles for
+ * the expensive passes, the live frame cost, and the post on/off benchmark. Lit scenes only.
  */
 export function GraphicsDebugPanel() {
   const settings = useGraphicsStore((s) => s.settings);
+  const timeOfDay = useGraphicsStore((s) => s.timeOfDay);
   const stats = useGraphicsStore((s) => s.stats);
   const benchmark = useGraphicsStore((s) => s.benchmark);
   const benchmarking = useGraphicsStore((s) => s.benchmarking);
@@ -44,6 +45,21 @@ export function GraphicsDebugPanel() {
       </div>
       {open && (
         <div className="mt-2 flex flex-col gap-2 tabular-nums">
+          <div className="flex gap-1">
+            {TIMES_OF_DAY.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`${buttonClass} ${timeOfDay === t ? "bg-amber-200/20" : ""}`}
+                onClick={(e) => {
+                  commands?.setTimeOfDay(t);
+                  e.currentTarget.blur();
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-1">
             {QUALITIES.map((q) => (
               <button

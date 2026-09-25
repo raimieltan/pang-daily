@@ -6,7 +6,7 @@
  * outcomes come back as events (`commandRejected`, `raceStarted`, ...), so React
  * never depends on engine internals or synchronous return values.
  */
-import type { GraphicsSettings } from "../rendering/LightingConfig";
+import type { GraphicsSettings, TimeOfDay } from "../rendering/LightingConfig";
 import type { SceneId } from "../scenes";
 import type { RaceId, SpawnPointId } from "./types";
 
@@ -24,6 +24,8 @@ export type GameCommandMap = {
   setGraphics: Partial<GraphicsSettings>;
   /** Measures frame cost with post effects off, then on, for `seconds` each (default 4). */
   runGraphicsBenchmark: { seconds?: number };
+  /** Switches the lighting mood (morning, afternoon, night). */
+  setTimeOfDay: { time: TimeOfDay };
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -79,6 +81,7 @@ export interface GameCommands {
   setHandlingPreset(presetId: string): void;
   setGraphics(settings: Partial<GraphicsSettings>): void;
   runGraphicsBenchmark(seconds?: number): void;
+  setTimeOfDay(time: TimeOfDay): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -94,5 +97,6 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
     setGraphics: (settings) => dispatch("setGraphics", settings),
     runGraphicsBenchmark: (seconds) => dispatch("runGraphicsBenchmark", { seconds }),
+    setTimeOfDay: (time) => dispatch("setTimeOfDay", { time }),
   };
 }

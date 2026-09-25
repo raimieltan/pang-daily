@@ -1,4 +1,6 @@
 import { filletPolyline, LayoutAuthor, rect } from "../layoutTools";
+import { pixelText } from "../pixelFont";
+import type { Vec3Tuple } from "../props/PropDefinition";
 import type { LocationData, RoadPoint, Vec2, WorldLayout } from "../WorldLayout";
 
 /**
@@ -40,13 +42,13 @@ const CHUNKS = [
   { id: "coffee_shop", rect: rect(70, 70, 250, 210) },
 ] as const;
 
-// Fictional brands only (ART_DIRECTION §7): colours evoke the category, not a real chain.
+// Fictional brands (ART_DIRECTION §7): colours evoke the category, not a real chain. The one
+// exception is Kyo Coffee, built after the real café on purpose (see coffeeShop).
 const BRAND = {
   fuel: "#19b58a",
   fuelAccent: "#f2f2e8",
   store: "#2f6bff",
   storeAccent: "#ffd23a",
-  cafe: "#ffd9a0",
   talyerTarp: "#e8e2d0",
 };
 
@@ -142,7 +144,7 @@ export const HUB_LOCATIONS: readonly LocationData[] = [
   },
   {
     id: "coffee_shop",
-    name: "Tambay Coffee",
+    name: "Kyo Coffee",
     chunk: "coffee_shop",
     area: rect(125, 82, 166, 126),
     spawn: { x: 131, z: 97, headingDeg: 270 },
@@ -302,67 +304,169 @@ function talyer() {
 }
 
 function coffeeShop() {
-  // Low modern box with a glass front facing the connector road, nose-in parking right in front,
-  // and a terrace fenced from the lot by planters (walking-safe).
-  const front = 147;
-  a.surface({ kind: "asphalt", center: [132.5, 100], size: [15, 44] });
-  a.surface({ kind: "tile", center: [143.5, 100], size: [7, 30] });
-  a.surface({ kind: "tile", center: [155, 119], size: [16, 10] });
-  a.block({ center: [155, 2, 100], size: [16, 4, 28], color: "#c9c3b6", collide: true });
-  a.block({ center: [155, 4.2, 100], size: [17, 0.4, 29], color: "#2c2a28" });
-  // Glass front (lit interior) and warm fascia.
-  a.block({ center: [front - 0.02, 1.5, 100], size: [0.05, 2.6, 22], color: "#ffcf8a", glow: true });
-  a.block({ center: [front - 0.3, 3.2, 100], size: [0.6, 0.6, 26], color: "#4a3626" });
-  a.prop("sign_fascia", [front - 0.7, 100], { y: 3.3, rotDeg: 270, scale: 0.7, tint: BRAND.cafe });
-  // Terrace awning.
-  a.block({ center: [143.5, 3.4, 100], size: [7, 0.12, 28], color: "#3a2e26" });
-  for (const z of [86.5, 100, 113.5]) a.block({ center: [140.3, 1.7, z], size: [0.15, 3.4, 0.15], color: "#3a2e26", collide: true });
+  // Kyo Coffee on the ground floor of the KLMB Bldg., modelled on the real place so Ilonggo
+  // players know it on sight (the one real brand in the hub, on purpose). Three storeys: white
+  // facade, dark slab bands with glass-railed balconies, a dark-glass stair tower on the south
+  // end, wood soffit under the roof. The black-framed glass front faces the connector road
+  // (−x). Out front: a bare concrete apron to park on, black bollards and pink posts; to the
+  // south the gravel lot behind its white wall; to the north the fenced motorcycle corner.
+  const glass = 140.6;
+  const f2 = 3.9;
+  const f3 = 7.25;
+  const white = "#d9d6ce";
+  const band = "#35363a";
+  const frame = "#141414";
 
-  for (const z of [89, 95, 105, 111]) a.prop("string_lights_6m", [140.5, z], { y: 3.2, rotDeg: 90 });
-  a.lamp({ id: "cafe_terrace_n", at: [143, 3.0, 109], profile: "cafe" });
-  a.lamp({ id: "cafe_terrace_s", at: [143, 3.0, 91], profile: "cafe" });
-  a.lamp({ id: "cafe_interior", at: [148.5, 2.4, 100], profile: "cafe", strength: 1.1 });
-  a.lamp({ id: "cafe_side", at: [155, 2.8, 119], profile: "cafe", strength: 0.7 });
+  a.surface({ kind: "concrete", center: [130.65, 98], size: [11.3, 28] });
+  a.surface({ kind: "tile", center: [138.45, 103], size: [4.3, 18] });
+  a.surface({ kind: "gravel", center: [150.65, 85], size: [28.7, 18] });
+  a.surface({ kind: "gravel", center: [130.65, 80], size: [11.3, 8] });
+  a.surface({ kind: "gravel", center: [158, 100], size: [14, 12] });
+  a.surface({ kind: "dirt", center: [152.8, 115], size: [24.4, 18] });
 
-  // Planters with gaps as the lot/terrace edge; a sign at the road.
-  for (const z of [87.5, 92.5, 107.5, 112.5]) a.prop("planter_box", [139.6, z], { rotDeg: 90 });
-  for (const z of [97.5, 102.5]) a.prop("bollard", [139.6, z]);
-  for (let z = 81; z <= 119; z += 3.2) a.prop("curb_stop", [137.6, z], { rotDeg: 90 });
-  a.prop("sign_roadside", [126.5, 124], { rotDeg: 270, tint: BRAND.cafe });
+  // ── building mass ──
+  a.block({ center: [(glass + 151) / 2, 1.7, 101], size: [151 - glass, 3.4, 10], color: white, collide: true });
+  a.block({ center: [145.5, 7.05, 101], size: [11, 6.3, 10], color: white, collide: true });
+  for (const [z0, z1] of [[105.4, 106], [99.4, 100.2], [96, 97.2]] as const) {
+    a.block({ center: [(140 + glass) / 2, 1.7, (z0 + z1) / 2], size: [glass - 140, 3.4, z1 - z0], color: white, collide: true });
+  }
+  a.block({ center: [140.1, 0.05, 101], size: [1.2, 0.1, 10], color: "#8f8b83" });
+  // Dark slab bands: the 2nd-floor one runs the full width and carries the storefront sign.
+  a.block({ center: [145, 3.65, 101], size: [12, 0.5, 10.2], color: band });
+  a.block({ center: [139.66, 7.02, 102.3], size: [0.72, 0.45, 7.6], color: band });
+  // Stair tower in dark glass, floor lines and a cool reflection.
+  a.block({ center: [140, 7, 97.2], size: [1, 6.2, 2.6], color: "#1b2638" });
+  for (const y of [f3, 9.6]) a.block({ center: [139.49, y, 97.2], size: [0.02, 0.08, 2.6], color: "#0e131c" });
+  a.block({ center: [139.48, 7, 97.9], size: [0.02, 6.1, 0.35], color: "#2d4466" });
+  // Roof slab with the wood soffit and downlights along the front.
+  a.block({ center: [145.1, 10.4, 101], size: [12.6, 0.4, 10.8], color: "#ecebe6" });
+  a.block({ center: [139.4, 10.15, 101], size: [1.2, 0.1, 10.8], color: "#8a5a3a" });
+  for (const z of [98, 101, 104]) a.block({ center: [139.4, 10.09, z], size: [0.14, 0.02, 0.14], color: "#fff0cc", glow: true });
+  // Solar panels on the roof, as seen from above.
+  for (const x of [144.5, 147.5]) a.block({ center: [x, 10.68, 101], size: [2.6, 0.08, 8], color: "#1d2a44" });
 
-  const seats: [number, number][] = [
-    [142, 90],
-    [145, 93],
-    [142, 97.5],
-    [145, 106],
-    [142, 109.5],
-    [145, 112],
+  // ── ground floor: black-framed glass, warm café behind it ──
+  const bays: [number, number, string][] = [
+    [100.2, 105.4, "#eeb27a"],
+    [97.2, 99.4, "#d89a66"],
   ];
-  for (const [x, z] of seats) {
-    a.prop("plastic_table", [x, z], { tint: "#2c2a28" });
-    a.prop("plastic_chair", [x - 0.8, z + 0.4], { rotDeg: 110, tint: "#2c2a28" });
-    a.prop("plastic_chair", [x + 0.8, z - 0.4], { rotDeg: 290, tint: "#2c2a28" });
+  for (const [z0, z1, wall] of bays) {
+    const zc = (z0 + z1) / 2;
+    const w = z1 - z0;
+    a.block({ center: [glass, 0.45, zc], size: [0.04, 0.9, w], color: "#9a5a34", glow: true });
+    a.block({ center: [glass, 1.8, zc], size: [0.04, 1.8, w], color: wall, glow: true });
+    a.block({ center: [glass, 2.83, zc], size: [0.04, 0.26, w], color: "#ffe2b0", glow: true });
+    a.block({ center: [140.5, 2.45, zc], size: [0.08, 0.06, w], color: frame });
+    a.block({ center: [140.5, 3.18, zc], size: [0.08, 0.44, w], color: frame });
+    a.block({ center: [140.5, 0.13, zc], size: [0.08, 0.06, w], color: frame });
   }
-  // Side yard seating under the mango tree (the actual tambay spot).
-  a.prop("tree_mango", [160, 121]);
-  for (const [x, z, r] of [[151, 118, 30], [153, 120.5, 200], [156, 117.5, 320], [149.5, 121, 90]] as const) {
-    a.prop("plastic_chair", [x, z], { rotDeg: r, tint: "#e7e4dc" });
-  }
-  a.prop("plastic_table", [153, 119], { tint: "#e7e4dc" });
-  a.prop("string_lights_6m", [155, 117], { y: 3.0 });
-  a.prop("motorcycle_parked", [129, 123], { rotDeg: 90, tint: "#1d1d1d" });
-  a.prop("motorcycle_parked", [129, 121.6], { rotDeg: 90, tint: "#a31f1f" });
-  a.prop("trash_drum", [146.2, 85.8]);
-  a.prop("dog_sleeping", [146, 116], { rotDeg: 200 });
+  for (const z of [100.25, 102.4, 103.6, 105.35, 97.25, 99.35]) a.block({ center: [140.5, 1.5, z], size: [0.08, 3, 0.08], color: frame });
+  a.block({ center: [140.42, 1.05, 102.55], size: [0.05, 0.6, 0.04], color: "#b8bcc0" });
+  // Interior read through the glass: counter, espresso machine, menu board, pendants, seats.
+  const inside = (center: Vec3Tuple, size: [number, number], color: string) =>
+    a.block({ center: [140.56, center[1], center[2]], size: [0.03, size[0], size[1]], color, glow: true });
+  inside([0, 0.52, 104.5], [1.05, 1.4], "#3b2418");
+  inside([0, 1.22, 104.45], [0.34, 0.5], "#5e5e5e");
+  inside([0, 1.95, 104.5], [0.7, 1.4], "#2a1a12");
+  for (const y of [1.8, 1.95, 2.1]) inside([0, y, 104.5], [0.03, 1.1], "#f4e2c0");
+  for (const z of [100.9, 102.9, 104.6]) inside([0, 2.3, z], [0.18, 0.18], "#fff4d6");
+  for (const z of [101.1, 101.9]) inside([0, 0.7, z], [0.5, 0.3], "#2a1a12");
+  inside([0, 0.74, 101.5], [0.05, 0.7], "#2a1a12");
+  for (let y = 1.2; y < 2.8; y += 0.25) inside([0, y, 98.3], [0.03, 2.1], "#b07048");
+  inside([0, 0.6, 98.3], [1.2, 1.0], "#1f3a24");
+  // Vertical Kyo logo panel on the glass beside the door.
+  a.block({ center: [140.49, 1.9, 100.9], size: [0.02, 1.3, 0.5], color: "#f4efe6", glow: true });
+  [..."KYO"].forEach((ch, i) => signText(ch, 140.48, 2.45 - i * 0.4, 100.9, 0.05, "#b8322a"));
+  // The storefront sign on the slab band, with downlights under it.
+  signText("KYO COFFEE", 139, 3.86, 102.8, 0.06, "#fff1d6");
+  for (const z of [98, 100, 102, 104]) a.block({ center: [139.4, 3.39, z], size: [0.14, 0.02, 0.14], color: "#ffe6b8", glow: true });
 
-  a.zone({ id: "cafe_terrace", kind: "walk", rect: rect(140, 86, 147, 114), locationId: "coffee_shop" });
-  a.zone({ id: "cafe_side_yard", kind: "walk", rect: rect(147, 114, 163, 124), locationId: "coffee_shop" });
-  a.zone({ id: "cafe_counter", kind: "interact", rect: rect(145, 97, 147, 103), locationId: "coffee_shop" });
-  a.zone({ id: "cafe_parking", kind: "parking", rect: rect(125, 80, 138, 120), locationId: "coffee_shop" });
+  // ── upper floors: balconies, wood-framed windows, KLMB Bldg. lettering ──
+  for (const [base, railX] of [[f2, 139.12], [f3, 139.4]] as const) {
+    for (let z = 98.7; z <= 106; z += 1.2) a.block({ center: [railX, base + 0.52, z], size: [0.05, 1.05, 0.05], color: "#b8bcc0" });
+    a.block({ center: [railX, base + 1.06, 102.2], size: [0.06, 0.05, 7.4], color: "#c8ccd0" });
+    a.block({ center: [railX, base + 0.06, 102.2], size: [0.06, 0.06, 7.4], color: "#8e959c" });
+    a.block({ center: [139.97, base + 1.15, 102.2], size: [0.06, 2.1, 2.0], color: "#6b3f24" });
+    a.block({ center: [139.93, base + 1.15, 102.2], size: [0.03, 1.9, 1.8], color: base === f3 ? "#b88a5c" : "#161c26", glow: base === f3 });
+    a.block({ center: [139.9, base + 1.15, 102.2], size: [0.02, 1.9, 0.06], color: "#6b3f24" });
+    a.block({ center: [139.92, base + 2.3, 102.2], size: [0.16, 0.1, 2.5], color: "#f4f3ef" });
+    a.block({ center: [139.97, base + 1.25, 104.8], size: [0.06, 0.7, 0.7], color: "#6b3f24" });
+    a.block({ center: [139.93, base + 1.25, 104.8], size: [0.03, 0.56, 0.56], color: "#161c26" });
+    a.block({ center: [139.93, base + 1.7, 104.8], size: [0.14, 0.08, 1.0], color: "#f4f3ef" });
+  }
+  signText("KLMB", 139.98, 10.06, 104.68, 0.08, "#8fb4e0");
+  signText("BLDG.", 139.98, 9.415, 104.68, 0.045, "#8fb4e0");
+  a.prop("aircon_unit", [139.98, 99.9], { y: 8.9, rotDeg: 270 });
+  a.prop("aircon_unit", [141.8, 95.98], { y: 2.2, rotDeg: 180 });
+  a.prop("plastic_chair", [139.5, 104.8], { y: f2, rotDeg: 270, tint: "#d8d8d4" });
+
+  // ── outdoor tambay: café tables tight against the glass, one big umbrella ──
+  const cream = "#e2d6bf";
+  a.prop("patio_umbrella", [137.8, 104.6], { tint: "#d8c8a8" });
+  for (const [x, z] of [[137.8, 104.6], [138.2, 101.2], [138, 98]] as const) {
+    a.prop("cafe_table", [x, z]);
+    a.prop("tabletop_cups", [x, z], { y: 0.76, rotDeg: x * 40 });
+    a.prop("folding_chair", [x, z + 0.7], { rotDeg: 180, tint: cream });
+    a.prop("folding_chair", [x, z - 0.7], { rotDeg: 0, tint: cream });
+  }
+  a.prop("plastic_chair", [137.4, 101.3], { rotDeg: 80, tint: "#e7e4dc" });
+  a.prop("plastic_chair", [138.9, 97.4], { rotDeg: 300, tint: "#2c2a28" });
+  a.prop("umbrella_closed", [139.6, 100.8], { tint: "#d8c8a8" });
+  a.prop("string_lights_6m", [138.9, 102], { y: 3.3, rotDeg: 90 });
+  for (const z of [97, 99.8, 105.8]) a.prop("potted_plant", [139.75, z]);
+  a.prop("dog_sleeping", [137.2, 96.8], { rotDeg: 200 });
+
+  // Frontage: black bollards, pink posts and the parking notice on its A-frame.
+  for (const z of [96.6, 98.4, 100.2]) a.prop("bollard_round", [136.1, z], { tint: "#262626" });
+  a.prop("post_slim", [135.3, 103.4], { tint: "#e7a7b3" });
+  a.prop("post_slim", [134.4, 99.6], { tint: "#e7a7b3" });
+  a.prop("sign_aframe", [135.4, 101.8], { rotDeg: 270, tint: "#ececea" });
+
+  // ── north corner: tall white gate pillars, steel fence, parked motorcycles ──
+  a.block({ center: [142.5, 1.2, 112.5], size: [17, 2.4, 0.3], color: "#e6e4dc", collide: true });
+  for (const x of [134.3, 137]) a.block({ center: [x, 2.8, 112.4], size: [0.6, 5.6, 0.6], color: "#e6e4dc", collide: true });
+  a.block({ center: [135.65, 3.3, 111.8], size: [3.4, 0.3, 1.4], color: "#dcdad2" });
+  a.wallRun([151, 112.5], [165, 112.5]);
+  for (const z of [107.9, 110.9]) a.prop("steel_fence_3m", [134.6, z], { rotDeg: 90 });
+  a.prop("utility_box", [134, 112.1], { y: 1.5, rotDeg: 270 });
+  a.prop("motorcycle_parked", [136.6, 108.8], { rotDeg: 200, tint: "#1d1d1d" });
+  a.prop("motorcycle_parked", [138.4, 109.4], { rotDeg: 160, tint: "#8a1f1f" });
+  a.prop("trash_drum", [133.6, 113.3]);
+
+  // ── south: the gravel lot behind its white wall, gate leaf swung open ──
+  a.wallRun([127, 76.2], [165, 76.2]);
+  a.prop("steel_fence_3m", [128.2, 77.8], { rotDeg: 30 });
+  for (let x = 140; x <= 162; x += 3.2) a.prop("curb_stop", [x, 78]);
+  a.prop("beer_crate_stack", [141.2, 94.6], { tint: "#c9a227" });
+  a.prop("water_jug", [142.2, 95.3]);
+
+  // ── roadside: drainage edge, poles and wires across the front, the Kyo sign ──
+  for (const z of [74, 116, 120, 124]) a.prop("canal_4m", [125.9, z]);
+  for (const z of [90, 106]) a.prop("drain_grate", [125.6, z], { rotDeg: 90 });
+  a.poleLine([[127, 122], [127, 79]], 2, 1.4);
+  for (const z of [113, 116]) a.block({ center: [128, 1.4, z], size: [0.12, 2.8, 0.12], color: "#2a2a2a", collide: true });
+  a.block({ center: [128.02, 2.55, 114.5], size: [0.1, 0.8, 3.4], color: "#1a1a1a" });
+  signText("KYO COFFEE", 127.96, 2.73, 114.5, 0.05, "#ffe9c4");
+
+  // Tropical side plants and the old mango tree behind the building.
+  a.prop("tree_mango", [160, 121]);
+  for (const [x, z] of [[131, 118], [146, 114.5], [163, 80], [152, 94.8]] as const) a.prop("banana_plant", [x, z]);
+  for (const [x, z] of [[139, 114], [156, 115], [133, 78]] as const) a.prop("bush", [x, z]);
+
+  // Out over the terrace, not against the glass: a lamp that close blows the white wall out.
+  a.lamp({ id: "kyo_interior", at: [136.2, 2.8, 102.5], profile: "cafe", strength: 0.75 });
+  a.lamp({ id: "kyo_terrace", at: [136.5, 3.0, 98], profile: "cafe", strength: 0.6 });
+  a.lamp({ id: "kyo_sign", at: [128.8, 2.6, 114.5], profile: "porch", strength: 0.6 });
+  a.lamp({ id: "kyo_side", at: [141, 3, 94.8], profile: "porch", strength: 0.7 });
+
+  a.zone({ id: "kyo_terrace", kind: "walk", rect: rect(136.6, 96.5, 140, 106.2), locationId: "coffee_shop" });
+  a.zone({ id: "kyo_counter", kind: "interact", rect: rect(139.6, 102.2, 140.5, 103.8), locationId: "coffee_shop" });
+  a.zone({ id: "kyo_apron", kind: "parking", rect: rect(125.5, 84, 136, 112), locationId: "coffee_shop" });
+  a.zone({ id: "kyo_moto_corner", kind: "parking", rect: rect(134.8, 106.6, 140.4, 111.8), locationId: "coffee_shop" });
+  a.zone({ id: "kyo_lot", kind: "parking", rect: rect(128, 77, 164, 93.5), locationId: "coffee_shop" });
 
   // Neighbours along the connector.
   house([150, 150], [14, 12], { wall: WALL.pink, roof: ROOF.gi, facingDeg: 270, window: true });
-  house([155, 77.5], [12, 8], { wall: WALL.sage, roof: ROOF.rust, facingDeg: 270 });
   house([95, 165], [16, 12], { wall: WALL.cream, roof: ROOF.gi, facingDeg: 180, window: true });
   a.wallRun([165, 128], [165, 76]);
 }
@@ -536,6 +640,23 @@ function local(x: number, z: number, facingDeg: number, lx: number, lz: number):
   const c = Math.cos(facingDeg * DEG);
   const s = Math.sin(facingDeg * DEG);
   return [x + lx * c + lz * s, z - lx * s + lz * c];
+}
+
+/**
+ * Block-letter `text` on a wall facing −x (read looking east, so it runs from +z to −z),
+ * centred on `centerZ` with its top at `top`. `px` is one font pixel in metres.
+ */
+function signText(text: string, x: number, top: number, centerZ: number, px: number, color: string) {
+  const { runs, columns } = pixelText(text);
+  const left = centerZ + (columns * px) / 2;
+  for (const run of runs) {
+    a.block({
+      center: [x - 0.015, top - (run.row + 0.5) * px, left - (run.col + run.length / 2) * px],
+      size: [0.03, px, run.length * px],
+      color,
+      glow: true,
+    });
+  }
 }
 
 /** Barrier and closed-road sign where a road leaves the hub. */

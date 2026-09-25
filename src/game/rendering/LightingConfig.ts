@@ -1,5 +1,5 @@
 /**
- * Night-lighting and post-processing tuning (ART_DIRECTION §2.3, §4, §5, §13).
+ * Scene lighting (morning, afternoon, night) and post-processing tuning (ART_DIRECTION §2.3, §4, §5, §13).
  * Every value the lighting pass reads lives here, so the mood can be tuned without touching
  * the systems. Colours are sRGB hex. Rationale and measured costs: docs/NIGHT_LIGHTING.md.
  */
@@ -69,20 +69,126 @@ export const LIGHT_PROFILES = {
 
 export type LightProfileId = keyof typeof LIGHT_PROFILES;
 
-/** Scene-wide mood: sky, fog, the ambient floor, moonlight, and the car-only rim light. */
-export const NIGHT_MOOD = {
-  clearColor: "#0e1118",
-  fog: { color: "#10131a", density: 0.0065 },
-  /** Ambient floor: keeps unlit areas readable (Night Rule), never pitch black. */
-  ambient: { sky: "#5a6a8c", ground: "#1a1712", intensity: 0.32 },
-  /** Cool moonlight: gives roofs, walls and trees a silhouette between lamps. */
-  moon: { color: "#9fb2d6", intensity: 0.28, direction: [0.35, -1, 0.45] as const },
+export type TimeOfDay = "morning" | "afternoon" | "night";
+
+export const TIMES_OF_DAY: readonly TimeOfDay[] = ["morning", "afternoon", "night"];
+
+export const DEFAULT_TIME_OF_DAY: TimeOfDay = "night";
+
+/** Scene-wide mood for one time of day: sky, fog, ambient, key light, car rim, and how lit the lamps are. */
+export type SceneMood = {
+  readonly clearColor: string;
+  readonly fog: { readonly color: string; readonly density: number };
+  /** Ambient floor: keeps unlit areas readable, never pitch black. */
+  readonly ambient: { readonly sky: string; readonly ground: string; readonly intensity: number };
+  /** Key directional light: the sun by day, faint moonlight at night. Direction is where it shines toward. */
+  readonly key: { readonly color: string; readonly intensity: number; readonly direction: readonly [number, number, number] };
   /**
    * Car Rule: a light that only touches the player's car, from above-behind the camera side,
    * so paint and silhouette read even on an unlit road.
    */
-  carRim: { color: "#c9d6f0", intensity: 0.55, direction: [-0.3, -0.6, -0.75] as const },
-} as const;
+  readonly carRim: { readonly color: string; readonly intensity: number; readonly direction: readonly [number, number, number] };
+  /** Scales every lamp's real light and ground pool. 0 turns them off (and hides the pools). */
+  readonly lamps: number;
+  /** Scales the unlit glow material (shopfront glass, signs, lenses). Below 1 so they don't glow in daylight. */
+  readonly glow: number;
+  /** Scales the car's headlight beam. */
+  readonly headlight: number;
+  readonly exposure: number;
+  /** Bright daylight surfaces would bloom at the night threshold. */
+  readonly bloomThreshold: number;
+  readonly sky: SkyMood;
+};
+
+/**
+ * Procedural sky dome (Sky.ts). The horizon always melts into `fog.color`, so fogged
+ * buildings and the sky meet without a seam.
+ */
+export type SkyMood = {
+  readonly zenith: string;
+  /** Band just above the horizon, before it fades into the fog colour. */
+  readonly horizon: string;
+  /** Sun by day, moon at night. Sits on the key light's compass bearing at `elevationDeg`. */
+  readonly body: {
+    readonly color: string;
+    readonly sizeDeg: number;
+    readonly elevationDeg: number;
+    /** Halo and horizon scatter around the disc. */
+    readonly glow: number;
+  };
+  readonly clouds: { readonly lit: string; readonly shade: string; readonly cover: number };
+  /** 0 hides them; 1 is a clear provincial night. */
+  readonly stars: number;
+  /** Sodium light pollution hugging the horizon. */
+  readonly cityGlow: { readonly color: string; readonly strength: number };
+};
+
+/** +x is east, +z is north (docs/HUB_LAYOUT.md). */
+export const MOODS: Record<TimeOfDay, SceneMood> = {
+  /** Fresh and slightly hazy: low sun out of the east, cool sky fill, long soft light. */
+  morning: {
+    clearColor: "#9cc3e8",
+    fog: { color: "#bcd0e2", density: 0.0045 },
+    ambient: { sky: "#c4d6ee", ground: "#7a6a52", intensity: 1 },
+    key: { color: "#ffe4c2", intensity: 1.2, direction: [-0.8, -0.65, 0.3] },
+    carRim: { color: "#dfe8ff", intensity: 0.2, direction: [-0.3, -0.6, -0.75] },
+    lamps: 0,
+    glow: 0.55,
+    headlight: 0,
+    exposure: 1.15,
+    bloomThreshold: 0.95,
+    sky: {
+      zenith: "#2c6cc6",
+      horizon: "#b8d2ea",
+      body: { color: "#fff0d4", sizeDeg: 1.8, elevationDeg: 13, glow: 1 },
+      clouds: { lit: "#fff3e2", shade: "#95a9c0", cover: 0.4 },
+      stars: 0,
+      cityGlow: { color: "#ffc27a", strength: 0 },
+    },
+  },
+  /** Hot, bright tropical afternoon: high sun from the west, warm golden key, a little dusty haze. */
+  afternoon: {
+    clearColor: "#7fb2e4",
+    fog: { color: "#cdd3d2", density: 0.0038 },
+    ambient: { sky: "#b4cdea", ground: "#846c4a", intensity: 0.95 },
+    key: { color: "#ffd8a0", intensity: 1.35, direction: [0.6, -0.9, -0.2] },
+    carRim: { color: "#fff0d8", intensity: 0.2, direction: [-0.3, -0.6, -0.75] },
+    lamps: 0,
+    glow: 0.55,
+    headlight: 0,
+    exposure: 1.1,
+    bloomThreshold: 0.95,
+    sky: {
+      zenith: "#1c5fc0",
+      horizon: "#94bfe8",
+      body: { color: "#fff6e2", sizeDeg: 1.6, elevationDeg: 52, glow: 0.7 },
+      clouds: { lit: "#ffffff", shade: "#9fb0c2", cover: 0.52 },
+      stars: 0,
+      cityGlow: { color: "#ffd8a0", strength: 0 },
+    },
+  },
+  /** Lo-fi nocturnal realism (ART_DIRECTION §2.3): cool ambient floor, faint moon, lamps carry the scene. */
+  night: {
+    clearColor: "#0e1118",
+    fog: { color: "#10131a", density: 0.0065 },
+    ambient: { sky: "#5a6a8c", ground: "#1a1712", intensity: 0.32 },
+    key: { color: "#9fb2d6", intensity: 0.28, direction: [0.35, -1, 0.45] },
+    carRim: { color: "#c9d6f0", intensity: 0.55, direction: [-0.3, -0.6, -0.75] },
+    lamps: 1,
+    glow: 1,
+    headlight: 1,
+    exposure: 1.25,
+    bloomThreshold: 0.72,
+    sky: {
+      zenith: "#03050b",
+      horizon: "#161b29",
+      body: { color: "#dfe6ff", sizeDeg: 2.4, elevationDeg: 24, glow: 0.35 },
+      clouds: { lit: "#2a3246", shade: "#07090e", cover: 0.36 },
+      stars: 1,
+      cityGlow: { color: "#ff9a3c", strength: 0.07 },
+    },
+  },
+};
 
 export const VEHICLE_LIGHTS = {
   headlight: {
@@ -114,11 +220,13 @@ export type PostSettings = {
 export const POST_TUNING = {
   /** HDR pipeline so emissive lenses and signs can exceed the bloom threshold. */
   hdr: true,
-  bloom: { threshold: 0.72, weight: 0.32, kernel: 32, scale: 0.5 },
+  /** Threshold comes from the time of day's mood. */
+  bloom: { weight: 0.32, kernel: 32, scale: 0.5 },
   grain: { intensity: 9, animated: true },
   vignette: { weight: 1.8, stretch: 0.35, color: "#000000" },
   chromaticAberration: { amount: 14, radialIntensity: 0.9 },
-  toneMapping: { aces: true, exposure: 1.25, contrast: 1.12 },
+  /** Exposure comes from the time of day's mood. */
+  toneMapping: { aces: true, contrast: 1.12 },
 } as const;
 
 export type GraphicsQuality = "high" | "medium" | "low";

@@ -8,8 +8,9 @@ import { InputManager } from "../input/InputManager";
 import { loadHavok } from "../physics/havok";
 import { PhysicsWorld } from "../physics/PhysicsWorld";
 import { GraphicsSystem } from "../rendering/GraphicsSystem";
-import { GRAPHICS_PRESETS, type GraphicsQuality } from "../rendering/LightingConfig";
-import { NightLighting } from "../rendering/NightLighting";
+import { DEFAULT_TIME_OF_DAY, GRAPHICS_PRESETS, TIMES_OF_DAY, type GraphicsQuality, type TimeOfDay } from "../rendering/LightingConfig";
+import { SceneLighting } from "../rendering/SceneLighting";
+import { Sky, skyLast } from "../rendering/Sky";
 import { VehicleLights } from "../rendering/VehicleLights";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
@@ -19,14 +20,14 @@ import { HubLocations, toVehiclePose } from "../world/hub/HubLocations";
 import { buildChunk, WorldKit } from "../world/WorldChunk";
 
 /**
- * The vertical-slice hub at night (docs/HUB_LAYOUT.md, docs/NIGHT_LIGHTING.md): home,
+ * The vertical-slice hub, morning, afternoon or night (docs/HUB_LAYOUT.md, docs/NIGHT_LIGHTING.md): home,
  * tambay coffee shop, talyer, gas station and convenience store on one driveable loop, with
  * the main road running out east toward the future mountain route.
  *
  * Every chunk is built up front for now; each is self-contained (geometry, props, colliders),
  * so streaming later only changes when `buildChunk` / `dispose` run.
  * `?spawn=<locationId>` picks the start, `?quality=high|medium|low` the graphics preset,
- * `?handling=<presetId>` the handling preset.
+ * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
   async setup({ scene, engine, addSystem, bridge, signal }) {
@@ -46,10 +47,6 @@ export const hubScene: SceneDefinition = {
     );
     const world = addSystem(new PhysicsWorld(scene, havok));
 
-    // All world meshes share one material, so Babylon's default order (material, then creation)
-    // draws far chunks first and the car last, lighting every covered pixel and then painting
-    // over it. Nearest-first lets the depth test skip hidden pixels before they are shaded.
-    scene.setRenderingOrder(0, RenderingGroup.frontToBackSortCompare);
     const kit = new WorldKit(scene);
     const chunks = HUB_LAYOUT.chunks.map((chunk) => buildChunk(scene, chunk, kit));
     addSystem({ name: "hubChunks", dispose: () => (chunks.forEach((c) => c.dispose()), kit.dispose()) });
@@ -57,7 +54,15 @@ export const hubScene: SceneDefinition = {
     const quality = params.get("quality");
     const preset = GRAPHICS_PRESETS[quality && quality in GRAPHICS_PRESETS ? (quality as GraphicsQuality) : "high"];
     const lamps = HUB_LAYOUT.chunks.flatMap((c) => c.lamps);
-    const lighting = addSystem(new NightLighting(scene, lamps, kit.litMaterials, preset.lightPoolSize));
+    const time = params.get("time");
+    const timeOfDay = TIMES_OF_DAY.includes(time as TimeOfDay) ? (time as TimeOfDay) : DEFAULT_TIME_OF_DAY;
+    const lighting = addSystem(new SceneLighting(scene, lamps, kit.litMaterials, [kit.glow], preset.lightPoolSize, timeOfDay));
+    const sky = addSystem(new Sky(scene, lighting));
+    // All world meshes share one material, so Babylon's default order (material, then creation)
+    // draws far chunks first and the car last, lighting every covered pixel and then painting
+    // over it. Nearest-first lets the depth test skip hidden pixels before they are shaded.
+    // The sky goes after everything, so its shader only runs where nothing else covered the pixel.
+    scene.setRenderingOrder(0, skyLast(sky.mesh, RenderingGroup.frontToBackSortCompare));
 
     const spawnPoints = Object.fromEntries(HUB_LAYOUT.locations.map((l) => [l.id, toVehiclePose(l.spawn)]));
     const requestedSpawn = params.get("spawn");
@@ -78,7 +83,7 @@ export const hubScene: SceneDefinition = {
     // Order: car state → locations (may teleport) → lights follow → camera → graphics readout.
     addSystem(player);
     addSystem(new HubLocations(HUB_LAYOUT, player, bridge));
-    addSystem(new VehicleLights(scene, player));
+    addSystem(new VehicleLights(scene, player, lighting));
     addSystem(chase);
     const pools = chunks.map((c) => c.pools).filter((m): m is Mesh => m !== null);
     addSystem(new GraphicsSystem(scene, engine, chase.camera, bridge, lighting, pools, preset.quality));

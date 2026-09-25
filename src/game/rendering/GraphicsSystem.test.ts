@@ -7,8 +7,8 @@ import { GameBridge, type GameEventMap } from "../bridge";
 import { HUB_LAYOUT } from "../world/hub/hubLayout";
 import { buildChunk, WorldKit } from "../world/WorldChunk";
 import { GraphicsSystem } from "./GraphicsSystem";
-import { GRAPHICS_PRESETS } from "./LightingConfig";
-import { NightLighting } from "./NightLighting";
+import { GRAPHICS_PRESETS, MOODS } from "./LightingConfig";
+import { SceneLighting } from "./SceneLighting";
 
 let engine: NullEngine | null = null;
 afterEach(() => {
@@ -26,10 +26,10 @@ function setup(baseScaling = 1) {
   const camera = new FreeCamera("camera", new Vector3(130, 3, 90), scene);
   const kit = new WorldKit(scene);
   const chunk = buildChunk(scene, HUB_LAYOUT.chunks.find((c) => c.id === "coffee_shop")!, kit, { physics: false });
-  const lighting = new NightLighting(scene, HUB_LAYOUT.chunks.flatMap((c) => c.lamps), kit.litMaterials, 8);
+  const lighting = new SceneLighting(scene, HUB_LAYOUT.chunks.flatMap((c) => c.lamps), kit.litMaterials, [kit.glow], 8);
   const bridge = new GameBridge();
   const events: { name: keyof GameEventMap; payload: unknown }[] = [];
-  for (const name of ["graphicsState", "renderStats", "graphicsBenchmark", "commandRejected"] as const) {
+  for (const name of ["graphicsState", "timeOfDay", "renderStats", "graphicsBenchmark", "commandRejected"] as const) {
     bridge.ui.events.on(name, (payload) => events.push({ name, payload }));
   }
   const graphics = new GraphicsSystem(scene, engine, camera, bridge.runtime, lighting, chunk.pools ? [chunk.pools] : [], "high");
@@ -135,5 +135,36 @@ describe("GraphicsSystem", () => {
     }
     expect(new Set(scene.lights)).toEqual(lights);
     expect(scene.lights.map((l) => l.isEnabled())).toEqual(enabledBefore);
+  });
+
+  it("switches time of day: lamps and pools off by day, back on at night, with no light added or removed", () => {
+    const { scene, graphics, lighting, commands, events, frames, pools } = setup();
+    const car = { position: new Vector3(130, 0, 90), forward: new Vector3(1, 0, 0) };
+    lighting.attachCar(car, []);
+    const lights = new Set(scene.lights);
+    frames(1);
+    const lampLit = () => scene.lights.some((l) => l.name.startsWith("scene:pool") && l.intensity > 0);
+    expect(lampLit()).toBe(true);
+
+    commands.setTimeOfDay("morning");
+    frames(0.1);
+    expect(events.at(-1)).toEqual({ name: "timeOfDay", payload: { time: "morning" } });
+    expect(lampLit()).toBe(false);
+    expect(pools.isEnabled()).toBe(false);
+    expect(scene.imageProcessingConfiguration.exposure).toBe(MOODS.morning.exposure);
+    expect(graphics.pipeline?.bloomThreshold).toBe(MOODS.morning.bloomThreshold);
+    expect(lighting.key.intensity).toBe(MOODS.morning.key.intensity);
+
+    commands.setTimeOfDay("night");
+    frames(0.1);
+    expect(lampLit()).toBe(true);
+    expect(pools.isEnabled()).toBe(true);
+    expect(new Set(scene.lights)).toEqual(lights);
+  });
+
+  it("rejects unknown times of day", () => {
+    const { commands, events } = setup();
+    commands.setTimeOfDay("dusk" as never);
+    expect(events.at(-1)?.name).toBe("commandRejected");
   });
 });

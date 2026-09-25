@@ -94,6 +94,26 @@ export const PROP_KIT = {
     collider: { size: [0.7, 9, 0.7], at: [0, 4.5, 0.15] },
   },
 
+  utility_box: {
+    category: "utility",
+    description: "Electric meter box with its conduit. Mount on a wall or pole (set y); faces +z.",
+    parts: [
+      box([0.35, 0.45, 0.15], [0, 0, 0.08], "#8a8f8a"),
+      box([0.14, 0.12, 0.01], [0, 0.08, 0.16], "#cfd8d0"),
+      box([0.04, 1.2, 0.04], [0, -0.8, 0.04], STEEL),
+    ],
+  },
+  aircon_unit: {
+    category: "utility",
+    description: "Split-type aircon outdoor unit on brackets. Mount on a wall (set y); the fan grille faces +z.",
+    parts: [
+      box([0.8, 0.55, 0.3], [0, 0, 0.17], "#dcdcd6"),
+      cyl(0.42, 0.02, [-0.1, 0, 0.33], "#3a3a3a", { rotDeg: [90, 0, 0], tessellation: 10 }),
+      ...[-0.3, 0.3].map((x) => box([0.04, 0.04, 0.36], [x, -0.3, 0.18], STEEL)),
+      box([0.03, 0.6, 0.03], [0.36, -0.5, 0.03], "#e8e8e0"),
+    ],
+  },
+
   // ── walls & drainage ──────────────────────────────────────────────────────
   concrete_wall_3m: {
     category: "wall",
@@ -115,6 +135,16 @@ export const PROP_KIT = {
       box([0.28, 1.2, 0.28], [1.5, 0.6, 0], "#8b8f78"),
     ],
     collider: { size: [3, 1.2, 0.3], at: [0, 0.6, 0] },
+  },
+  steel_fence_3m: {
+    category: "wall",
+    description: "3 m black steel bar fence/gate panel, the kind that fronts every motorcycle corner.",
+    parts: [
+      ...[0.12, 1.1, 2.0].map((y) => box([3, 0.05, 0.05], [0, y, 0], "#1e2022")),
+      ...[-1.5, 1.5].map((x) => box([0.08, 2.1, 0.08], [x, 1.05, 0], "#1e2022")),
+      ...Array.from({ length: 11 }, (_, i) => box([0.025, 1.9, 0.025], [-1.25 + i * 0.25, 1.05, 0], "#1e2022")),
+    ],
+    collider: { size: [3, 2.1, 0.12], at: [0, 1.05, 0] },
   },
   canal_4m: {
     category: "drainage",
@@ -187,6 +217,16 @@ export const PROP_KIT = {
     collider: { size: [0.3, 3.2, 0.3], at: [0, 1.6, 0] },
   },
 
+  sign_aframe: {
+    category: "signage",
+    description: "Folding A-frame sidewalk sign (parking notice). The face takes the tint; walk-through.",
+    parts: [
+      box([0.62, 0.9, 0.03], [0, 0.6, 0.12], "#5a3a26", { rotDeg: [-12, 0, 0] }),
+      box([0.54, 0.78, 0.01], [0, 0.61, 0.145], "#ffffff", { layer: "tint", rotDeg: [-12, 0, 0] }),
+      box([0.62, 0.9, 0.03], [0, 0.6, -0.12], "#5a3a26", { rotDeg: [12, 0, 0] }),
+    ],
+  },
+
   // ── lighting fixtures ─────────────────────────────────────────────────────
   street_lamp: {
     category: "lighting",
@@ -244,6 +284,58 @@ export const PROP_KIT = {
       cyl(0.8, 0.03, [0, 0.72, 0], WHITE_PLASTIC, { layer: "tint", tessellation: 12 }),
       cyl(0.12, 0.7, [0, 0.36, 0], WHITE_PLASTIC, { layer: "tint" }),
       cyl(0.5, 0.03, [0, 0.015, 0], WHITE_PLASTIC, { layer: "tint" }),
+    ],
+  },
+  folding_chair: {
+    category: "clutter",
+    description: "Steel folding café chair. Cream by default; tint per placement.",
+    parts: [
+      box([0.42, 0.03, 0.4], [0, 0.45, 0.02], "#ffffff", { layer: "tint" }),
+      box([0.42, 0.28, 0.03], [0, 0.8, -0.2], "#ffffff", { layer: "tint", rotDeg: [-6, 0, 0] }),
+      ...[-0.19, 0.19].flatMap((x) => [
+        box([0.03, 0.46, 0.03], [x, 0.23, 0.18], "#ffffff", { layer: "tint" }),
+        box([0.03, 0.94, 0.03], [x, 0.47, -0.2], "#ffffff", { layer: "tint", rotDeg: [-6, 0, 0] }),
+      ]),
+    ],
+  },
+  cafe_table: {
+    category: "clutter",
+    description: "Small square café table: timber top on a black pedestal.",
+    parts: [
+      box([0.7, 0.04, 0.7], [0, 0.74, 0], "#6b4a32"),
+      cyl(0.08, 0.72, [0, 0.36, 0], "#1a1a1a"),
+      box([0.5, 0.03, 0.5], [0, 0.015, 0], "#1a1a1a"),
+    ],
+  },
+  tabletop_cups: {
+    category: "clutter",
+    description: "Iced coffees, a hot cup and a bottle for a table top (set y to the table height).",
+    parts: [
+      cyl(0.08, 0.1, [-0.12, 0.05, 0.1], "#f2efe8"),
+      cyl(0.08, 0.13, [0.14, 0.065, -0.08], "#6a4028"),
+      cyl(0.08, 0.13, [-0.1, 0.065, -0.14], "#8a5a38"),
+      cyl(0.07, 0.24, [0.08, 0.12, 0.16], "#2f6a3a"),
+    ],
+  },
+  patio_umbrella: {
+    category: "clutter",
+    description: "Large open market umbrella on a weighted base, 2.8 m across. Tint the fabric.",
+    parts: [
+      box([0.5, 0.08, 0.5], [0, 0.04, 0], "#2a2a2a"),
+      cyl(0.05, 2.5, [0, 1.25, 0], "#d8d4c8"),
+      cyl(2.8, 0.06, [0, 2.3, 0], "#ffffff", { layer: "tint" }),
+      cyl(1.5, 0.14, [0, 2.4, 0], "#ffffff", { layer: "tint" }),
+      ball([0.1, 0.1, 0.1], [0, 2.52, 0], STEEL),
+    ],
+  },
+  umbrella_closed: {
+    category: "clutter",
+    description: "Market umbrella furled on its base, as it stands most of the day. Tint the fabric.",
+    parts: [
+      box([0.5, 0.1, 0.5], [0, 0.05, 0], "#1d1d1d"),
+      cyl(0.05, 2.6, [0, 1.3, 0], "#d8d4c8"),
+      cyl(0.24, 1.3, [0, 1.8, 0], "#ffffff", { layer: "tint", tessellation: 6 }),
+      cyl(0.1, 0.25, [0, 2.55, 0], "#ffffff", { layer: "tint", tessellation: 6 }),
     ],
   },
   beer_crate_stack: {
@@ -402,6 +494,18 @@ export const PROP_KIT = {
     parts: [cyl(0.22, 0.9, [0, 0.45, 0], "#b5ae9c"), cyl(0.23, 0.12, [0, 0.72, 0], "#c9a227")],
     collider: { size: [0.25, 0.9, 0.25], at: [0, 0.45, 0] },
   },
+  bollard_round: {
+    category: "barrier",
+    description: "Round painted bollard along a café frontage. Tint per placement (black at Kyo).",
+    parts: [cyl(0.24, 0.8, [0, 0.4, 0], "#ffffff", { layer: "tint" }), cyl(0.26, 0.05, [0, 0.82, 0], "#2a2a2a")],
+    collider: { size: [0.26, 0.85, 0.26], at: [0, 0.425, 0] },
+  },
+  post_slim: {
+    category: "barrier",
+    description: "Slim painted steel post on a base plate. Tint per placement (pink at Kyo).",
+    parts: [box([0.3, 0.05, 0.3], [0, 0.025, 0], "#3a3a3a"), cyl(0.1, 1.2, [0, 0.625, 0], "#ffffff", { layer: "tint" })],
+    collider: { size: [0.15, 1.25, 0.15], at: [0, 0.625, 0] },
+  },
   planter_box: {
     category: "barrier",
     description: "Concrete planter with shrubs. Edge for café terraces and store walkways.",
@@ -443,6 +547,15 @@ export const PROP_KIT = {
     category: "vegetation",
     description: "Roadside shrub/weed clump.",
     parts: [ball([1.7, 1.0, 1.4], [0, 0.45, 0], "#22401f")],
+  },
+  potted_plant: {
+    category: "vegetation",
+    description: "Snake plant in a dark pot by a shop door.",
+    parts: [
+      cyl(0.45, 0.45, [0, 0.225, 0], "#3a3a38"),
+      ...[0, 72, 144, 216, 288].map((yaw) => box([0.08, 0.7, 0.2], [0, 0.75, 0], FOLIAGE_LIGHT, { rotDeg: [12, yaw, 0] })),
+      ball([0.4, 0.3, 0.4], [0, 0.5, 0], FOLIAGE),
+    ],
   },
   coconut_palm: {
     category: "vegetation",
