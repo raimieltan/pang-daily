@@ -229,6 +229,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   setHoodOpen(open: boolean): void { this.visual.model.setHoodOpen(open); }
 
+  setStockSpoilerVisible(visible: boolean): void { this.visual.model.setStockSpoilerVisible(visible); }
+
   setCondition(condition: VehicleCondition): void {
     this.condition = { ...condition };
     this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition,

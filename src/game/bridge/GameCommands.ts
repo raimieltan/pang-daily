@@ -64,6 +64,8 @@ export type GameCommandMap = {
   equipBodyPart: { itemId: string; finish?: import('../../game-core/exterior').PaintFinish | null };
   /** Take a fitted body part off; the socket goes back to stock. */
   removeBodyPart: { itemId: string };
+  /** Return an aftermarket wing to inventory and select the bare trunk or factory spoiler. */
+  setSpoilerMode: { mode: 'none' | 'stock' };
   /** Respray an owned body part, fitted or in the trunk (null = back to how it came). */
   refinishBodyPart: { itemId: string; finish: import('../../game-core/exterior').PaintFinish | null };
 };
@@ -145,6 +147,7 @@ export interface GameCommands {
   equipWheels(itemId: string | null): void;
   equipBodyPart(itemId: string, finish?: import('../../game-core/exterior').PaintFinish | null): void;
   removeBodyPart(itemId: string): void;
+  setSpoilerMode(mode: 'none' | 'stock'): void;
   refinishBodyPart(itemId: string, finish: import('../../game-core/exterior').PaintFinish | null): void;
 }
 
@@ -185,6 +188,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     equipWheels: itemId => dispatch("equipWheels", { itemId }),
     equipBodyPart: (itemId, finish) => dispatch("equipBodyPart", finish === undefined ? { itemId } : { itemId, finish }),
     removeBodyPart: itemId => dispatch("removeBodyPart", { itemId }),
+    setSpoilerMode: mode => dispatch("setSpoilerMode", { mode }),
     refinishBodyPart: (itemId, finish) => dispatch("refinishBodyPart", { itemId, finish }),
   };
 }

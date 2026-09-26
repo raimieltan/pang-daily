@@ -62,6 +62,7 @@ export const PART_TEMPLATES: readonly PartTemplate[] = [
   body('dalagan_ducktail', 2),
   body('marketplace_gt_wing', 2),
   body('dalagan_primer_bumper', 2),
+  body('evo_type_front_bumper', 1),
   body('dalagan_red_fender_fl', 2),
   body('vented_carbon_look_hood', 1),
 ];

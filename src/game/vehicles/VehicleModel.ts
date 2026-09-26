@@ -95,6 +95,7 @@ type Bounds = { min: Vector3; max: Vector3; center: Vector3; size: Vector3 };
 export class VehicleModel {
   private rideHeightM: number;
   private paintHex: string;
+  private stockSpoilerVisible = true;
   /** Mean hub rise over stock across the four sockets; the body sits on it. */
   private tireLiftM = 0;
   private readonly stockHubY: ReadonlyMap<WheelId, number>;
@@ -264,8 +265,15 @@ export class VehicleModel {
     if (previous) previous.parent = null;
     point.mounted = part;
     if (part) part.parent = point.anchor;
-    point.stock?.setEnabled(part === null);
+    point.stock?.setEnabled(part === null && (slot !== "spoiler" || this.stockSpoilerVisible));
     return previous;
+  }
+
+  /** Remember the bare-trunk choice even while an aftermarket wing occupies this socket. */
+  setStockSpoilerVisible(visible: boolean): void {
+    this.stockSpoilerVisible = visible;
+    const point = this.attachments.get("spoiler");
+    point?.stock?.setEnabled(visible && point.mounted === null);
   }
 
   /** Mounted parts and wheels are detached, not disposed: they belong to the caller. */

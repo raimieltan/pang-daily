@@ -13,6 +13,7 @@ contract is in `docs/VEHICLE_ASSETS.md` §8: car axes, origin at the socket, mat
 | `dalagan_ducktail.glb` | `dalagan_ducktail` | `spoiler` | 12 tris, 1 material |
 | `marketplace_gt_wing.glb` | `marketplace_gt_wing` | `spoiler` | 100 tris, 2 materials |
 | `dalagan_primer_bumper.glb` | `dalagan_primer_bumper` | `bumper_front` | 40 tris, 2 materials |
+| `evo_type_front_bumper.glb` | `evo_type_front_bumper` | `bumper_front` | 1224 tris, 5 materials |
 | `dalagan_fender_fl.glb` | `dalagan_red_fender_fl` | `fender_fl` | 480 tris, 1 material |
 | `vented_carbon_look_hood.glb` | `vented_carbon_look_hood` | `hood` | 280 tris, 2 materials |
 
@@ -25,3 +26,22 @@ stock geometry as their seam template. The hood keeps the authored cowl
 pivot and the spoilers use the corrected rearward mounting point.
 Rebuild with `node scripts/build-body-part-models.mjs`; the older geometry
 counts and mount coordinates above describe the superseded placeholders.
+
+GT wing feet and the ducktail base now follow the actual trunk skin, sampled
+from the modular GLB. Spoiler assemblies retain those contact points when worn;
+finish wear still applies, but whole-part fitment offsets and tilts do not.
+
+The same mounting rule now applies to every exterior part: wear no longer
+translates or pitches an entire panel away from its authored seams. Hood vent
+inserts follow the hood surface, and the ACP splitter keeps the stock chin's
+mounting geometry with its support rods seated against the bumper face.
+
+The Evo V-type bumper is authored fresh rather than copied from stock: rows of
+face profile swept around the stock plan outline, with fog-lamp, mouth, duct
+and brake-slot pockets cut on grid lines. Its fog lamps use the car's `chrome`
+and `headlight` materials and its plate uses `plate`; all are authored, only
+`panel` takes the finish.
+
+`poly` reverses triangle order when it mirrors x into glTF space, so winding
+agrees with the stored normal. Before this, two-sided lighting shaded every
+generated (non-stock) face as if it were facing away from the viewer.

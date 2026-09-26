@@ -104,7 +104,7 @@ describe("BodyPartSwapper", () => {
       await swapper.equip(part.socket, fitting);
       const node = model.attachments.get(part.socket)!.mounted!;
       expect(node.parent).toBe(model.attachments.get(part.socket)!.anchor);
-      expect(node.position.asArray()).toEqual([0.1, 0.2 - fitting.look.gapM, 0.3]);
+      expect(node.position.asArray()).toEqual([0.1, 0.2, 0.3]);
       expect(node.scaling.asArray()).toEqual([0.9, 0.9, 0.9]);
       expect(node.rotationQuaternion!.toEulerAngles().y).toBeCloseTo(Math.PI / 2);
       expect(panelOf(node)).toBeInstanceOf(PBRMaterial);
@@ -154,8 +154,8 @@ describe("BodyPartSwapper", () => {
     expect(ducktail.isDisposed()).toBe(true);
     expect(socket.mounted!.name).toBe("spoiler_marketplace_gt_wing");
     expect(swapper.equipped.map((f) => f.part.id)).toEqual(["marketplace_gt_wing"]);
-    // Zip-tied: it hangs off its socket and pitches.
-    expect(socket.mounted!.position.y).toBeLessThan(0);
+    // Wear shows in the finish only; the wing stays seated on its socket.
+    expect(socket.mounted!.position.y).toBe(0);
 
     expect(await swapper.equip("spoiler", null)).toBe(true);
     expect(socket.mounted).toBeNull();

@@ -28,7 +28,7 @@ const DEG = Math.PI / 180;
  * Puts body parts on a `VehicleModel`'s exterior sockets, one part per socket. Each asset loads
  * once per scene; a mounted part is a clone with its own `panel` material, so a primer bumper and
  * a body-colour ducktail can share a car. The part sits at its socket's origin with its own
- * `transform`, then hangs and tilts by the look's fit gap. Visual only: stats and persistence
+ * `transform`. Wear changes the finish, while mounting seams remain seated. Visual only: stats and persistence
  * belong to the caller.
  */
 export class BodyPartSwapper {
@@ -73,7 +73,7 @@ export class BodyPartSwapper {
     this.unmount(socket);
     if (fitted && node) {
       this.applyLook(node.materials, fitted.look);
-      place(node.node, fitted.part, fitted.look);
+      place(node.node, fitted.part);
       this.mounted.set(socket, { ...fitted, ...node });
     }
     return true;
@@ -86,7 +86,7 @@ export class BodyPartSwapper {
     if (!current) return false;
     if (!canRefinish(current.part, look.finish)) throw new Error(`${current.part.id} cannot use ${look.finish}`);
     this.applyLook(current.materials, look);
-    place(current.node, current.part, look);
+    place(current.node, current.part);
     current.look = look;
     return true;
   }
@@ -171,11 +171,11 @@ export class BodyPartSwapper {
   }
 }
 
-/** The part's own transform against the socket, then the misfit: it hangs `gapM` low and pitches `tiltDeg`. */
-function place(node: TransformNode, part: BodyPart, look: BodyPartLook) {
+/** Preserve the authored mounting boundary; finish wear must not detach a panel from its mounts. */
+function place(node: TransformNode, part: BodyPart) {
   const { positionM: p, rotationDeg: r, scale } = part.transform;
-  node.position.set(p.x, p.y - look.gapM, p.z);
-  node.rotationQuaternion = Quaternion.RotationYawPitchRoll(r.y * DEG, (r.x + look.tiltDeg) * DEG, r.z * DEG);
+  node.position.set(p.x, p.y, p.z);
+  node.rotationQuaternion = Quaternion.RotationYawPitchRoll(r.y * DEG, r.x * DEG, r.z * DEG);
   node.scaling.setAll(scale);
 }
 

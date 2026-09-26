@@ -40,6 +40,40 @@ function position(node) {
   return origin.map((v, i) => v + (node.translation?.[i] ?? 0));
 }
 
+/** Upper skin height in authored glTF/world coordinates, for feet that must meet a body panel. */
+export function stockSurfaceHeight(name, x, z) {
+  return stockSurface(name, 1, x, z);
+}
+
+/** Front-facing skin position, for splitter brackets that fasten to the bumper. */
+export function stockSurfaceFrontZ(name, x, y) {
+  return stockSurface(name, 2, x, y);
+}
+
+function stockSurface(name, axis, uPosition, vPosition) {
+  const node = gltf.nodes.find(n => n.name === name);
+  if (!node || node.mesh === undefined) throw new Error(`Missing stock surface ${name}`);
+  const origin = position(node);
+  const [uAxis, vAxis] = axis === 1 ? [0, 2] : [0, 1];
+  let height = -Infinity;
+  for (const primitive of gltf.meshes[node.mesh].primitives) {
+    const vertices = accessor(primitive.attributes.POSITION), indices = accessor(primitive.indices);
+    const point = i => vertices.slice(i * 3, i * 3 + 3).map((value, axis) => value + origin[axis]);
+    for (let i = 0; i < indices.length; i += 3) {
+      const [a, b, c] = indices.slice(i, i + 3).map(point);
+      const denominator = (b[vAxis] - c[vAxis]) * (a[uAxis] - c[uAxis]) + (c[uAxis] - b[uAxis]) * (a[vAxis] - c[vAxis]);
+      if (Math.abs(denominator) < 1e-10) continue;
+      const u = ((b[vAxis] - c[vAxis]) * (uPosition - c[uAxis]) + (c[uAxis] - b[uAxis]) * (vPosition - c[vAxis])) / denominator;
+      const v = ((c[vAxis] - a[vAxis]) * (uPosition - c[uAxis]) + (a[uAxis] - c[uAxis]) * (vPosition - c[vAxis])) / denominator;
+      if (u >= -1e-6 && v >= -1e-6 && u + v <= 1 + 1e-6) {
+        height = Math.max(height, u * a[axis] + v * b[axis] + (1 - u - v) * c[axis]);
+      }
+    }
+  }
+  if (!Number.isFinite(height)) throw new Error(`${name} has no surface at (${uPosition}, ${vPosition}) on axis ${axis}`);
+  return height;
+}
+
 /** Copy stock triangles into a replacement's mount frame, retaining material boundaries. */
 export function stockPanel(builder, names, origin, panelMaterial = "paint") {
   for (const name of names) {

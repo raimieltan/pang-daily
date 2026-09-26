@@ -2,9 +2,9 @@ import { parseBodyPart, type BodyPart } from "./BodyPart";
 
 /**
  * Body parts off the Iloilo used market: the lip everyone's barkada has, a pull-out ducktail, the
- * marketplace GT wing that's wider than the trunk, a bumper nobody got around to painting, a
- * fender off a red Dalagan and the carbon-look hood with pins. Numbers are against the Banwa
- * Dalagan's stock panels.
+ * marketplace GT wing that's wider than the trunk, a bumper nobody got around to painting, an
+ * Evo-type replica still in its donor's white, a fender off a red Dalagan and the carbon-look hood
+ * with pins. Numbers are against the Banwa Dalagan's stock panels.
  */
 export const BODY_PARTS: readonly BodyPart[] = [
   parseBodyPart({
@@ -104,6 +104,23 @@ export const BODY_PARTS: readonly BodyPart[] = [
     paint: { paintable: true, finish: "primer", mismatchColor: null },
     market: { priceRangePhp: [2500, 4000], conditionRange: [0.4, 0.9] },
     effects: { weightKg: 0, drag: 0, downforce: 0, cooling: 0.02, reputation: 0 },
+  }),
+  // Replica of the Evo V front end, pulled off a white donor. Mostly looks; the mouth does feed the radiator.
+  parseBodyPart({
+    id: "evo_type_front_bumper",
+    name: "Evo V-type front bumper (white)",
+    description: "Evo 5 type bumper, fiberglass replica. May fog lamps na, kasama plate bracket. Puti pa, galing sa ibang oto.",
+    fits: "Banwa Dalagan '94–'98, konting trim",
+    category: "front_bumper",
+    socket: "bumper_front",
+    assetPath: "/model/body/evo_type_front_bumper.glb",
+    compatibleTags: ["banwa_dalagan"],
+    construction: "fiberglass",
+    rarity: "rare",
+    fitment: 0.6,
+    paint: { paintable: true, finish: "mismatched", mismatchColor: "#e6e4dc" },
+    market: { priceRangePhp: [7000, 12000], conditionRange: [0.35, 0.9] },
+    effects: { weightKg: 3, drag: 0.01, downforce: 0.01, cooling: 0.06, reputation: 4 },
   }),
   parseBodyPart({
     id: "dalagan_red_fender_fl",

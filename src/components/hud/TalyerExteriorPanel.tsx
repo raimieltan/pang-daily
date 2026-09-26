@@ -18,10 +18,24 @@ export function TalyerExteriorPanel() {
   const commands = useGameUiStore(s => s.commands);
   if (!inventory) return <p role="status" className="my-4 text-white/60">Loading your exterior parts…</p>;
   const effects = exterior?.vehicleId === inventory.vehicleId ? exterior.effects : null;
+  const fittedSpoiler = inventory.parts.find(item => item.installedOn === inventory.vehicleId && bodyPart(item.partId)?.socket === 'spoiler');
   return <section aria-label="Exterior parts" className="mt-4 space-y-4 text-xs">
     <p className="text-white/65">Bring your Baligya finds here. Fit a lip, swap a bumper, or make that donor fender match. Fitting and finish changes are free for now.</p>
     {inventory.pending && <p role="status" className="text-amber-200">Fitting parts…</p>}
     {(inventory.error || rejection) && <p role="alert" className="text-red-300">{inventory.error || rejection}</p>}
+    {inventory.hasSpoilerSlot && <div className="border border-white/15 p-3">
+      <h3 className="text-sm text-white">Spoiler</h3>
+      <p className="mt-1 text-white/60">{fittedSpoiler ? bodyPart(fittedSpoiler.partId)?.name : inventory.stockSpoilerRemoved ? 'No spoiler · bare trunk' : 'Stock spoiler'}</p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" className="tape-button disabled:opacity-40"
+          disabled={!commands || inventory.pending || (!fittedSpoiler && !!inventory.stockSpoilerRemoved)}
+          onClick={() => commands?.setSpoilerMode('none')}>No spoiler</button>
+        <button type="button" className="tape-button disabled:opacity-40"
+          disabled={!commands || inventory.pending || (!fittedSpoiler && !inventory.stockSpoilerRemoved)}
+          onClick={() => commands?.setSpoilerMode('stock')}>Stock spoiler</button>
+      </div>
+      <p className="mt-2 text-white/40">Your choice is saved. Any fitted wing goes back into your inventory.</p>
+    </div>}
     {inventory.parts.length === 0 && <p className="border border-dashed border-white/20 p-4 text-white/60">No exterior parts in your trunk. Buy body parts from Phone · Baligya, then bring them to Mang Boy.</p>}
     <ul className="space-y-3">
       {inventory.parts.map(item => {

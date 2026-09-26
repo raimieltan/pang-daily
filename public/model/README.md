@@ -111,3 +111,8 @@ bumper, skirts and lip geometry is generated from the modular stock seams by
 A talyer inspection opens the stock or fitted hood 60 degrees at its cowl
 hinge; dismissing the inspection or leaving closes it. The engine and bay
 accessories retain their independent authored nodes below the hood.
+
+At the talyer, Exterior parts → Spoiler offers **No spoiler** and **Stock
+spoiler**. This choice is saved per vehicle. Either option returns any fitted
+aftermarket wing to inventory; fitting and later removing a wing preserves
+the saved stock-versus-bare-trunk preference.

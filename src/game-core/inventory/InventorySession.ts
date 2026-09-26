@@ -27,6 +27,7 @@ export type InventoryItem = z.infer<typeof itemSchema>;
 const installsSchema = z.record(z.string().min(1), z.partialRecord(z.enum(PART_SLOTS), z.string().min(1)));
 const inventorySaveSchema = z.object({ version: z.literal(1), serial: z.number().int().nonnegative(), items: z.array(itemSchema), installed: installsSchema,
   appearance: z.record(z.string().min(1), vehicleAppearanceSchema).default({}),
+  stockSpoilerRemoved: z.record(z.string().min(1), z.boolean()).optional(),
 })
   .refine(save => new Set(save.items.map(i => i.id)).size === save.items.length, 'duplicate item id')
   .refine(save => new Set(save.items.flatMap(i => i.key ? [i.key] : [])).size === save.items.filter(i => i.key).length, 'duplicate item key')
@@ -66,6 +67,22 @@ export class InventorySession {
     return null;
   }
   installedOn(vehicleId: string): Partial<Record<PartSlot, string>> { return { ...this.state.installed[vehicleId] }; }
+
+  isStockSpoilerRemoved(vehicleId: string): boolean {
+    return this.state.stockSpoilerRemoved?.[vehicleId] ?? false;
+  }
+
+  /** Select bare trunk or factory spoiler, returning any fitted wing to inventory in one save. */
+  setSpoilerMode(vehicleId: string, mode: 'none' | 'stock'): void {
+    if (!vehicleId || (mode !== 'none' && mode !== 'stock')) return;
+    (this.state.stockSpoilerRemoved ??= {})[vehicleId] = mode === 'none';
+    const slots = this.state.installed[vehicleId];
+    if (slots) {
+      delete slots.spoiler;
+      if (Object.keys(slots).length === 0) delete this.state.installed[vehicleId];
+    }
+    this.changed();
+  }
 
   appearance(vehicleId: string): VehicleAppearance | null {
     const value = this.state.appearance[vehicleId];

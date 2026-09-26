@@ -14,6 +14,7 @@ export interface ExteriorVehicle {
   readonly exterior: FittedBodyPart[];
   readonly exteriorEffects: ExteriorEffects;
   readonly paint?: string;
+  setStockSpoilerVisible?(visible: boolean): void;
   equipBodyPart(socket: ExteriorSlot, fitting: BodyPartFitting | null): Promise<boolean>;
 }
 
@@ -38,6 +39,8 @@ export type ExteriorView = {
 /** Owned parts for the workshop, without revealing hidden condition. */
 export type ExteriorInventoryView = {
   vehicleId: string;
+  stockSpoilerRemoved?: boolean;
+  hasSpoilerSlot?: boolean;
   parts: { itemId: string; partId: string; finish: PaintFinish | null; installedOn: string | null; compatible: boolean }[];
   pending: boolean;
   error: string | null;
@@ -64,6 +67,15 @@ export class ExteriorSystem implements GameSystem {
       inventory.subscribe(() => this.sync()),
       bridge.handle('equipBodyPart', ({ itemId, finish }) => this.equip(itemId, finish)),
       bridge.handle('removeBodyPart', ({ itemId }) => this.remove(itemId)),
+      bridge.handle('setSpoilerMode', ({ mode }) => {
+        const rejection = this.workshopRejection();
+        if (rejection) return { rejected: rejection };
+        if (mode !== 'none' && mode !== 'stock') return { rejected: 'Choose stock or no spoiler.' };
+        if (!vehicle.setStockSpoilerVisible || !vehicle.definition.spec.visual.model.attachments.some(a => a.slot === 'spoiler')) {
+          return { rejected: 'This car does not have a removable spoiler.' };
+        }
+        inventory.setSpoilerMode(vehicle.id, mode);
+      }),
       bridge.handle('refinishBodyPart', ({ itemId, finish }) => this.refinish(itemId, finish)),
     ];
     this.sync();
@@ -116,6 +128,7 @@ export class ExteriorSystem implements GameSystem {
 
   private sync() {
     if (this.disposed) return;
+    this.vehicle.setStockSpoilerVisible?.(!this.inventory.isStockSpoilerRemoved(this.vehicle.id));
     const installed = this.inventory.installedOn(this.vehicle.id);
     const sockets = new Set(this.vehicle.definition.spec.visual.model.attachments.map(a => a.slot));
     for (const socket of BODY_PART_SOCKETS) {
@@ -170,7 +183,10 @@ export class ExteriorSystem implements GameSystem {
         compatible: fitsVehicle(part, spec.tags) && spec.visual.model.attachments.some(a => a.slot === part.socket),
       }] : [];
     });
-    this.bridge.emit('exteriorInventory', { vehicleId: this.vehicle.id, parts, pending: this.pending > 0, error: this.error });
+    this.bridge.emit('exteriorInventory', { vehicleId: this.vehicle.id, parts, pending: this.pending > 0, error: this.error,
+      stockSpoilerRemoved: this.inventory.isStockSpoilerRemoved(this.vehicle.id),
+      hasSpoilerSlot: !!this.vehicle.setStockSpoilerVisible && spec.visual.model.attachments.some(a => a.slot === 'spoiler'),
+    });
   }
 
   dispose() {
