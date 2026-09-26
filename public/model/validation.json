@@ -1,0 +1,43 @@
+{
+  "triangles": 19732,
+  "bounds_min": [
+    -0.913,
+    0.0,
+    -2.2
+  ],
+  "bounds_max": [
+    0.913,
+    1.3947551020408164,
+    2.1889999999999996
+  ],
+  "dimensions_xyz": [
+    1.826,
+    1.3947551020408164,
+    4.388999999999999
+  ],
+  "wheelbase": 2.5,
+  "track": 1.456,
+  "wheel_radius": 0.3,
+  "left": "+X",
+  "issues": [],
+  "required_nodes_present": true,
+  "export_reimport_bounds_match": true,
+  "mesh_nodes": 52,
+  "attachment_nodes": [
+    "attach_fender_fr",
+    "attach_sideskirt_r",
+    "attach_fender_fl",
+    "attach_sideskirt_l",
+    "attach_hood",
+    "attach_trunk",
+    "attach_bumper_front",
+    "attach_bumper_rear",
+    "attach_chin_front",
+    "attach_lip_front",
+    "attach_spoiler_rear",
+    "attach_engine"
+  ],
+  "engine_max_y": 0.6650000095367432,
+  "hood_min_y": 0.7810000032186508,
+  "engine_clearance_conservative": 0.11599999368190761
+}

@@ -186,7 +186,9 @@ export class VehicleModel {
       stock?.setEnabled(true);
       attachments.set(slot, { slot, anchor: copyOf(point.anchor), stock, mounted: null });
     }
-    return new VehicleModel(this.definition, container, root, copyOf(this.chassis), wheels, attachments, paint, this.stats, []);
+    const model = new VehicleModel(this.definition, container, root, copyOf(this.chassis), wheels, attachments, paint, this.stats, []);
+    model.setHoodOpen(false);
+    return model;
   }
 
   /** Visual ride-height offset in metres (negative = lowered), clamped to the definition's range. Returns the applied value. */
@@ -232,6 +234,12 @@ export class VehicleModel {
   /** The body colour as sRGB `#rrggbb`; body-colour parts match it. */
   get paint(): string {
     return this.paintHex;
+  }
+
+  /** Rotate the stock or fitted hood around its authored cowl hinge for workshop inspection. */
+  setHoodOpen(open: boolean): void {
+    const hood = this.attachments.get("hood");
+    if (hood) hood.anchor.rotation.x = open ? -Math.PI / 3 : 0;
   }
 
   /** Recolours the paint material. `hex` is sRGB `#rrggbb`. */
@@ -295,7 +303,13 @@ export class VehicleModel {
 
     const bodyNodes = spec.bodyNodes.map((name) => required(name, "body"));
     const wheelNodes = WHEEL_IDS.map((id) => required(spec.wheelNodes[id], `wheel ${id}`));
-    const stockNodes = spec.attachments.map((a) => (a.stockNode ? required(a.stockNode, `stock ${a.slot}`) : null));
+    const stockNodes = spec.attachments.map((a) => {
+      const names = a.stockNode === null ? [] : Array.isArray(a.stockNode) ? a.stockNode : [a.stockNode];
+      return names.map(name => required(name, `stock ${a.slot}`));
+    });
+    const mountNodes = spec.attachments.map(a => a.mountNode
+      ? required(a.mountNode, `mount ${a.slot}`)
+      : nodes.get(`attach_${a.slot}`)?.[0]);
     const paint = container.materials.find((m) => m.name === spec.paintMaterial);
     if (!paint) problems.push(`missing material "${spec.paintMaterial}" (paint)`);
     else if (!(paint instanceof PBRMaterial || paint instanceof StandardMaterial)) {
@@ -380,13 +394,19 @@ export class VehicleModel {
 
     const attachments = new Map<ExteriorSlot, VehicleAttachmentPoint>();
     spec.attachments.forEach((a, i) => {
-      const stock = stockNodes[i];
-      const empty = nodes.get(`attach_${a.slot}`)?.[0];
+      const parts = stockNodes[i] as TransformNode[];
+      const empty = mountNodes[i];
       const anchor = new TransformNode(a.socket, scene);
       anchor.parent = chassis;
       if (empty) anchor.position.copyFrom(empty.getAbsolutePosition());
       else if (a.anchor) anchor.position.set(a.anchor.x, a.anchor.y, a.anchor.z);
-      else anchor.position.copyFrom(boundsOf(stock!).center);
+      else anchor.position.copyFrom(unionBounds(parts.map(boundsOf)).center);
+      // Keep paired stock parts together so a replacement hides/restores the whole set.
+      const stock = parts.length > 1 ? new TransformNode(`${a.slot}_stock`, scene) : parts[0] ?? null;
+      if (parts.length > 1) {
+        stock!.parent = anchor;
+        for (const part of parts) part.setParent(stock);
+      } else stock?.setParent(anchor);
       attachments.set(a.slot, { slot: a.slot, anchor, stock, mounted: null });
     });
 

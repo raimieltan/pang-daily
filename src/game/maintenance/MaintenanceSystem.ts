@@ -13,6 +13,7 @@ export interface MaintenanceVehicle {
   maintenanceSample(racing: boolean): WearSample;
   setCondition(condition: VehicleCondition): void;
   setFuelAvailable?(available: boolean): void;
+  setHoodOpen?(open: boolean): void;
 }
 export type WorkshopAccess = { rejection(): string | null; interactions: Pick<InteractionSystem, 'handle'> };
 
@@ -67,6 +68,7 @@ export class MaintenanceSystem implements GameSystem {
     if (rejection) return { rejected: rejection };
     this.flush();
     this.quote = this.session.quote(this.definition);
+    this.vehicle.setHoodOpen?.(true);
     this.bridge.emit('repairQuote', this.quote);
   }
 
@@ -97,7 +99,7 @@ export class MaintenanceSystem implements GameSystem {
     this.session.wear(this.definition, this.pending);
     this.pending = emptyLoss(); this.elapsed = 0;
   }
-  private closeQuote() { this.quote = null; this.bridge.emit('repairQuote', null); }
+  private closeQuote() { this.quote = null; this.vehicle.setHoodOpen?.(false); this.bridge.emit('repairQuote', null); }
   dispose() {
     if (this.disposed) return;
     this.disposed = true;

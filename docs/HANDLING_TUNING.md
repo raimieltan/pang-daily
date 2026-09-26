@@ -122,7 +122,7 @@ acts once the rear slides past 5°. Try both on the skidpad with `…_bald_rears
 | Param | Value | Why |
 |---|---|---|
 | `massKg` | 1080 | Light 1.5 L early-90s sedan. |
-| `wheelbaseM` | 2.50 | Matches `starter_sedan.glb` (axles at z +1.28 / −1.22), so the model's pivot matches the wheels you see. |
+| `wheelbaseM` | 2.50 | Matches `banwa_dalagan_1996_modular.glb` (axles at z +1.28 / −1.22), so the model's pivot matches the wheels you see. |
 | `frontWeight` | 0.62 | Transverse engine over the front axle; the root of the FWD push. Set `collision.centerOfMass.z` to match (0.33 m ahead of the wheelbase centre). |
 | `cgHeightM` | 0.52 | Normal sedan. Only scales load transfer. |
 | `yawInertiaScale` | 1.1 | Slightly lazy rotation, so the car feels heavy and every rotation is telegraphed. |

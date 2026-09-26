@@ -19,7 +19,7 @@ import { NPC_CAR_BUILDS } from '@/game-core/exterior/npcBuilds';
 import { WheelSwapper } from './WheelSwapper';
 import { wheelPart } from '@/game-core/wheels';
 
-const GLB = new Uint8Array(readFileSync("public/model/starter_sedan.glb"));
+const GLB = new Uint8Array(readFileSync("public/model/banwa_dalagan_1996_modular.glb"));
 const fromPublic = (path: string) => new Uint8Array(readFileSync(`public${path}`));
 const car = BANWA_DALAGAN_1996;
 const look = (id: string, condition: number, finish: PaintFinish | null = null): BodyPartLook =>
@@ -74,6 +74,27 @@ describe("BodyPartSwapper", () => {
       expect(player.attachments.get('spoiler')!.mounted!.getChildMeshes()[1].getTotalVertices()).toBeGreaterThan(0);
     }
   });
+  it("fits replacement panels to the modular stock seams and removes the complete stock panel", async () => {
+    const model = await VehicleModel.load(scene, car, GLB);
+    const swapper = new BodyPartSwapper(scene, model, fromPublic);
+    for (const id of ["dalagan_red_fender_fl", "dalagan_primer_bumper", "vented_carbon_look_hood", "dalagan_fiberglass_skirts"]) {
+      const fitting = fitted(id);
+      fitting.look = { ...fitting.look, gapM: 0, tiltDeg: 0 };
+      const socket = model.attachments.get(fitting.part.socket)!;
+      const before = socket.stock!.getHierarchyBoundingVectors(true);
+      await swapper.equip(fitting.part.socket, fitting);
+      const after = socket.mounted!.getHierarchyBoundingVectors(true);
+      expect(socket.stock!.isEnabled()).toBe(false);
+      for (const axis of ["x", "z"] as const) {
+        expect(after.min[axis], `${id} min ${axis}`).toBeCloseTo(before.min[axis], 4);
+        expect(after.max[axis], `${id} max ${axis}`).toBeCloseTo(before.max[axis], 4);
+      }
+      await swapper.equip(fitting.part.socket, null);
+      expect(socket.stock!.isEnabled()).toBe(true);
+    }
+    swapper.dispose();
+  });
+
   it("loads every catalog GLB and respects each part's local transform", async () => {
     const model = await VehicleModel.load(scene, car, GLB);
     const swapper = new BodyPartSwapper(scene, model, fromPublic);

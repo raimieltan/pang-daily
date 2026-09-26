@@ -11,7 +11,7 @@ import { VehicleVisual } from "../vehicles/VehicleVisual";
 import { VEHICLE_LIGHTS } from "./LightingConfig";
 import { VehicleLights } from "./VehicleLights";
 
-const GLB = new Uint8Array(readFileSync("public/model/starter_sedan.glb"));
+const GLB = new Uint8Array(readFileSync("public/model/banwa_dalagan_1996_modular.glb"));
 
 let engine: NullEngine | null = null;
 afterEach(() => {

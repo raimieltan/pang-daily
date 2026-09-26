@@ -11,7 +11,7 @@ import { VehicleModel } from "./VehicleModel";
 import { WheelSwapper } from "./WheelSwapper";
 import { WheelSystem, type WheelVehicle } from "./WheelSystem";
 
-const GLB = new Uint8Array(readFileSync("public/model/starter_sedan.glb"));
+const GLB = new Uint8Array(readFileSync("public/model/banwa_dalagan_1996_modular.glb"));
 const fromPublic = (path: string) => new Uint8Array(readFileSync(`public${path}`));
 const car = BANWA_DALAGAN_1996;
 const mags = wheelPart("mags_15_4x100")!;

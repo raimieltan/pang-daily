@@ -21,6 +21,7 @@ function setup(session = new VehicleSession()) {
   let racing = false;
   const sample: WearSample = { speedMps: 0, throttle: .8, brake: .2, slip: .3, handbrake: 0, grounded: true, racing: false };
   const vehicle = { definition: { spec: car }, impactSerial: 0, impactStrength: 0, setCondition: vi.fn(),
+    hoodOpen: false, setHoodOpen(open: boolean) { this.hoodOpen = open; },
     maintenanceSample: (race: boolean) => ({ ...sample, racing: race }) };
   const interactions = new InteractionSystem(bridge.runtime, focus, [() => interactablesFromZones(HUB_LAYOUT.chunks.flatMap(c => c.zones))]);
   const unbind = bindMaintenanceStore(bridge.ui.events);
@@ -33,6 +34,22 @@ function setup(session = new VehicleSession()) {
 }
 
 describe('driving → talyer → payment bridge loop', () => {
+  it('opens the hood only during an authorized inspection and closes it on dismissal, departure or disposal', () => {
+    const s = setup();
+    s.setRacing(true); s.commands.inspectVehicle();
+    expect(s.vehicle.hoodOpen).toBe(false);
+    s.setRacing(false); s.commands.inspectVehicle();
+    expect(s.vehicle.hoodOpen).toBe(true);
+    s.commands.dismissRepair();
+    expect(s.vehicle.hoodOpen).toBe(false);
+    s.commands.inspectVehicle();
+    s.focus.position.x = 70; s.system.update(.1);
+    expect(s.vehicle.hoodOpen).toBe(false);
+    s.focus.position.x = 16; s.commands.inspectVehicle();
+    expect(s.vehicle.hoodOpen).toBe(true);
+    s.system.dispose();
+    expect(s.vehicle.hoodOpen).toBe(false);
+  });
   it('wears during driving, inspects using F interaction and repairs selected systems', () => {
     const s = setup(); const before = s.session.summary(car);
     s.focus.mode = 'driving'; s.sample.speedMps = 25; s.setRacing(true);

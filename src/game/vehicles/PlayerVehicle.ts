@@ -227,6 +227,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   setFuelAvailable(available: boolean): void { this.controller.fuelAvailable = available; }
 
+  setHoodOpen(open: boolean): void { this.visual.model.setHoodOpen(open); }
+
   setCondition(condition: VehicleCondition): void {
     this.condition = { ...condition };
     this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition,

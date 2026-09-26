@@ -15,3 +15,13 @@ contract is in `docs/VEHICLE_ASSETS.md` §8: car axes, origin at the socket, mat
 | `dalagan_primer_bumper.glb` | `dalagan_primer_bumper` | `bumper_front` | 40 tris, 2 materials |
 | `dalagan_fender_fl.glb` | `dalagan_red_fender_fl` | `fender_fl` | 480 tris, 1 material |
 | `vented_carbon_look_hood.glb` | `vented_carbon_look_hood` | `hood` | 280 tris, 2 materials |
+
+
+### Modular vehicle fitment
+
+These assets are now generated for `banwa_dalagan_1996_modular.glb`.
+The lip, paired skirts, front bumper, front-left fender and hood use its
+stock geometry as their seam template. The hood keeps the authored cowl
+pivot and the spoilers use the corrected rearward mounting point.
+Rebuild with `node scripts/build-body-part-models.mjs`; the older geometry
+counts and mount coordinates above describe the superseded placeholders.

@@ -3,9 +3,11 @@
 // Run: node scripts/build-body-part-models.mjs
 import { mkdirSync, writeFileSync } from "node:fs";
 import { cross, normalize, packGlb, sub } from "./lib/glb.mjs";
+import { mounting, stockMaterials, stockPanel } from "./lib/modular-panels.mjs";
 
 /** `panel` takes the finish and wear at runtime; `hardware` (brackets, zip ties, grilles) stays as authored. */
 const MATERIALS = {
+  ...stockMaterials,
   panel: { color: "#8b8e89", metallic: 0, roughness: 0.8 },
   hardware: { color: "#141516", metallic: 0.1, roughness: 0.75 },
 };
@@ -60,27 +62,20 @@ function builder() {
   return { parts, poly, alongX, alongZ, box, sheet };
 }
 
-const lerp = (a, b, t) => a + (b - a) * t;
-
 /** Socket origins (catalog.ts) are noted where the shape depends on the body around them. */
 const PARTS = {
-  // front_lip at (0, 0.16, 2.06): a rubber strip under the bumper, screwed on with a couple of zip ties.
   universal_rubber_lip(g) {
-    g.alongX("panel", [[0, -0.08], [0, 0.05], [-0.02, 0.075], [-0.035, 0.065], [-0.03, -0.08]], -0.78, 0.78);
-    for (const x of [-0.55, 0, 0.55]) g.box("hardware", [x - 0.006, x + 0.006], [-0.036, 0.004], [0.03, 0.08]);
+    stockPanel(g, ["lip_front_stock"], mounting.lip_front, "trim");
   },
-  // chin at (0, 0.14, 2.1): an aluminium splitter plate on threaded rods.
+  // chin at the modular attach_chin_front frame: an aluminium splitter plate on threaded rods.
   acp_chin_splitter(g) {
     g.alongX("panel", [[-0.012, -0.12], [-0.012, 0.16], [0, 0.17], [0, -0.12]], -0.42, 0.42);
     for (const x of [-0.3, 0.3]) g.box("hardware", [x - 0.005, x + 0.005], [0, 0.11], [0.08, 0.09]);
   },
-  // side_skirts at (0, 0.2, 0): both sills, just outside the body at x ±0.81..0.85.
   dalagan_fiberglass_skirts(g) {
-    for (const s of [-1, 1]) {
-      g.alongZ("panel", [[s * 0.8, -0.05], [s * 0.86, -0.05], [s * 0.865, 0.03], [s * 0.85, 0.075], [s * 0.8, 0.075]].map(([x, y]) => [x, y]), -0.92, 0.95);
-    }
+    stockPanel(g, ["sideskirt_l_stock", "sideskirt_r_stock"], [0, 0.2, 0]);
   },
-  // spoiler at (0, 0.95, -1.95): a kicked-up lip on the trunk's trailing edge.
+  // spoiler at the corrected modular attach_spoiler_rear frame: a kicked-up lip on the trunk's trailing edge.
   dalagan_ducktail(g) {
     g.alongX("panel", [[0.004, 0.1], [0.004, -0.12], [0.07, -0.16], [0.05, -0.1]], -0.7, 0.7);
   },
@@ -94,25 +89,16 @@ const PARTS = {
     g.alongX("panel", blade, -0.8, 0.8);
     for (const s of [-1, 1]) g.box("panel", s < 0 ? [-0.81, -0.8] : [0.8, 0.81], [0.22, 0.39], [-0.18, 0.15]);
   },
-  // bumper_front at (0, 0.36, 2.16): a shell over the stock face (z 2.08 at y 0.18 to 2.16 at y 0.4), with its intake.
   dalagan_primer_bumper(g) {
-    g.alongX("panel", [[0.1, -0.06], [0.1, 0.022], [0.03, 0.04], [-0.12, 0.018], [-0.205, -0.05], [-0.205, -0.12], [-0.17, -0.12], [-0.17, -0.06]], -0.85, 0.85);
-    g.box("hardware", [-0.34, 0.34], [-0.11, -0.04], [0.024, 0.034]);
+    stockPanel(g, ["bumper_front_stock"], mounting.bumper_front);
   },
-  // fender_fl at (-0.84, 0.62, 1.28): a skin just outside the body, arched over the wheel (centre y 0.3, z 1.28).
   dalagan_fender_fl(g) {
-    const arch = 0.33, hub = -0.32, lengthZ = [-0.46, 0.56];
-    const bottom = (z) => (Math.abs(z) < arch ? hub + Math.sqrt(arch * arch - z * z) : -0.24);
-    g.sheet("panel", 24, 3, (u, v) => {
-      const z = lerp(lengthZ[0], lengthZ[1], u);
-      return [-0.018 + 0.01 * v, lerp(bottom(z), 0.17, v), z];
-    }, [0.014, 0, 0]);
+    stockPanel(g, ["fender_fl_stock"], mounting.fender_fl);
   },
-  // hood at (0, 0.81, 1.5): follows the stock slope (local y -0.074 at z +0.6 to 0.055 at z -0.4), with a vent.
   vented_carbon_look_hood(g) {
-    const top = (x, z) => lerp(0.055, -0.074, (z + 0.4) / 1) + 0.012 - 0.03 * x * x;
-    g.sheet("panel", 6, 8, (u, v) => { const x = lerp(-0.72, 0.72, u), z = lerp(-0.4, 0.6, v); return [x, top(x, z), z]; }, [0, -0.012, 0]);
-    for (const x of [-0.18, 0.18]) g.box("hardware", [x - 0.12, x + 0.12], [top(x, 0.1) - 0.004, top(x, 0.1) + 0.012], [0, 0.2]);
+    stockPanel(g, ["hood_stock"], mounting.hood);
+    // Raised vent inserts sit inside the original panel boundary; the cowl hinge stays intact.
+    for (const x of [-0.18, 0.18]) g.box("hardware", [x - 0.12, x + 0.12], [-0.027, -0.011], [0.48, 0.68]);
   },
 };
 
@@ -120,6 +106,11 @@ mkdirSync("public/model/body", { recursive: true });
 for (const [file, build] of Object.entries(PARTS)) {
   const g = builder();
   build(g);
+  if (file === "dalagan_ducktail" || file === "marketplace_gt_wing") {
+    for (const part of Object.values(g.parts)) {
+      for (let i = 1; i < part.positions.length; i += 3) part.positions[i] += 0.105;
+    }
+  }
   const data = packGlb({ parts: g.parts, materials: MATERIALS, generator: "pang-daily build-body-part-models", node: file });
   writeFileSync(`public/model/body/${file}.glb`, data);
   const tris = Object.values(g.parts).reduce((n, p) => n + p.indices.length / 3, 0);

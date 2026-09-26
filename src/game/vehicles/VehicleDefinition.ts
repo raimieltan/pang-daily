@@ -42,7 +42,7 @@ export const STARTER_SEDAN: VehicleRuntimeDefinition = {
   spec: BANWA_DALAGAN_1996,
   handlingPreset: "fwd_worn_sedan",
   collision: {
-    // Matches starter_sedan.glb: body 1.69 × 4.33 m, roof at 1.40 m, wheels r 0.30 at ±0.728.
+    // Matches banwa_dalagan_1996_modular.glb: body 1.69 × 4.33 m, roof at 1.40 m, wheels r 0.30 at ±0.728.
     body: { width: 1.66, height: 1.1, length: 4.3, bottomY: 0.25, centerZ: 0 },
     wheels: { halfTrack: 0.728, frontZ: 1.28, rearZ: -1.22, radius: 0.3 },
     // 62% front weight on a 2.50 m wheelbase.

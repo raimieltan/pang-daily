@@ -164,7 +164,7 @@ const marketSchema = z.strictObject({
 });
 
 /**
- * One exterior slot on the model. `stockNode` is the mesh an aftermarket part replaces (null =
+ * One exterior slot on the model. `stockNode` names the mesh(es) an aftermarket part replaces (null =
  * empty slot, e.g. no factory spoiler). Parts mount at, in order of preference: an
  * `attach_<slot>` empty in the GLB, `anchor`, or the centre of the stock mesh.
  */
@@ -173,7 +173,9 @@ const attachmentSchema = z
     slot: z.enum(EXTERIOR_SLOTS),
     /** Name of the runtime socket node parts are parented to, conventionally `exteriorSocketName(slot)`. */
     socket: nodeName,
-    stockNode: nodeName.nullable(),
+    stockNode: z.union([nodeName, z.array(nodeName).min(1)]).nullable(),
+    /** Explicit GLB mounting node when its name differs from `attach_<slot>`. */
+    mountNode: nodeName.optional(),
     anchor: vec3.nullable(),
   })
   .refine((a) => a.stockNode !== null || a.anchor !== null, {
