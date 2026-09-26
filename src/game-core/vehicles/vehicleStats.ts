@@ -18,12 +18,20 @@ export type VehicleStats = {
 };
 
 /**
- * Lightweight part effects on top of condition (wheels today). Multipliers, 1 = no change;
+ * Lightweight part effects on top of condition (wheels, body parts). Multipliers, 1 = no change;
  * `addedWeightKg` adds to curb weight. Deliberately few, so the handling stays readable.
  */
 export type StatModifiers = { grip: number; braking: number; acceleration: number; addedWeightKg: number };
 
 export const NO_MODIFIERS: StatModifiers = { grip: 1, braking: 1, acceleration: 1, addedWeightKg: 0 };
+
+/** Stacks modifiers from several part groups: multipliers multiply, weights add. */
+export function combineModifiers(...all: readonly StatModifiers[]): StatModifiers {
+  return all.reduce((acc, m) => ({
+    grip: acc.grip * m.grip, braking: acc.braking * m.braking,
+    acceleration: acc.acceleration * m.acceleration, addedWeightKg: acc.addedWeightKg + m.addedWeightKg,
+  }), NO_MODIFIERS);
+}
 
 /** Every component in perfect health. */
 export const PRISTINE_CONDITION: VehicleCondition = Object.fromEntries(

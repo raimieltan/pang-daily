@@ -42,8 +42,12 @@ describe("vehicle definition schema", () => {
       parseVehicleDefinition(withChanges((d) => d.visual.model.attachments.push({ ...d.visual.model.attachments[0] }))),
     ).toThrow(/unique/);
     expect(() =>
-      parseVehicleDefinition(withChanges((d) => (d.visual.model.attachments[0] = { slot: "hood", stockNode: null, anchor: null }))),
+      parseVehicleDefinition(withChanges((d) => (d.visual.model.attachments[0] = { slot: "hood", socket: "hood_socket", stockNode: null, anchor: null }))),
     ).toThrow(/anchor/);
+    expect(() =>
+      parseVehicleDefinition(withChanges((d) => (d.visual.model.attachments[1].socket = d.visual.model.attachments[0].socket))),
+    ).toThrow(/socket names must be unique/);
+    expect(() => parseVehicleDefinition(withChanges((d) => (d.tags = [])))).toThrow(/tags/);
     expect(() => parseVehicleDefinition(withChanges((d) => (d.visual.defaultPaint = "silver")))).toThrow(/rrggbb/);
     expect(() => parseVehicleDefinition(withChanges((d) => (d.id = "Banwa Dalagan")))).toThrow(/snake_case/);
   });

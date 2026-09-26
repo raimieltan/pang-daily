@@ -16,7 +16,10 @@ import { VehicleBody, type VehiclePose } from "./VehicleBody";
 import { VehicleController, type DriverInputSource } from "./VehicleController";
 import type { VehicleRuntimeDefinition } from "./VehicleDefinition";
 import { VehicleVisual } from "./VehicleVisual";
-import { NO_MODIFIERS, PRISTINE_CONDITION, type StatModifiers } from "../../game-core/vehicles/vehicleStats";
+import { combineModifiers, NO_MODIFIERS, PRISTINE_CONDITION, type StatModifiers } from "../../game-core/vehicles/vehicleStats";
+import { exteriorEffects, NO_EXTERIOR_EFFECTS, resolveBodyPartLook, type BodyPart, type ExteriorEffects, type FittedBodyPart, type PaintFinish } from "../../game-core/exterior";
+import type { ExteriorSlot } from "../../game-core/vehicles/VehicleDefinition";
+import { BodyPartSwapper, type BodyPartAssetSource } from "./BodyPartSwapper";
 import { calculateFitment, wheelModifiers, type Fitment, type WheelPart } from "../../game-core/wheels";
 import { WheelSwapper, type WheelAssetSource } from "./WheelSwapper";
 import type { VehicleCondition } from "../../game-core/vehicles/VehicleDefinition";
@@ -36,7 +39,12 @@ export type PlayerVehicleOptions = {
   presetId?: HandlingPresetId;
   /** Overrides where wheel GLBs load from (file bytes in tests). */
   wheelSource?: WheelAssetSource;
+  /** Overrides where body part GLBs load from (file bytes in tests). */
+  bodyPartSource?: BodyPartAssetSource;
 };
+
+/** An owned body part as the car should wear it: the template plus the copy's condition and finish. */
+export type BodyPartFitting = { part: BodyPart; condition: number | null; finish: PaintFinish | null };
 
 const PRESET_INFO = Object.entries(HANDLING_PRESETS).map(([id, { name, description }]) => ({ id, name, description }));
 
@@ -54,8 +62,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private readonly telemetry: SummaryPublisher<VehicleTelemetry>;
   /** Runs after `place`, e.g. to snap the camera. */
   onPlaced?: () => void;
-  /** Runs after a wheel swap, e.g. to re-light the new wheel meshes. */
-  onWheelsChanged?: () => void;
+  /** Runs after a wheel or body part swap, e.g. to re-light the new meshes. */
+  onVisualsChanged?: () => void;
   canReposition?: () => boolean;
   impactSerial = 0;
   impactStrength = 0;
@@ -64,7 +72,9 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private baseConfig: HandlingConfig;
   private condition: VehicleCondition = { ...PRISTINE_CONDITION };
   private wheelEffects: StatModifiers = NO_MODIFIERS;
+  private bodyEffects: ExteriorEffects = NO_EXTERIOR_EFFECTS;
   readonly wheels: WheelSwapper;
+  readonly bodyParts: BodyPartSwapper;
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -75,6 +85,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     presetId: HandlingPresetId,
   ) {
     this.wheels = new WheelSwapper(visual.model.root.getScene(), visual.model, options.wheelSource);
+    this.bodyParts = new BodyPartSwapper(visual.model.root.getScene(), visual.model, options.bodyPartSource);
     this.presetId = presetId;
     this.baseConfig = controller.model.config;
     this.spawnId = options.initialSpawn;
@@ -218,7 +229,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   setCondition(condition: VehicleCondition): void {
     this.condition = { ...condition };
-    this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition, this.wheelEffects));
+    this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition,
+      combineModifiers(this.wheelEffects, this.bodyEffects.modifiers)));
   }
 
   /** The wheel part on the car (null = stock wheels). */
@@ -240,7 +252,45 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     if (!(await this.wheels.equip(part))) return false;
     this.wheelEffects = wheelModifiers(this.definition.spec, part, condition);
     this.setCondition(this.condition);
-    this.onWheelsChanged?.();
+    this.onVisualsChanged?.();
+    return true;
+  }
+
+  /** Body parts on the car, with the look each is wearing. */
+  get exterior(): FittedBodyPart[] {
+    return this.bodyParts.equipped;
+  }
+
+  get paint(): string { return this.visual.model.paint; }
+
+  setAppearance(value: import('@/game-core/exterior').VehicleAppearance): void {
+    this.visual.model.setPaint(value.paint);
+    this.visual.model.setRideHeight(value.rideHeightM);
+    this.onVisualsChanged?.();
+  }
+
+  /** What the fitted body parts do: stat modifiers plus drag, cooling, reputation and repair cost. */
+  get exteriorEffects(): ExteriorEffects {
+    return this.bodyEffects;
+  }
+
+  /**
+   * Replaces the part on `socket` (null = back to stock): loads and attaches its GLB, dresses it
+   * in its finish (body colour follows the car's paint), wear and fit, then re-derives handling
+   * and the exterior effects. Resolves false if superseded.
+   */
+  async equipBodyPart(socket: ExteriorSlot, fitting: BodyPartFitting | null): Promise<boolean> {
+    const { spec } = this.definition;
+    const fitted = fitting && {
+      part: fitting.part,
+      look: resolveBodyPartLook(fitting.part, {
+        condition: fitting.condition, finish: fitting.finish, bodyColor: this.visual.model.paint, vehicleTags: spec.tags,
+      }),
+    };
+    if (!(await this.bodyParts.equip(socket, fitted))) return false;
+    this.bodyEffects = exteriorEffects(this.bodyParts.equipped);
+    this.setCondition(this.condition);
+    this.onVisualsChanged?.();
     return true;
   }
 
@@ -253,6 +303,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   dispose(): void {
     this.wheels.dispose();
+    this.bodyParts.dispose();
     this.releaseImpact();
     this.controller.dispose();
     this.body.dispose();

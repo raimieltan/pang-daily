@@ -46,6 +46,8 @@ import { VehicleLights } from "../rendering/VehicleLights";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { WheelSystem } from "../vehicles/WheelSystem";
+import { ExteriorSystem } from "../vehicles/ExteriorSystem";
+import { CustomizationSystem } from "../vehicles/CustomizationSystem";
 import { STARTER_SEDAN } from "../vehicles/VehicleDefinition";
 import { HUB_LAYOUT } from "../world/hub/hubLayout";
 import { HubLocations, toVehiclePose } from "../world/hub/HubLocations";
@@ -126,7 +128,7 @@ export const hubScene: SceneDefinition = {
     const lightCar = (car: PlayerVehicle) => lighting.attachCar(modes, [...car.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
     const litCar = player;
     lightCar(litCar);
-    litCar.onWheelsChanged = () => lightCar(litCar);
+    litCar.onVisualsChanged = () => lightCar(litCar);
     addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES]));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
@@ -153,7 +155,9 @@ export const hubScene: SceneDefinition = {
         car: maintainedCar.position, speedKmh: maintainedCar.speedKmh, racing: race.active }, zones),
     }));
     addSystem(jobSystem);
+    addSystem(new CustomizationSystem(bridge, inventory, maintainedCar, talyer));
     addSystem(new WheelSystem(bridge, inventory, maintainedCar));
+    addSystem(new ExteriorSystem(bridge, inventory, maintainedCar, talyer));
     let footstepTime = 0;
     let footstepDistance = 0;
     addSystem({ name: "footstepAudio", update(dt) {

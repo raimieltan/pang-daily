@@ -241,6 +241,21 @@ function talyer() {
   // Bay divider and grease pit edges.
   a.block({ center: [24, 0.5, 164], size: [0.4, 1, 8], color: "#8d887c", collide: true });
 
+  // Budget spray booth in the left bay: washable panels, open front and bright inspection strips.
+  // The 5.6 m opening stays clear for the player's car and walking access to Mang Boy.
+  for (const x of [12.8, 19.2]) {
+    a.block({ center: [x, 1.6, 161], size: [0.12, 3.2, 8], color: "#d4d7cf", collide: true });
+    a.block({ center: [x + (x < 16 ? 0.08 : -0.08), 1.5, 161], size: [0.05, 0.15, 6], color: "#f2f2d7" });
+  }
+  a.block({ center: [16, 1.6, 165], size: [6.5, 3.2, 0.12], color: "#d4d7cf", collide: true });
+  a.block({ center: [16, 3.25, 161], size: [6.5, 0.12, 8.1], color: "#c5c9c2" });
+  a.block({ center: [16, 2.6, 164.9], size: [1.5, 0.6, 0.06], color: "#505c59" });
+  a.prop("fluorescent_tube", [16, 160], { y: 3.05, rotDeg: 90 });
+  a.lamp({ id: "talyer_paint_booth", at: [16, 2.9, 160], profile: "fluorescent", strength: 1.2 });
+  // Lift rails and yellow posts in the suspension bay, with a clear drive-in route.
+  for (const x of [28.5, 35.5]) a.block({ center: [x, 1.5, 157], size: [0.3, 3, 0.3], color: "#c49a32", collide: true });
+  for (const x of [31.2, 32.8]) a.block({ center: [x, 0.04, 157], size: [0.32, 0.08, 5.5], color: "#52575a" });
+
   for (const [x, z] of [[16, 158], [32, 158], [16, 152.5], [32, 152.5]] as const) {
     a.prop("fluorescent_tube", [x, z], { y: roofY - 0.25, rotDeg: 90 });
   }
@@ -305,7 +320,7 @@ function talyer() {
       kind: "interact",
       rect: r,
       locationId: "talyer",
-      interaction: { action: "talk_mechanic", label: "Inspect car · Mang Boy", dialogueId: "talyer_mang_boy" },
+      interaction: { action: "talk_mechanic", label: "Repairs · Paint · Parts · Mang Boy", dialogueId: "talyer_mang_boy" },
     });
   }
   // Corkboard on the waiting-area side of the bay wall: Mang Boy's errands (see game/jobs/hubJobs).

@@ -8,6 +8,7 @@ import { loadJobSession } from "../jobs/jobStorage";
 import { HUB_JOBS } from "../jobs/hubJobs";
 import { loadInventorySession, loadMarketplaceSession } from "../marketplace/marketStorage";
 import { MarketplaceService } from "../marketplace/MarketplaceService";
+import { grantCustomizationTestKit } from '../vehicles/developmentParts';
 
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
@@ -58,6 +59,7 @@ export class GameRuntime {
 
     // The phone outlives scenes, so the marketplace is runtime-wide like pause.
     const inventory = loadInventorySession(storage);
+    if (process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
     this.market = new MarketplaceService(this.bridge.runtime, loadMarketplaceSession(session, inventory, storage));
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),

@@ -9,6 +9,8 @@ import { useMaintenanceStore } from '@/state/maintenanceStore';
 import { useGameUiStore } from '@/state/gameUiStore';
 import { FITMENT_LABELS } from '@/game-core/wheels';
 import type { WheelsView } from '@/game/vehicles/WheelSystem';
+import { bodyPart, canRefinish, PAINT_FINISHES, type FitState, type PaintFinish, type WearState } from '@/game-core/exterior';
+import type { ExteriorView } from '@/game/vehicles/ExteriorSystem';
 
 const pesos = (value: number) => `₱${value.toLocaleString('en-PH')}`;
 const ago = (s: number) => s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`;
@@ -21,7 +23,7 @@ const VERDICT: Record<Verdict, { text: string; tone: string }> = {
   scammed: { text: 'Na-scam ka, pre. Hindi ’yan good condition.', tone: 'text-red-300' },
 };
 const CATEGORIES: { id: PartCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' }, { id: 'wheels', label: 'Wheels' }, { id: 'tires', label: 'Tires' }, { id: 'suspension', label: 'Suspension' },
+  { id: 'all', label: 'All' }, { id: 'wheels', label: 'Wheels' }, { id: 'body', label: 'Body' }, { id: 'tires', label: 'Tires' }, { id: 'suspension', label: 'Suspension' },
   { id: 'brakes', label: 'Brakes' }, { id: 'engine', label: 'Engine' }, { id: 'drivetrain', label: 'Drivetrain' },
   { id: 'exhaust', label: 'Exhaust' }, { id: 'lighting', label: 'Lights' }, { id: 'interior', label: 'Interior' },
 ];
@@ -130,6 +132,7 @@ function OwnedParts({ parts, feePhp }: { parts: OwnedPartView[]; feePhp: number 
       {part.advertised && <p className="mt-1 text-[11px] text-white/45">from {part.seller} · listed “{part.advertised.label}”</p>}
       {part.installedOn && <p className="mt-1 text-[11px] text-sky-200/80">Installed on your car</p>}
       {part.category === 'wheels' && <WheelControls part={part} />}
+      {part.category === 'body' && <BodyPartControls part={part} />}
       {part.actual
         ? <p className="mt-2 text-xs"><span className="text-white/60">Mang Boy: </span><strong data-testid="actual-condition" className="text-white">{part.actual.label}</strong> {part.actual.verdict && <span className={VERDICT[part.actual.verdict].tone}>{VERDICT[part.actual.verdict].text}</span>}</p>
         : <button type="button" className="mt-2 rounded-md border border-amber-200/40 px-3 py-1.5 text-xs text-amber-100" onClick={() => commands?.inspectPart(part.id)}>Have Mang Boy inspect · {pesos(feePhp)}</button>}
@@ -161,6 +164,48 @@ function WheelControls({ part }: { part: OwnedPartView }) {
   </div>;
 }
 
+const FINISH_LABELS: Record<PaintFinish, string> = {
+  body_color: 'Body colour', primer: 'Primer', mismatched: 'Donor paint', bare_plastic: 'Bare plastic', fake_carbon: 'Carbon look', damaged: 'Beaten',
+};
+const WEAR_LABELS: Record<WearState, string> = { clean: 'clean', scratched: 'scratched', cracked: 'cracked' };
+const FIT_LABELS: Record<FitState, string> = { flush: 'Flush', gappy: 'Gappy', zip_tied: 'Zip-tied' };
+const FIT_TONE = { flush: 'text-emerald-200', gappy: 'text-amber-200', zip_tied: 'text-red-300' } as const;
+
+/** The whole kit's light effects, e.g. "drag +9% · +4 kg · porma +3 · fix-up ₱1,200". */
+function exteriorLine({ effects }: ExteriorView) {
+  const parts: string[] = [];
+  if (Math.round(effects.drag * 100) !== 0) parts.push(`drag ${percent(1 + effects.drag)}`);
+  if (Math.round(effects.cooling * 100) !== 0) parts.push(`cooling ${percent(1 + effects.cooling)}`);
+  if (effects.addedWeightKg !== 0) parts.push(`${effects.addedWeightKg > 0 ? '+' : ''}${Math.round(effects.addedWeightKg)} kg`);
+  if (effects.reputation !== 0) parts.push(`porma ${effects.reputation > 0 ? '+' : ''}${effects.reputation}`);
+  if (effects.repairCostPhp > 0) parts.push(`fix-up ${pesos(effects.repairCostPhp)}`);
+  return parts.join(' · ');
+}
+
+/** Fit or take off a body part, and pick its finish. The game checks fitment and installs; this only sends commands. */
+function BodyPartControls({ part }: { part: OwnedPartView }) {
+  const commands = useGameUiStore(s => s.commands);
+  const exterior = useMarketStore(s => s.exterior);
+  const template = bodyPart(part.partId);
+  if (!template) return null;
+  const finish = part.finish ?? template.paint.finish;
+  const finishes = PAINT_FINISHES.filter(f => canRefinish(template, f));
+  const mounted = exterior?.parts.find(p => p.itemId === part.id) ?? null;
+  return <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+    <button type="button" className="rounded-md border border-sky-200/40 px-3 py-1.5 text-sky-100 disabled:opacity-40" disabled={!commands}
+      onClick={() => part.installedOn ? commands?.removeBodyPart(part.id) : commands?.equipBodyPart(part.id)}>{part.installedOn ? 'Take off' : 'Fit it'}</button>
+    <label className="flex items-center gap-1 text-white/60">Finish
+      <select aria-label="Finish" className="rounded-md border border-white/20 bg-neutral-900 px-1.5 py-1 text-white/90 disabled:opacity-40" value={finish}
+        disabled={!commands || finishes.length < 2} onChange={e => commands?.refinishBodyPart(part.id, e.target.value as PaintFinish)}>
+        {finishes.map(f => <option key={f} value={f}>{FINISH_LABELS[f]}</option>)}
+      </select>
+    </label>
+    {mounted && exterior && <p data-testid="body-part-look" className="w-full">
+      <span className={FIT_TONE[mounted.fit]}>{FIT_LABELS[mounted.fit]}</span><span className="text-white/60"> · {FINISH_LABELS[mounted.finish].toLowerCase()}, {WEAR_LABELS[mounted.wear]}</span>
+      {exteriorLine(exterior) && <span className="text-white/45"> · {exteriorLine(exterior)}</span>}</p>}
+  </div>;
+}
+
 /** Stand-in "digicam flash" listing photo: seeded tone, part glyph, time stamp, grain. */
 function Photo({ listing, large = false }: { listing: ListingView; large?: boolean }) {
   const hue = listing.photoSeed % 360, tilt = (listing.photoSeed % 9) - 4;
@@ -185,6 +230,7 @@ function Glyph({ category }: { category: PartCategory }) {
     case 'drivetrain': return <g {...s}><circle cx="50" cy="50" r="28" /><circle cx="50" cy="50" r="10" />{Array.from({ length: 8 }, (_, i) => <line key={i} x1="50" y1="22" x2="50" y2="10" transform={`rotate(${i * 45} 50 50)`} />)}</g>;
     case 'exhaust': return <g {...s}><path d="M6 60h30" /><rect x="36" y="42" width="44" height="36" rx="18" /><circle cx="80" cy="60" r="8" /></g>;
     case 'lighting': return <g {...s}><path d="M14 30h48a24 24 0 0 1 0 40H14z" /><circle cx="56" cy="50" r="10" /></g>;
+    case 'body': return <g {...s}><path d="M8 62h84M14 62l10-18h30l14 10h18l4 8M22 30h40l-6 14" /><path d="M60 30l26-4v10" /></g>;
     case 'interior': return <g {...s}><path d="M34 10h24l-4 50H38zM32 60h36l6 18H26zM30 88h40" /></g>;
   }
 }

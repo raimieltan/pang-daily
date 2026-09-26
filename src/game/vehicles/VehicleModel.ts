@@ -1,4 +1,4 @@
-import type { AssetContainer } from "@babylonjs/core/assetContainer";
+import { AssetContainer } from "@babylonjs/core/assetContainer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { Material } from "@babylonjs/core/Materials/material";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
@@ -49,7 +49,10 @@ export type VehicleWheel = {
 
 export type VehicleAttachmentPoint = {
   readonly slot: ExteriorSlot;
-  /** Mount point in the chassis (follows ride height). Parts parented here sit at its origin. */
+  /**
+   * The named exterior socket (`attachments[].socket`, e.g. `spoiler_socket`): a mount point in
+   * the chassis that follows ride height. Parts parented here sit at its origin, in car axes.
+   */
   readonly anchor: TransformNode;
   /** Factory part the slot replaces, or null for an empty slot. */
   readonly stock: TransformNode | null;
@@ -80,7 +83,7 @@ type Bounds = { min: Vector3; max: Vector3; center: Vector3; size: Vector3 };
  * <id>_model                   ← parent this to the physics node
  * ├── <id>_chassis             ← ride height offset + tire lift
  * │   ├── __root__ (glTF)      ← bodywork, lights, trim
- * │   └── <id>_attach_<slot>   ← exterior part anchors
+ * │   └── <slot>_socket        ← exterior part sockets (attachments[].socket)
  * └── <id>_hub_<fl|fr|rl|rr>   ← wheel pivots (steer/spin), raised by taller tires
  *     └── wheel_<id>_socket    ← wheel offset along the axle
  *         └── wheel_<id> (glTF) or a swapped wheel
@@ -91,19 +94,20 @@ type Bounds = { min: Vector3; max: Vector3; center: Vector3; size: Vector3 };
  */
 export class VehicleModel {
   private rideHeightM: number;
+  private paintHex: string;
   /** Mean hub rise over stock across the four sockets; the body sits on it. */
   private tireLiftM = 0;
   private readonly stockHubY: ReadonlyMap<WheelId, number>;
   private readonly stockRadius: ReadonlyMap<WheelId, number>;
 
   private constructor(
-    private readonly definition: VehicleDefinition,
+    readonly definition: VehicleDefinition,
     private readonly container: AssetContainer,
     readonly root: TransformNode,
     readonly chassis: TransformNode,
     readonly wheels: readonly VehicleWheel[],
     readonly attachments: ReadonlyMap<ExteriorSlot, VehicleAttachmentPoint>,
-    private readonly paint: Material,
+    private readonly paintMaterial: Material,
     readonly stats: VehicleModelStats,
     /** Non-fatal findings (re-pivots, budget overruns, mirrored names). Log them; fix them in Blender. */
     readonly warnings: readonly string[],
@@ -111,6 +115,7 @@ export class VehicleModel {
     this.stockHubY = new Map(wheels.map((w) => [w.id, w.hub.position.y]));
     this.stockRadius = new Map(wheels.map((w) => [w.id, w.radius]));
     this.rideHeightM = 0;
+    this.paintHex = definition.visual.defaultPaint;
     this.setRideHeight(definition.visual.rideHeight.defaultM);
     this.setPaint(definition.visual.defaultPaint);
   }
@@ -139,6 +144,49 @@ export class VehicleModel {
 
   get rideHeight(): number {
     return this.rideHeightM;
+  }
+
+  /** Independent stock rig for NPC builds; shares geometry, never player paint or equipped parts. */
+  clone(name: string): VehicleModel {
+    const scene = this.root.getScene();
+    const root = this.root.clone(name, null, false)!;
+    const nodes = new Map<TransformNode, TransformNode>();
+    const pair = (source: TransformNode, copy: TransformNode) => {
+      nodes.set(source, copy);
+      const sourceChildren = source.getChildren(), copyChildren = copy.getChildren();
+      sourceChildren.forEach((child, i) => pair(child as TransformNode, copyChildren[i] as TransformNode));
+    };
+    pair(this.root, root);
+    const copyOf = (node: TransformNode) => nodes.get(node)!;
+    root.position.setAll(0);
+    root.rotation.setAll(0);
+    root.rotationQuaternion = Quaternion.Identity();
+    root.scaling.setAll(1);
+    root.setEnabled(true);
+    const container = new AssetContainer(scene);
+    const paint = this.paintMaterial.clone(`${name}_paint`)!;
+    container.materials.push(paint);
+    for (const mesh of root.getChildMeshes()) {
+      if (mesh.material === this.paintMaterial) mesh.material = paint;
+      mesh.isPickable = false;
+    }
+    const wheels = this.wheels.map((wheel): VehicleWheel => {
+      if (wheel.mounted) copyOf(wheel.mounted).dispose(false, false);
+      const hub = copyOf(wheel.hub), socket = copyOf(wheel.socket), mesh = copyOf(wheel.mesh);
+      hub.position.y = this.stockHubY.get(wheel.id)!;
+      hub.rotationQuaternion = Quaternion.Identity();
+      socket.position.x = 0;
+      mesh.setEnabled(true);
+      return { ...wheel, hub, socket, mesh, mounted: null, radius: this.stockRadius.get(wheel.id)!, fit: { ...this.definition.wheels.stock } };
+    });
+    const attachments = new Map<ExteriorSlot, VehicleAttachmentPoint>();
+    for (const [slot, point] of this.attachments) {
+      if (point.mounted) copyOf(point.mounted).dispose(false, false);
+      const stock = point.stock ? copyOf(point.stock) : null;
+      stock?.setEnabled(true);
+      attachments.set(slot, { slot, anchor: copyOf(point.anchor), stock, mounted: null });
+    }
+    return new VehicleModel(this.definition, container, root, copyOf(this.chassis), wheels, attachments, paint, this.stats, []);
   }
 
   /** Visual ride-height offset in metres (negative = lowered), clamped to the definition's range. Returns the applied value. */
@@ -181,14 +229,20 @@ export class VehicleModel {
     return this.container.materials.find((m) => m.name === name);
   }
 
+  /** The body colour as sRGB `#rrggbb`; body-colour parts match it. */
+  get paint(): string {
+    return this.paintHex;
+  }
+
   /** Recolours the paint material. `hex` is sRGB `#rrggbb`. */
   setPaint(hex: string): void {
     if (!/^#[0-9a-f]{6}$/i.test(hex)) throw new Error(`Invalid paint colour "${hex}", expected #rrggbb`);
+    this.paintHex = hex;
     const color = Color3.FromHexString(hex).toLinearSpace();
-    this.paint.unfreeze();
-    if (this.paint instanceof PBRMaterial) this.paint.albedoColor = color;
-    else if (this.paint instanceof StandardMaterial) this.paint.diffuseColor = color;
-    this.paint.freeze();
+    this.paintMaterial.unfreeze();
+    if (this.paintMaterial instanceof PBRMaterial) this.paintMaterial.albedoColor = color;
+    else if (this.paintMaterial instanceof StandardMaterial) this.paintMaterial.diffuseColor = color;
+    this.paintMaterial.freeze();
   }
 
   /**
@@ -328,7 +382,7 @@ export class VehicleModel {
     spec.attachments.forEach((a, i) => {
       const stock = stockNodes[i];
       const empty = nodes.get(`attach_${a.slot}`)?.[0];
-      const anchor = new TransformNode(`${definition.id}_attach_${a.slot}`, scene);
+      const anchor = new TransformNode(a.socket, scene);
       anchor.parent = chassis;
       if (empty) anchor.position.copyFrom(empty.getAbsolutePosition());
       else if (a.anchor) anchor.position.set(a.anchor.x, a.anchor.y, a.anchor.z);

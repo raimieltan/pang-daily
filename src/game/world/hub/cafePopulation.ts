@@ -11,12 +11,12 @@ export const CAFE_CUSTOMERS = [
 ] as const;
 
 export const CAFE_PARKED_CARS = [
-  { x: 140, z: 81.4, heading: 180, paint: '#b4b9b2' },
-  { x: 146.4, z: 81.4, heading: 180, paint: '#4e6e7b' },
-  { x: 152.8, z: 81.4, heading: 180, paint: '#8f4740' },
-  { x: 159.2, z: 81.4, heading: 180, paint: '#c3b18e' },
-  { x: 130.6, z: 88.5, heading: 270, paint: '#516353' },
-  { x: 130.6, z: 106, heading: 270, paint: '#626475' },
+  { x: 140, z: 81.4, heading: 180, paint: '#b4b9b2', build: 'clean_daily' },
+  { x: 146.4, z: 81.4, heading: 180, paint: '#4e6e7b', build: 'marketplace_hero' },
+  { x: 152.8, z: 81.4, heading: 180, paint: '#8f4740', build: 'primer_project' },
+  { x: 159.2, z: 81.4, heading: 180, paint: '#c3b18e', build: 'donor_daily' },
+  { x: 130.6, z: 88.5, heading: 270, paint: '#516353', build: 'tidy_kit' },
+  { x: 130.6, z: 106, heading: 270, paint: '#626475', build: 'clean_daily' },
 ] as const;
 
 /** The regulars' table (the south one, plus its plastic chair); seats match the chair props. */

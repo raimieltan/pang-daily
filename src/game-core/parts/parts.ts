@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EXTERIOR_SLOTS, type ExteriorSlot } from '../vehicles/VehicleDefinition';
 import type { ServiceComponent } from '../maintenance/condition';
 import { WHEEL_PARTS, wheelPart } from '../wheels/catalog';
+import { BODY_PARTS, bodyPart } from '../exterior/catalog';
 
 /**
  * Equip slots on an owned car. Exterior slots are the vehicle schema's `EXTERIOR_SLOTS` (the
@@ -11,7 +12,7 @@ import { WHEEL_PARTS, wheelPart } from '../wheels/catalog';
 export const PERFORMANCE_SLOTS = ['wheels', 'tires', 'shocks', 'springs', 'brakes_front', 'alternator', 'cylinder_head', 'gearbox', 'clutch', 'seat_driver'] as const;
 export const PART_SLOTS = [...PERFORMANCE_SLOTS, ...EXTERIOR_SLOTS] as const;
 export type PartSlot = typeof PERFORMANCE_SLOTS[number] | ExteriorSlot;
-export type PartCategory = 'wheels' | 'tires' | 'suspension' | 'brakes' | 'engine' | 'drivetrain' | 'exhaust' | 'lighting' | 'interior';
+export type PartCategory = 'wheels' | 'tires' | 'suspension' | 'brakes' | 'engine' | 'drivetrain' | 'exhaust' | 'body' | 'lighting' | 'interior';
 
 /**
  * Part definitions (TECH_ARCHITECTURE §17), shared by the marketplace, inventory and later the
@@ -31,6 +32,14 @@ function wheels(id: string, weight: number): PartTemplate {
     priceRange: part.market.priceRangePhp, conditionRange: part.market.conditionRange, weight };
 }
 
+/** Body parts are defined in `game-core/exterior`; this is their listing entry, on the part's socket. */
+function body(id: string, weight: number): PartTemplate {
+  const part = bodyPart(id);
+  if (!part) throw new Error(`Unknown body part "${id}"`);
+  return { id, name: part.name, category: 'body', fits: part.fits, component: null, slots: [part.socket],
+    priceRange: part.market.priceRangePhp, conditionRange: part.market.conditionRange, weight };
+}
+
 export const PART_TEMPLATES: readonly PartTemplate[] = [
   { id: 'used_coilovers_01', name: 'Used coilovers (adjustable)', category: 'suspension', fits: 'Most 90s sedans', component: 'suspension', slots: ['shocks', 'springs'], priceRange: [6500, 9000], conditionRange: [.35, .85], weight: 2 },
   { id: 'stock_shocks_set', name: 'Stock shocks, set of 4', category: 'suspension', fits: 'Banwa Dalagan', component: 'suspension', slots: ['shocks'], priceRange: [1800, 2600], conditionRange: [.3, .9], weight: 3 },
@@ -47,9 +56,18 @@ export const PART_TEMPLATES: readonly PartTemplate[] = [
   { id: 'projector_headlights', name: 'Projector headlights, pair', category: 'lighting', fits: 'Banwa Dalagan', component: null, slots: ['headlight_l', 'headlight_r'], priceRange: [3000, 5200], conditionRange: [.35, .95], weight: 2 },
   { id: 'bucket_seat', name: 'Bucket seat w/ rails', category: 'interior', fits: 'Universal rails', component: null, slots: ['seat_driver'], priceRange: [4500, 8000], conditionRange: [.35, .9], weight: 1 },
   wheels('oversized_17_deep_dish', 1),
+  body('universal_rubber_lip', 3),
+  body('acp_chin_splitter', 2),
+  body('dalagan_fiberglass_skirts', 1),
+  body('dalagan_ducktail', 2),
+  body('marketplace_gt_wing', 2),
+  body('dalagan_primer_bumper', 2),
+  body('dalagan_red_fender_fl', 2),
+  body('vented_carbon_look_hood', 1),
 ];
 
 const byId = new Map(PART_TEMPLATES.map(part => [part.id, part]));
 if (WHEEL_PARTS.some(part => !byId.has(part.id))) throw new Error('Every wheel part needs a PART_TEMPLATES entry');
+if (BODY_PARTS.some(part => !byId.has(part.id))) throw new Error('Every body part needs a PART_TEMPLATES entry');
 export const partDefinition = (id: string): PartTemplate | undefined => byId.get(id);
 export const partIdSchema = z.string().refine(id => byId.has(id), 'unknown part');

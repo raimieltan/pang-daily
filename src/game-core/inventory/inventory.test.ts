@@ -21,6 +21,17 @@ describe('part definitions', () => {
 });
 
 describe('InventorySession', () => {
+  it('persists per-car paint and ride height, validates inputs and reads older saves', () => {
+    const { inventory, saves } = setup();
+    expect(inventory.setAppearance('car_a', { paint: '#abcdef', rideHeightM: -0.04 })).toEqual({ paint: '#abcdef', rideHeightM: -0.04 });
+    expect(new InventorySession(JSON.parse(JSON.stringify(saves.at(-1)))).appearance('car_a')).toEqual({ paint: '#abcdef', rideHeightM: -0.04 });
+    expect(inventory.appearance('car_b')).toBeNull();
+    expect(inventory.setAppearance('car_a', { paint: 'red', rideHeightM: 0 })).toHaveProperty('rejected');
+    expect(inventory.setAppearance('car_a', { paint: '#ffffff', rideHeightM: NaN })).toHaveProperty('rejected');
+    const old = JSON.parse(JSON.stringify(inventory.snapshot()));
+    delete old.appearance;
+    expect(new InventorySession(old).appearance('car_a')).toBeNull();
+  });
   it('starts empty and keeps identical parts as separate items with their own condition', () => {
     const { inventory } = setup();
     expect(inventory.items()).toEqual([]);
@@ -90,6 +101,18 @@ describe('InventorySession', () => {
     expect(restored.installedOn('car_a')).toEqual({ cylinder_head: head.id });
     expect(restored.add(grant('surplus_head', .9, 'k'))).toMatchObject({ id: head.id });
     expect(ok(restored.add(grant('surplus_head'))).id).not.toBe(head.id); // Serial survives: no id reuse.
+  });
+
+  it('persists a body part refinish, and loads older saves without one as it came', () => {
+    const { inventory, saves } = setup();
+    const lip = ok(inventory.add(grant('universal_rubber_lip')));
+    expect(lip.finish).toBeNull();
+    expect(ok(inventory.refinish(lip.id, 'primer')).finish).toBe('primer');
+    expect(inventory.refinish('item-999', 'primer')).toHaveProperty('rejected');
+    const save = JSON.parse(JSON.stringify(saves.at(-1)));
+    expect(setup(save).inventory.item(lip.id)?.finish).toBe('primer');
+    delete save.items[0].finish;
+    expect(setup(save).inventory.item(lip.id)?.finish).toBeNull();
   });
 
   it('falls back to an empty inventory for inconsistent saves', () => {

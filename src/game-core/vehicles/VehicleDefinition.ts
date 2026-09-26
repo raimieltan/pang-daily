@@ -30,13 +30,26 @@ export const CONDITION_COMPONENTS = [
 /** Stats that condition can degrade. */
 export const CONDITION_STATS = ["power", "grip", "braking", "reliability"] as const;
 
-/** Exterior customization slots, in ART_DIRECTION §6 priority order after wheels/ride height. */
+/**
+ * Exterior customization slots: body panels and add-ons first (ART_DIRECTION §6 priority after
+ * wheels/ride height), then trim. Each is a named socket on the car (`exteriorSocketName`). Pairs
+ * that are sold as a pair (side skirts, mirrors) share one centred socket; only the bolt-on front
+ * fenders are per side (rear quarters are welded on these cars).
+ */
 export const EXTERIOR_SLOTS = [
   "hood",
   "bumper_front",
   "bumper_rear",
+  "front_lip",
+  "chin",
+  "side_skirts",
   "spoiler",
+  "fender_fl",
+  "fender_fr",
   "side_mirrors",
+  "roof",
+  "accessory_front",
+  "accessory_rear",
   "exhaust",
   "headlight_l",
   "headlight_r",
@@ -50,6 +63,12 @@ export const EXTERIOR_SLOTS = [
  * src/game-core/wheels/README.md.
  */
 export const wheelSocketName = (id: (typeof WHEEL_IDS)[number]) => `wheel_${id}_socket` as const;
+
+/**
+ * Default exterior socket names (`<slot>_socket`): the runtime node a body part hangs from, under
+ * the chassis so it follows ride height. See docs/VEHICLE_ASSETS.md §4 and src/game-core/exterior.
+ */
+export const exteriorSocketName = (slot: (typeof EXTERIOR_SLOTS)[number]) => `${slot}_socket` as const;
 
 export type Drivetrain = (typeof DRIVETRAINS)[number];
 export type WheelId = (typeof WHEEL_IDS)[number];
@@ -152,6 +171,8 @@ const marketSchema = z.strictObject({
 const attachmentSchema = z
   .strictObject({
     slot: z.enum(EXTERIOR_SLOTS),
+    /** Name of the runtime socket node parts are parented to, conventionally `exteriorSocketName(slot)`. */
+    socket: nodeName,
     stockNode: nodeName.nullable(),
     anchor: vec3.nullable(),
   })
@@ -195,6 +216,10 @@ const visualSchema = z
   })
   .refine((v) => new Set(v.model.attachments.map((a) => a.slot)).size === v.model.attachments.length, {
     message: "attachment slots must be unique",
+    path: ["model", "attachments"],
+  })
+  .refine((v) => new Set(v.model.attachments.map((a) => a.socket)).size === v.model.attachments.length, {
+    message: "attachment socket names must be unique",
     path: ["model", "attachments"],
   });
 
@@ -257,6 +282,11 @@ export const vehicleDefinitionSchema = z.strictObject({
   schemaVersion: z.literal(VEHICLE_SCHEMA_VERSION),
   id: slug,
   identity: identitySchema,
+  /**
+   * What body parts match against (`compatibleTags`): the model line first, then shape and era,
+   * e.g. `banwa_dalagan`, `sedan`, `nineties`. Parts tagged `universal` fit anything, badly.
+   */
+  tags: z.array(slug).min(1),
   drivetrain: drivetrainSchema,
   power: powerSchema,
   weight: weightSchema,

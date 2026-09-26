@@ -40,6 +40,8 @@ export type GameCommandMap = {
   inspectVehicle: void;
   repairVehicle: { quoteId: string; components: ServiceComponent[] };
   dismissRepair: void;
+  setVehiclePaint: { color: string };
+  setRideHeight: { offsetM: number };
   quoteFuel: FuelRequest;
   purchaseFuel: { quoteId: string };
   dismissFuel: void;
@@ -55,6 +57,15 @@ export type GameCommandMap = {
   inspectPart: { partId: string };
   /** Bolt an owned wheel set (inventory item) onto the player car; null puts the stock wheels back. */
   equipWheels: { itemId: string | null };
+  /**
+   * Fit an owned body part on its socket, replacing whatever is there. `finish` resprays it
+   * (null = back to how it came; omitted = unchanged); also works on a part already fitted.
+   */
+  equipBodyPart: { itemId: string; finish?: import('../../game-core/exterior').PaintFinish | null };
+  /** Take a fitted body part off; the socket goes back to stock. */
+  removeBodyPart: { itemId: string };
+  /** Respray an owned body part, fitted or in the trunk (null = back to how it came). */
+  refinishBodyPart: { itemId: string; finish: import('../../game-core/exterior').PaintFinish | null };
 };
 
 export type GameCommandName = keyof GameCommandMap;
@@ -119,6 +130,8 @@ export interface GameCommands {
   inspectVehicle(): void;
   repairVehicle(quoteId: string, components: ServiceComponent[]): void;
   dismissRepair(): void;
+  setVehiclePaint(color: string): void;
+  setRideHeight(offsetM: number): void;
   quoteFuel(request: FuelRequest): void;
   purchaseFuel(quoteId: string): void;
   dismissFuel(): void;
@@ -130,6 +143,9 @@ export interface GameCommands {
   buyListing(listingId: string): void;
   inspectPart(partId: string): void;
   equipWheels(itemId: string | null): void;
+  equipBodyPart(itemId: string, finish?: import('../../game-core/exterior').PaintFinish | null): void;
+  removeBodyPart(itemId: string): void;
+  refinishBodyPart(itemId: string, finish: import('../../game-core/exterior').PaintFinish | null): void;
 }
 
 type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>) => void;
@@ -154,6 +170,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     inspectVehicle: () => dispatch("inspectVehicle"),
     repairVehicle: (quoteId, components) => dispatch("repairVehicle", { quoteId, components }),
     dismissRepair: () => dispatch("dismissRepair"),
+    setVehiclePaint: color => dispatch('setVehiclePaint', { color }),
+    setRideHeight: offsetM => dispatch('setRideHeight', { offsetM }),
     quoteFuel: request => dispatch("quoteFuel", request),
     purchaseFuel: quoteId => dispatch("purchaseFuel", { quoteId }),
     dismissFuel: () => dispatch("dismissFuel"),
@@ -165,5 +183,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     buyListing: listingId => dispatch("buyListing", { listingId }),
     inspectPart: partId => dispatch("inspectPart", { partId }),
     equipWheels: itemId => dispatch("equipWheels", { itemId }),
+    equipBodyPart: (itemId, finish) => dispatch("equipBodyPart", finish === undefined ? { itemId } : { itemId, finish }),
+    removeBodyPart: itemId => dispatch("removeBodyPart", { itemId }),
+    refinishBodyPart: (itemId, finish) => dispatch("refinishBodyPart", { itemId, finish }),
   };
 }

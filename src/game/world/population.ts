@@ -7,7 +7,7 @@ export type Resident = {
   activity: ResidentActivity; shirt: string; voice: number;
   to?: { x: number; z: number; y?: number };
 };
-export type ParkedCarPlacement = { x: number; y?: number; z: number; heading: number; paint: string };
+export type ParkedCarPlacement = { x: number; y?: number; z: number; heading: number; paint: string; build?: import('@/game-core/exterior/npcBuilds').NpcCarBuildId };
 
 const people: Resident[] = [];
 const shirts = ['#718594', '#bc8460', '#8a9873', '#a79d84', '#936b78', '#b6ad94'];
@@ -93,9 +93,9 @@ const overlookCar = (ds: number, offset: number, paint: string): ParkedCarPlacem
 export const NEIGHBORHOOD_CARS: readonly ParkedCarPlacement[] = [
   { x: 10.5, z: 19, heading: 0, paint: '#b9b7a7' },
   { x: 39.8, z: 26, heading: 0, paint: '#57717e' },
-  { x: 32, z: 158, heading: 180, paint: '#96634c' },
+  { x: 32, z: 158, heading: 180, paint: '#96634c', build: 'primer_project' },
   { x: 33, z: 147.5, heading: 90, paint: '#758474' },
-  { x: -78.5, z: 12.5, heading: 0, paint: '#9f6659' },
+  { x: -78.5, z: 12.5, heading: 0, paint: '#9f6659', build: 'donor_daily' },
   { x: -59.5, z: 12.5, heading: 0, paint: '#b4b7ae' },
   { x: 83, z: -14, heading: 90, paint: '#76828b' },
   { x: 151, z: -14, heading: 90, paint: '#a3916c' },

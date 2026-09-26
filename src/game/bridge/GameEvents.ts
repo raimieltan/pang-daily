@@ -41,6 +41,10 @@ export type GameEventMap = {
   partInspected: import('../../game-core/marketplace/MarketplaceSession').PartInspection;
   /** Wheels on the player car, their fitment and listed effects. On scene setup and after every swap. */
   wheelsState: import('../vehicles/WheelSystem').WheelsView;
+  /** Body parts on the player car, how they look and what they do. On scene setup and after every swap. */
+  exteriorState: import('../vehicles/ExteriorSystem').ExteriorView;
+  exteriorInventory: import('../vehicles/ExteriorSystem').ExteriorInventoryView;
+  customizationState: import('../vehicles/CustomizationSystem').CustomizationView;
   maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
   repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;
   repairCompleted: import('../../game-core/maintenance/VehicleSession').RepairReceipt;

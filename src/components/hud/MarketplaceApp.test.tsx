@@ -13,6 +13,8 @@ import { bindGameUiStore } from '@/state/gameUiStore';
 import { WheelSystem } from '@/game/vehicles/WheelSystem';
 import { BANWA_DALAGAN_1996 } from '@/game-core/vehicles';
 import { calculateFitment, type WheelPart } from '@/game-core/wheels';
+import { ExteriorSystem } from '@/game/vehicles/ExteriorSystem';
+import { exteriorEffects, resolveBodyPartLook, type FittedBodyPart } from '@/game-core/exterior';
 
 const release: (() => void)[] = [];
 let root: Root;
@@ -90,4 +92,44 @@ it('bolts an owned wheel set on and takes it off, showing fitment and listed eff
   expect(container.textContent).not.toContain('Installed on your car');
   expect(container.querySelector('[data-testid="wheel-fitment"]')).toBeNull();
   expect(button('Bolt on')).toBeTruthy();
+});
+
+it('fits a body part, resprays it and takes it off, showing its look and the kit effects', async () => {
+  const { bridge, inventory } = setup();
+  const car = BANWA_DALAGAN_1996;
+  const on = new Map<string, FittedBodyPart>();
+  const exterior = new ExteriorSystem(bridge.runtime, inventory, {
+    id: car.id, definition: { spec: car },
+    get exterior() { return [...on.values()]; },
+    get exteriorEffects() { return exteriorEffects([...on.values()]); },
+    equipBodyPart: async (socket, fitting) => {
+      if (!fitting) on.delete(socket);
+      else on.set(socket, { part: fitting.part, look: resolveBodyPartLook(fitting.part, { ...fitting, bodyColor: '#2f5d8a', vehicleTags: car.tags }) });
+      return true;
+    },
+  });
+  release.push(() => exterior.dispose());
+  const flush = () => act(() => new Promise(resolve => setTimeout(resolve)));
+  act(() => { inventory.add({ partId: 'marketplace_gt_wing', condition: 0.5, origin: { kind: 'grant', reason: 'test' } }); });
+  click(button('Your parts'));
+  const select = container.querySelector<HTMLSelectElement>('select[aria-label="Finish"]')!;
+  expect(select.value).toBe('fake_carbon');
+  // ABS strips to bare plastic; donor paint needs a donor.
+  expect(Array.from(select.options).map(o => o.value)).toEqual(['body_color', 'primer', 'bare_plastic', 'fake_carbon', 'damaged']);
+
+  click(button('Fit it'));
+  await flush();
+  expect(container.textContent).toContain('Installed on your car');
+  expect(container.querySelector('[data-testid="body-part-look"]')?.textContent).toBe('Zip-tied · carbon look, scratched · drag +9% · +7 kg · porma +3 · fix-up ₱1,880');
+
+  act(() => { select.value = 'primer'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await flush();
+  expect(container.querySelector('[data-testid="body-part-look"]')?.textContent).toMatch(/^Zip-tied · primer, scratched · /);
+  // Primer halves the wing's porma, and the scuffs and zip ties eat the rest.
+  expect(container.querySelector('[data-testid="body-part-look"]')?.textContent).not.toContain('porma');
+
+  click(button('Take off'));
+  await flush();
+  expect(container.textContent).not.toContain('Installed on your car');
+  expect(container.querySelector('[data-testid="body-part-look"]')).toBeNull();
 });

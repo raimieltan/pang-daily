@@ -17,13 +17,16 @@ then call `add`.
   take `shocks` + `springs`, headlight pairs take both `EXTERIOR_SLOTS` sides). Anything in those
   slots goes back to the trunk as a whole part and is returned as `displaced`. `remove` refuses
   installed items; call `uninstall` first.
+- **Finish.** Body parts carry `finish`: the owner's respray (`refinish`), or `null` for how the
+  part came. Older saves without it load as `null`.
 - **API.** `items`, `item`, `byKey`, `installation`, `installedOn`, `add`, `remove`, `reveal`,
-  `install`, `uninstall`, `subscribe`. Failures return `{ rejected }`, and reads return copies.
+  `refinish`, `install`, `uninstall`, `subscribe`. Failures return `{ rejected }`, and reads return copies.
 - **Saves.** Saves that reference missing items, reuse ids or keys, or name unknown parts fall back
   to an empty inventory, matching the other sessions' fresh-session fallback.
 
 Wheels are the first installed part that does anything: `WheelSystem` (`src/game/vehicles`) watches
 the car's `wheels` slot, swaps the visuals and applies the set's stat modifiers (see
-`game-core/wheels/README.md`). Nothing else applies installed parts to handling or visuals yet. The garage/customization milestone
+`game-core/wheels/README.md`). `ExteriorSystem` does the same for body parts on the exterior sockets
+(see `game-core/exterior/README.md`). Nothing else applies installed parts to handling or visuals yet. The garage/customization milestone
 reads `installedOn(vehicleId)` and resolves each item through `partDefinition`
 (`component`, `slots`).

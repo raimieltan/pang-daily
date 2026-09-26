@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { PaintFinish } from '../exterior/BodyPart';
 import type { VehicleSession } from '../maintenance/VehicleSession';
 import type { InventoryItem, InventorySession, RevealMethod } from '../inventory/InventorySession';
 import { partDefinition, type PartCategory } from '../parts/parts';
@@ -15,8 +16,10 @@ export type MarketSave = z.infer<typeof marketSaveSchema>;
 
 /** An inventory item as the phone shows it: condition only once revealed. */
 export type OwnedPartView = {
-  id: string; title: string; category: PartCategory; paidPhp: number | null; seller: string | null; advertised: { grade: Grade; label: string } | null;
+  id: string; partId: string; title: string; category: PartCategory; paidPhp: number | null; seller: string | null; advertised: { grade: Grade; label: string } | null;
   installedOn: string | null;
+  /** Body parts: the owner's refinish, null = as it came. */
+  finish: PaintFinish | null;
   actual: { condition: number; label: string; verdict: Verdict | null; method: RevealMethod } | null;
 };
 export type MarketplaceView = { listings: ListingView[]; parts: OwnedPartView[]; inspectionFeePhp: number; nextExpirySeconds: number | null };
@@ -129,10 +132,10 @@ export class MarketplaceSession {
     const shown = item.revealedBy && item.condition !== null ? item.condition : null;
     const part = partDefinition(item.partId)!;
     return {
-      id: item.id, title: part.name, category: part.category, paidPhp: origin?.paidPhp ?? null,
+      id: item.id, partId: item.partId, title: part.name, category: part.category, paidPhp: origin?.paidPhp ?? null,
       seller: origin ? seller(origin.sellerId)?.name ?? 'Unknown seller' : null,
       advertised: origin ? { grade: origin.advertisedGrade, label: GRADE_LABEL[origin.advertisedGrade] } : null,
-      installedOn: this.inventory.installation(item.id)?.vehicleId ?? null,
+      installedOn: this.inventory.installation(item.id)?.vehicleId ?? null, finish: item.finish,
       actual: shown === null ? null : { condition: shown, label: `${Math.round(shown * 100)}%`, verdict: origin ? verdictFor(origin.advertisedGrade, shown) : null, method: item.revealedBy! },
     };
   }

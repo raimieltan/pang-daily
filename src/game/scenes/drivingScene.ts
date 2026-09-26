@@ -13,6 +13,8 @@ import { PhysicsWorld } from "../physics/PhysicsWorld";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { WheelSystem } from "../vehicles/WheelSystem";
+import { ExteriorSystem } from "../vehicles/ExteriorSystem";
+import { CustomizationSystem } from "../vehicles/CustomizationSystem";
 import { STARTER_SEDAN } from "../vehicles/VehicleDefinition";
 import { buildDebugRoad } from "../world/debugRoad";
 import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
@@ -73,7 +75,9 @@ export const drivingScene: SceneDefinition = {
     player.onPlaced = () => chase.snap();
     addSystem(player);
     addSystem(new MaintenanceSystem(bridge, session, player, () => controls.enabled));
+    addSystem(new CustomizationSystem(bridge, inventory, player, () => 'Visit Mang Boy’s talyer for paint and suspension.'));
     addSystem(new WheelSystem(bridge, inventory, player));
+    addSystem(new ExteriorSystem(bridge, inventory, player, () => 'Visit Mang Boy’s talyer to fit exterior parts.'));
     addSystem(chase);
   },
 };

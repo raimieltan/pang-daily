@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { PART_SLOTS, partDefinition, partIdSchema, type PartSlot } from '../parts/parts';
+import { PAINT_FINISHES, type PaintFinish } from '../exterior/BodyPart';
+import { vehicleAppearanceSchema, type VehicleAppearance } from '../exterior/VehicleAppearance';
 
 /** How the true condition of an item came out. Installation and seller trust hook in here later. */
 export const REVEAL_METHODS = ['mechanic', 'known'] as const;
@@ -18,10 +20,14 @@ const itemSchema = z.object({
   acquiredAt: z.number().int(), origin: origins,
   /** Idempotency key: adding the same key twice returns the first item instead of a copy. */
   key: z.string().min(1).nullable(),
+  /** Body parts: the owner's respray/refinish; null (or absent in old saves) = as it came. */
+  finish: z.enum(PAINT_FINISHES).nullable().default(null),
 });
 export type InventoryItem = z.infer<typeof itemSchema>;
 const installsSchema = z.record(z.string().min(1), z.partialRecord(z.enum(PART_SLOTS), z.string().min(1)));
-const inventorySaveSchema = z.object({ version: z.literal(1), serial: z.number().int().nonnegative(), items: z.array(itemSchema), installed: installsSchema })
+const inventorySaveSchema = z.object({ version: z.literal(1), serial: z.number().int().nonnegative(), items: z.array(itemSchema), installed: installsSchema,
+  appearance: z.record(z.string().min(1), vehicleAppearanceSchema).default({}),
+})
   .refine(save => new Set(save.items.map(i => i.id)).size === save.items.length, 'duplicate item id')
   .refine(save => new Set(save.items.flatMap(i => i.key ? [i.key] : [])).size === save.items.filter(i => i.key).length, 'duplicate item key')
   .refine(save => Object.values(save.installed).every(slots => Object.values(slots).every(id => save.items.some(i => i.id === id))), 'install references a missing item');
@@ -43,7 +49,7 @@ export class InventorySession {
 
   constructor(saved?: unknown, private readonly persist?: (save: InventorySave) => void, private readonly now: () => number = Date.now) {
     const parsed = inventorySaveSchema.safeParse(saved);
-    this.state = parsed.success ? parsed.data : { version: 1, serial: 0, items: [], installed: {} };
+    this.state = parsed.success ? parsed.data : { version: 1, serial: 0, items: [], installed: {}, appearance: {} };
   }
 
   snapshot(): InventorySave { return structuredClone(this.state); }
@@ -61,11 +67,26 @@ export class InventorySession {
   }
   installedOn(vehicleId: string): Partial<Record<PartSlot, string>> { return { ...this.state.installed[vehicleId] }; }
 
+  appearance(vehicleId: string): VehicleAppearance | null {
+    const value = this.state.appearance[vehicleId];
+    return value ? { ...value } : null;
+  }
+
+  setAppearance(vehicleId: string, value: VehicleAppearance): VehicleAppearance | Rejection {
+    const parsed = vehicleAppearanceSchema.safeParse(value);
+    if (!vehicleId || !parsed.success) return { rejected: 'Invalid paint or suspension setting.' };
+    const current = this.state.appearance[vehicleId];
+    if (current?.paint === parsed.data.paint && current.rideHeightM === parsed.data.rideHeightM) return { ...current };
+    this.state.appearance[vehicleId] = parsed.data;
+    this.changed();
+    return { ...parsed.data };
+  }
+
   add(input: AddItem): InventoryItem | Rejection {
     if (!partDefinition(input.partId)) return { rejected: 'Unknown part.' };
     if (input.key) { const existing = this.byKey(input.key); if (existing) return existing; }
     const parsed = itemSchema.safeParse({ id: `item-${this.state.serial + 1}`, partId: input.partId, condition: input.condition,
-      revealedBy: input.condition === null ? 'known' : input.revealedBy ?? null, acquiredAt: this.now(), origin: input.origin, key: input.key ?? null });
+      revealedBy: input.condition === null ? 'known' : input.revealedBy ?? null, acquiredAt: this.now(), origin: input.origin, key: input.key ?? null, finish: null });
     if (!parsed.success) return { rejected: 'Invalid inventory item.' };
     this.state.serial++; this.state.items.push(parsed.data); this.changed();
     return structuredClone(parsed.data);
@@ -85,6 +106,15 @@ export class InventorySession {
     if (!item) return { rejected: 'You do not have that part.' };
     if (item.revealedBy) return { rejected: 'Already inspected.' };
     item.revealedBy = method; this.changed();
+    return structuredClone(item);
+  }
+
+  /** Records a respray/refinish on the item (null = back to how it came). Which finishes a part takes is the caller's rule. */
+  refinish(itemId: string, finish: PaintFinish | null): InventoryItem | Rejection {
+    const item = this.find(itemId);
+    if (!item) return { rejected: 'You do not have that part.' };
+    if (item.finish === finish) return structuredClone(item);
+    item.finish = finish; this.changed();
     return structuredClone(item);
   }
 
@@ -120,4 +150,3 @@ export class InventorySession {
     this.listeners.forEach(listener => listener());
   }
 }
-
