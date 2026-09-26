@@ -1,7 +1,7 @@
 import { filletPolyline, LayoutAuthor, rect, pointAlong, polylineLength } from "../layoutTools";
 import { pixelText } from "../pixelFont";
 import type { Vec3Tuple } from "../props/PropDefinition";
-import type { LocationData, RoadPoint, Vec2, WorldLayout } from "../WorldLayout";
+import type { LocationData, Pose, RoadPoint, Vec2, WorldLayout } from "../WorldLayout";
 
 /**
  * Vertical-slice hub greybox (GAME_VISION §8, ART_DIRECTION §7, TECH_ARCHITECTURE §12):
@@ -123,6 +123,9 @@ coffeeShop();
 gasStation();
 convenienceStore();
 innerBlock();
+
+/** Beside the carport, inside the yard wall: where the car you aren't driving stays parked. */
+export const HOME_SECOND_BAY: Pose = { x: -70.5, z: 151.5, headingDeg: 180 };
 
 export const HUB_LOCATIONS: readonly LocationData[] = [
   {

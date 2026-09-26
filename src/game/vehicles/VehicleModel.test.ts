@@ -6,11 +6,12 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BANWA_DALAGAN_1996, type VehicleDefinition } from "@/game-core/vehicles";
+import { BANWA_DALAGAN_1996, HIRAYA_KIDLAT_1997, type VehicleDefinition } from "@/game-core/vehicles";
 import { VehicleModel, VehicleModelError } from "./VehicleModel";
 import { VehicleVisual } from "./VehicleVisual";
 
 const GLB = new Uint8Array(readFileSync("public/model/banwa_dalagan_1996_modular.glb"));
+const HATCH_GLB = new Uint8Array(readFileSync("public/model/civic/ek_hatch_1997_modular.glb"));
 
 let engine: NullEngine;
 let scene: Scene;
@@ -52,6 +53,23 @@ describe("VehicleModel import", () => {
     expect(hubs.fl.z - hubs.rl.z).toBeCloseTo(2.5, 2);
     expect(Math.abs(hubs.fl.x - hubs.fr.x)).toBeCloseTo(1.456, 2);
     expect(model.wheels.filter((w) => w.front).map((w) => w.id)).toEqual(["fl", "fr"]);
+  });
+
+  it("rigs the hatch within its budget, with every exterior slot backed by the GLB", async () => {
+    const model = await VehicleModel.load(scene, HIRAYA_KIDLAT_1997, HATCH_GLB);
+    const hubs = Object.fromEntries(model.wheels.map((w) => [w.id, worldPosition(w.hub)]));
+    for (const wheel of model.wheels) {
+      expect(wheel.radius).toBeCloseTo(0.295, 2);
+      expect(hubs[wheel.id].y).toBeCloseTo(0.295, 2);
+    }
+    expect(hubs.fl.z - hubs.rl.z).toBeCloseTo(2.62, 2);
+    // Bounds-centred hubs sit a few mm outboard of the 1.48 m axle track: the rim lip bulges out.
+    expect(Math.abs(hubs.fl.x - hubs.fr.x)).toBeCloseTo(1.48, 1);
+    expect(hubs.fl.x).toBeLessThan(0);
+    expect(model.warnings).toEqual([]);
+    expect([...model.attachments.keys()]).toEqual(HIRAYA_KIDLAT_1997.visual.model.attachments.map((a) => a.slot));
+    // The spoiler mount rides on the hatch, above and ahead of the tail.
+    expect(worldPosition(model.attachments.get("spoiler")!.anchor).y).toBeGreaterThan(1.25);
   });
 
   it("reports render cost and non-fatal asset issues instead of failing", async () => {

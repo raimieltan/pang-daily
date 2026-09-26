@@ -13,6 +13,7 @@ import type { LocationId, Rect, ZoneData } from "../world/WorldLayout";
  */
 export const INTERACTION_ACTIONS = [
   "enter_vehicle",
+  "switch_vehicle",
   "start_race",
   "order_coffee",
   "hang_out",
@@ -43,7 +44,7 @@ export type Interactable = {
   /** Modes it is offered in. Default: on foot only. */
   readonly modes?: readonly PlayerMode[];
   readonly locationId?: LocationId;
-  /** What the action is done to (the vehicle id for `enter_vehicle`). */
+  /** What the action is done to (the vehicle id for `enter_vehicle` / `switch_vehicle`). */
   readonly target?: string;
   /** Placeholder line fired with the interaction until dialogue is data-driven. */
   readonly dialogueId?: DialogueId;

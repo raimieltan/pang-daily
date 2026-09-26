@@ -15,7 +15,7 @@ import { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { WheelSystem } from "../vehicles/WheelSystem";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
-import { STARTER_SEDAN } from "../vehicles/VehicleDefinition";
+import { playerCar } from "../vehicles/VehicleDefinition";
 import { buildDebugRoad } from "../world/debugRoad";
 import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
 
@@ -60,9 +60,10 @@ export const drivingScene: SceneDefinition = {
     const world = addSystem(new PhysicsWorld(scene, havok));
     const road = buildDebugRoad(scene);
 
-    const requested = new URLSearchParams(window.location.search).get("handling");
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("handling");
     player = await PlayerVehicle.create(scene, world, controls, bridge, {
-      definition: STARTER_SEDAN,
+      definition: playerCar(params.get("car")),
       spawnPoints: road.spawnPoints,
       initialSpawn: "start",
       presetId: requested && isHandlingPresetId(requested) ? requested : undefined,

@@ -1,4 +1,4 @@
-import { BANWA_DALAGAN_1996, type VehicleDefinition } from "@/game-core/vehicles";
+import { BANWA_DALAGAN_1996, HIRAYA_KIDLAT_1997, type VehicleDefinition } from "@/game-core/vehicles";
 import type { HandlingPresetId } from "./handling/presets";
 
 /**
@@ -53,3 +53,29 @@ export const STARTER_SEDAN: VehicleRuntimeDefinition = {
   },
   gearThresholdsKmh: [1, 30, 55, 85, 120],
 };
+
+export const STARTER_HATCH: VehicleRuntimeDefinition = {
+  spec: HIRAYA_KIDLAT_1997,
+  handlingPreset: "fwd_hatch",
+  collision: {
+    // Matches civic/ek_hatch_1997_modular.glb: body 1.71 × 4.23 m, roof at 1.37 m, wheels r 0.295 at ±0.74.
+    body: { width: 1.68, height: 1.08, length: 4.2, bottomY: 0.25, centerZ: 0 },
+    wheels: { halfTrack: 0.74, frontZ: 1.31, rearZ: -1.31, radius: 0.295 },
+    // 61% front weight on a 2.62 m wheelbase.
+    centerOfMass: { y: 0.34, z: 0.29 },
+    tipInertiaScale: 3,
+    angularDamping: 0.5,
+    suspensionTravel: 0.2,
+  },
+  gearThresholdsKmh: [1, 35, 65, 100, 140],
+};
+
+/** Drivable cars by spec id. Scenes pick one with `?car=<id>`, defaulting to the sedan. */
+export const PLAYER_CARS: Readonly<Record<string, VehicleRuntimeDefinition>> = {
+  [STARTER_SEDAN.spec.id]: STARTER_SEDAN,
+  [STARTER_HATCH.spec.id]: STARTER_HATCH,
+};
+
+export function playerCar(id: string | null): VehicleRuntimeDefinition {
+  return (id && PLAYER_CARS[id]) || STARTER_SEDAN;
+}

@@ -1,0 +1,104 @@
+{
+  "required_nodes_present": true,
+  "missing_nodes": [],
+  "bounds_m": [
+    [
+      -0.9988399744033813,
+      1.3113021835042815e-08,
+      -2.1090000063180923
+    ],
+    [
+      0.9988399744033813,
+      1.3839999982714652,
+      2.1296796549856665
+    ]
+  ],
+  "dimensions_m": [
+    1.9976799488067627,
+    1.3839999851584435,
+    4.238679661303759
+  ],
+  "triangle_count": 48736,
+  "non_watertight_primitives": [
+    "shell_base__paint",
+    "hatch_stock__paint",
+    "taillight_r__taillight",
+    "taillight_l__taillight"
+  ],
+  "degenerate_triangles": 0,
+  "wheel_centers": {
+    "wheel_fl": [
+      0.74,
+      0.295,
+      1.31
+    ],
+    "wheel_fr": [
+      -0.74,
+      0.295,
+      1.31
+    ],
+    "wheel_rl": [
+      0.74,
+      0.295,
+      -1.31
+    ],
+    "wheel_rr": [
+      -0.74,
+      0.295,
+      -1.31
+    ]
+  },
+  "materials": [
+    "amber",
+    "chrome",
+    "engine_dark",
+    "engine_metal",
+    "glass",
+    "headlight",
+    "interior_dark",
+    "paint",
+    "plate",
+    "reverse",
+    "rim",
+    "taillight",
+    "tire",
+    "trim"
+  ],
+  "wheelbase_m": 2.62,
+  "engine_bounds_m": [
+    [
+      -0.41839998960494995,
+      0.3149999988079071,
+      0.9086997544765472
+    ],
+    [
+      0.4749999940395355,
+      0.7508080613613128,
+      1.4950000083446502
+    ]
+  ],
+  "engine_to_hood_min_vertical_clearance_m": 0.08417938230245736,
+  "attachment_count": 25,
+  "all_mesh_normals_finite": true,
+  "qa_views_inspected": 16,
+  "viewer_browser_test": "Not completed: browser executable download unavailable",
+  "topology_note": "Watertightness tested after welding coincident normal-split vertices, per material primitive. Separate assembled components intentionally meet/overlap at mounts.",
+  "welded_edge_details": {
+    "shell_base__paint": {
+      "open_boundary_edges": 0,
+      "edges_at_touching_closed_components": 1154
+    },
+    "taillight_l__taillight": {
+      "open_boundary_edges": 0,
+      "edges_at_touching_closed_components": 43
+    },
+    "taillight_r__taillight": {
+      "open_boundary_edges": 0,
+      "edges_at_touching_closed_components": 43
+    },
+    "hatch_stock__paint": {
+      "open_boundary_edges": 0,
+      "edges_at_touching_closed_components": 4
+    }
+  }
+}

@@ -115,6 +115,19 @@ export const HANDLING_PRESETS = {
       assists: { traction: 0, stability: 0 },
     },
   },
+
+  fwd_hatch: {
+    name: "'90s FWD hot hatch",
+    description: "Lighter, longer wheelbase, rear discs and a rev-happy 1.6. Less push, more lift-off bite.",
+    extends: "fwd_worn_sedan",
+    overrides: {
+      chassis: { massKg: 1030, wheelbaseM: 2.62, frontWeight: 0.61, cgHeightM: 0.5 },
+      drive: { accelerationMps2: 4.3, topSpeedKmh: 195 },
+      brakes: { decelerationMps2: 8.5, frontBias: 0.66 },
+      tires: { frontGrip: 1.0, rearGrip: 1.04 },
+      balance: { understeer: 0.38, liftOffRotation: 0.11 },
+    },
+  },
 } satisfies Record<string, HandlingPreset>;
 
 export type HandlingPresetId = keyof typeof HANDLING_PRESETS;

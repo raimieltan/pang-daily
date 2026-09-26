@@ -98,6 +98,10 @@ export class SceneManager<Id extends string> {
         slot.systems.push(system);
         return system;
       },
+      // Deferred: usually called from a system's update, and the rest of the frame still runs on this scene.
+      restart: () => queueMicrotask(() => {
+        if (this.current === slot) void this.switchTo(id);
+      }),
     };
 
     try {

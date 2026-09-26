@@ -34,6 +34,8 @@ export interface SceneContext {
   /** Lend the scene's talyer to the phone marketplace for part inspections; release on teardown. */
   readonly market: { useWorkshop(workshop: Workshop): () => void };
   addSystem<T extends GameSystem>(system: T): T;
+  /** Tear this scene down and build it again (e.g. after swapping the player's car). */
+  restart(): void;
 }
 
 export interface SceneDefinition {

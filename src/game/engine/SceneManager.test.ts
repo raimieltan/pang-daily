@@ -232,4 +232,24 @@ describe("SceneManager", () => {
     expect(manager.activeId).toBe("fresh");
     expect(onSpawn).toHaveBeenCalledOnce();
   });
+
+  it("restart rebuilds the same scene, and is a no-op once superseded", async () => {
+    let setups = 0;
+    let restart = () => {};
+    const { manager } = create({
+      a: { setup: (ctx) => { setups++; restart = ctx.restart; withCamera(ctx.scene); } },
+      b: empty,
+    });
+    await manager.switchTo("a");
+    const stale = restart;
+    stale();
+    await vi.waitFor(() => expect(manager.activeId).toBe("a"));
+    expect(setups).toBe(2);
+    await manager.switchTo("b");
+    stale();
+    restart();
+    await Promise.resolve();
+    expect(manager.activeId).toBe("b");
+    expect(setups).toBe(2);
+  });
 });
