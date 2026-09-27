@@ -1,3 +1,4 @@
+import type { PersistencePort, PersistentIntent } from '../persistence/PersistencePort';
 import { z } from 'zod';
 import { PART_SLOTS, partDefinition, partIdSchema, type PartSlot } from '../parts/parts';
 import { PAINT_FINISHES, type PaintFinish } from '../exterior/BodyPart';
@@ -52,6 +53,11 @@ type Rejection = { rejected: string };
  */
 export class InventorySession {
   private state: InventorySave;
+  private remote?: PersistencePort;
+  get persistent() { return !!this.remote; }
+  usePersistence(remote: PersistencePort) { this.remote = remote; }
+  execute(action: PersistentIntent) { if (!this.remote) throw new Error('Server persistence is not configured.'); return this.remote.execute(action); }
+  applyServerSnapshot(saved: InventorySave) { this.state = inventorySaveSchema.parse(saved); this.changed(); }
   private readonly listeners = new Set<() => void>();
 
   constructor(saved?: unknown, private readonly persist?: (save: InventorySave) => void, private readonly now: () => number = Date.now) {
@@ -82,6 +88,7 @@ export class InventorySession {
 
   /** Select bare trunk or factory spoiler, returning any fitted wing to inventory in one save. */
   setSpoilerMode(vehicleId: string, mode: 'none' | 'stock'): void {
+    if (this.remote) throw new Error('Customization requires a server-confirmed action.');
     if (!vehicleId || (mode !== 'none' && mode !== 'stock')) return;
     (this.state.stockSpoilerRemoved ??= {})[vehicleId] = mode === 'none';
     const slots = this.state.installed[vehicleId];
@@ -98,6 +105,7 @@ export class InventorySession {
   }
 
   setAppearance(vehicleId: string, value: VehicleAppearance): VehicleAppearance | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     const parsed = vehicleAppearanceSchema.safeParse(value);
     if (!vehicleId || !parsed.success) return { rejected: 'Invalid paint or suspension setting.' };
     const current = this.state.appearance[vehicleId];
@@ -108,6 +116,7 @@ export class InventorySession {
   }
 
   add(input: AddItem): InventoryItem | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     if (!partDefinition(input.partId)) return { rejected: 'Unknown part.' };
     if (input.key) { const existing = this.byKey(input.key); if (existing) return existing; }
     if (input.key && this.state.retiredKeys.includes(input.key)) return { rejected: 'That acquisition was already delivered and removed.' };
@@ -120,6 +129,7 @@ export class InventorySession {
 
   /** Sold, scrapped or used up. Installed parts must come off the car first. */
   remove(itemId: string): InventoryItem | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     const item = this.find(itemId);
     if (!item) return { rejected: 'You do not have that part.' };
     if (this.installation(itemId)) return { rejected: 'Take the part off the car first.' };
@@ -129,6 +139,7 @@ export class InventorySession {
   }
 
   reveal(itemId: string, method: RevealMethod): InventoryItem | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     const item = this.find(itemId);
     if (!item) return { rejected: 'You do not have that part.' };
     if (item.revealedBy) return { rejected: 'Already inspected.' };
@@ -138,6 +149,7 @@ export class InventorySession {
 
   /** Records a respray/refinish on the item (null = back to how it came). Which finishes a part takes is the caller's rule. */
   refinish(itemId: string, finish: PaintFinish | null): InventoryItem | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     const item = this.find(itemId);
     if (!item) return { rejected: 'You do not have that part.' };
     if (item.finish === finish) return structuredClone(item);
@@ -147,9 +159,11 @@ export class InventorySession {
 
   /** Fits the item into every slot its part needs, returning whatever it displaced to the trunk. */
   install(vehicleId: string, itemId: string, context?: InstallContext & { vehicle: VehicleDefinition }, beforeCommit?: () => void | Rejection): { installation: Installation; displaced: string[] } | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     const item = this.find(itemId), part = item && partDefinition(item.partId);
     if (!item || !part) return { rejected: 'You do not have that part.' };
     if (!vehicleId) return { rejected: 'Choose a car.' };
+    if (context && part.compatibleVehicleIds && !part.compatibleVehicleIds.includes(context.vehicle.id)) return { rejected: 'This part is not compatible with this vehicle.' };
     const current = this.installation(itemId);
     if (current) return { rejected: current.vehicleId === vehicleId ? 'Already installed.' : 'That part is on another car. Take it off first.' };
     const slots = { ...this.state.installed[vehicleId] };
@@ -171,6 +185,7 @@ export class InventorySession {
   }
 
   uninstall(itemId: string, beforeCommit?: () => void | Rejection): InventoryItem | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
     const where = this.installation(itemId);
     if (!where) return { rejected: 'That part is not installed.' };
     const payment = beforeCommit?.();

@@ -2,7 +2,7 @@
  * Public entry point of the game runtime. React imports only from here
  * (dynamically, so Babylon never loads during SSR).
  */
-import { GameRuntime } from "./engine/GameRuntime";
+import { GameRuntime, type GameRuntimeOptions } from "./engine/GameRuntime";
 import type { GameCommands, GameEventSource } from "./bridge";
 
 export type GameHandle = {
@@ -12,8 +12,8 @@ export type GameHandle = {
   dispose(): void;
 };
 
-export function createGame(canvas: HTMLCanvasElement): GameHandle {
-  return new GameRuntime(canvas);
+export function createGame(canvas: HTMLCanvasElement, options?: GameRuntimeOptions): GameHandle {
+  return new GameRuntime(canvas, options);
 }
 
 export type {

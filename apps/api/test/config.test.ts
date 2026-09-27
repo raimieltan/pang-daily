@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { validateEnvironment } from '../src/config/environment';
 
-const valid = { NODE_ENV: 'test', API_PORT: '3002', DATABASE_URL: 'postgresql://test:test@localhost:55433/pang_daily_test', FRONTEND_ORIGINS: 'http://localhost:3000,https://example.com' };
+const valid = { SESSION_SECRET: 'test-secret-at-least-32-characters-long', NODE_ENV: 'test', API_PORT: '3002', DATABASE_URL: 'postgresql://test:test@localhost:55433/pang_daily_test', FRONTEND_ORIGINS: 'http://localhost:3000,https://example.com' };
 test('valid configuration is typed and comma separated origins are parsed', () => {
   const result = validateEnvironment(valid);
   assert.equal(result.API_PORT, 3002);
@@ -13,7 +13,7 @@ test('valid configuration is typed and comma separated origins are parsed', () =
 test('missing configuration names each required variable', () => {
   assert.throws(() => validateEnvironment({}), (error: unknown) => {
     assert.ok(error instanceof Error);
-    for (const key of ['NODE_ENV', 'DATABASE_URL', 'API_PORT', 'FRONTEND_ORIGINS']) assert.ok(error.message.includes(key));
+    for (const key of ['NODE_ENV', 'DATABASE_URL', 'API_PORT', 'FRONTEND_ORIGINS', 'SESSION_SECRET']) assert.ok(error.message.includes(key));
     return true;
   });
 });

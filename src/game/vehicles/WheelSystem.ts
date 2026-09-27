@@ -43,10 +43,11 @@ export class WheelSystem implements GameSystem {
     this.sync();
   }
 
-  private equip(itemId: string | null): CommandOutcome {
+  private equip(itemId: string | null): CommandOutcome | Promise<CommandOutcome> {
     const current = this.inventory.installedOn(this.vehicle.id).wheels;
     if (itemId === null) {
       if (!current) return;
+      if (this.inventory.persistent) return this.inventory.execute({ type: 'part_remove', vehicleId: this.vehicle.id, partId: current }).then(() => undefined);
       const removed = this.inventory.uninstall(current);
       return 'rejected' in removed ? removed : undefined;
     }
@@ -54,6 +55,7 @@ export class WheelSystem implements GameSystem {
     if (!item) return { rejected: 'You do not have that part.' };
     if (!wheelPart(item.partId)) return { rejected: 'That is not a wheel set.' };
     if (current === itemId) return;
+    if (this.inventory.persistent) return this.inventory.execute({ type: 'part_install', vehicleId: this.vehicle.id, partId: itemId }).then(() => undefined);
     const installed = this.inventory.install(this.vehicle.id, itemId);
     return 'rejected' in installed ? installed : undefined;
   }

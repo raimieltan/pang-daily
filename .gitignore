@@ -44,3 +44,4 @@ apps/api/src/generated/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+packages/*/dist/

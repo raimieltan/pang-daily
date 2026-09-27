@@ -36,11 +36,13 @@ export class RaceSystem implements GameSystem {
   private materials: StandardMaterial[];
   private resultSent = false;
   private attemptId: string | null = null;
+  private checkpointSent = 0;
+  private starting = false;
   introRemaining = 0;
   private scene: Scene;
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
     private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE],
-    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn" | "snapshot">; access?: (raceId: string) => string | null } = {}) {
+    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn" | "snapshot"> & Partial<Pick<VehicleSession, "persistent" | "execute">>; access?: (raceId: string) => string | null } = {}) {
     this.publisher = new SummaryPublisher((progress) => bridge.emit("raceProgress", progress));
     this.root = new TransformNode("local-rival", scene);
     this.root.setEnabled(false);
@@ -100,10 +102,21 @@ export class RaceSystem implements GameSystem {
   private start(route: RaceDefinition) {
     const rejection = this.garage.access?.(route.id);
     if (rejection) return { rejected: rejection };
-    if (this.active) return { rejected: "Race already in progress" };
+    if (this.active || this.starting) return { rejected: "Race already in progress" };
     if (this.modes.mode !== "driving") return { rejected: "Get into your car to race" };
     if (!this.player.placeAt({ position: new Vector3(route.start.x, route.start.y, route.start.z), headingRad: route.heading })) return { rejected: "Start grid is unavailable" };
-    this.attemptId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+    if (this.garage.wallet?.persistent && this.garage.wallet.execute) {
+      this.starting = true;
+      return this.garage.wallet.execute({ type: 'race_start', definitionId: route.id, attemptId, vehicleId: this.player.definition.spec.id }).then(() => {
+        if (this.disposed) { void this.garage.wallet!.execute!({ type: 'race_complete', attemptId, elapsedMs: 0, finish: false }).catch(() => {}); return { rejected: 'The race scene was closed.' }; }
+        this.beginRace(route, attemptId);
+      }).finally(() => { this.starting = false; });
+    }
+    this.beginRace(route, attemptId);
+  }
+  private beginRace(route: RaceDefinition, attemptId: string) {
+    this.attemptId = attemptId; this.checkpointSent = 0;
     this.selected=route; this.race=new Race(route);
     if (route.rival?.npcId && route.rival.vehicleId) this.bridge.emit('raceAttemptStarted', { raceId: route.id, attemptId: this.attemptId, npcId: route.rival.npcId, vehicleId: route.rival.vehicleId, totalCheckpoints: route.checkpoints.length });
     this.gates.forEach(g=>g.setEnabled(g.metadata.routeId===route.id));
@@ -146,6 +159,10 @@ export class RaceSystem implements GameSystem {
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
       this.lastStanding = this.race.position; this.bridge.emit("raceStandingChanged", this.standing());
     }
+    while (this.attemptId && this.checkpointSent < this.race.player.next) {
+      const checkpointIndex = ++this.checkpointSent, attemptId = this.attemptId, elapsedMs = Math.round((this.race.playerTime ?? this.race.elapsed) * 1000);
+      if (this.garage.wallet?.persistent && this.garage.wallet.execute) { void this.garage.wallet.execute({ type: 'race_checkpoint', attemptId, checkpointIndex, elapsedMs }).catch(error => this.bridge.emit('persistenceError', `Race checkpoint was not saved: ${error instanceof Error ? error.message : String(error)}`)); }
+    }
     if (this.race.phase === "FINISHED" && !this.resultSent) this.publishResult();
     if (phase !== this.race.phase) this.publisher.flush(this.race.snapshot());
     else this.publisher.tick(dt, () => this.race.snapshot());
@@ -166,6 +183,12 @@ export class RaceSystem implements GameSystem {
     const outcome = this.race.phase === 'DNF' ? 'dnf' as const : this.race.position === 1 ? 'win' as const : 'loss' as const;
     const result = { ...this.standing(), attemptId: this.attemptId, npcId: this.selected.rival?.npcId, vehicleId: this.selected.rival?.vehicleId,
       outcome, timeMs: Math.round((this.race.playerTime ?? this.race.elapsed) * 1000), validation: this.race.validation() };
+    if (this.garage.wallet?.persistent && this.garage.wallet.execute) {
+      void this.garage.wallet.execute({ type: 'race_complete', attemptId: result.attemptId, elapsedMs: result.timeMs, finish: outcome !== 'dnf' && result.validation.finishValidated && !result.validation.invalidFinish }).then(receipt => {
+        this.bridge.emit('raceFinished', { ...result, outcome: receipt.details.outcome as 'win' | 'loss' | 'dnf', position: Number(receipt.details.position), prizePhp: Number(receipt.details.prizePhp) });
+      }, error => this.bridge.emit('persistenceError', `Race result was not saved: ${error instanceof Error ? error.message : String(error)}. Retry the save before leaving.`));
+      return;
+    }
     const prizePhp = this.garage.wallet ? payRacePrize(this.garage.wallet, result, this.selected.rival?.prizePhp ?? 0) : 0;
     this.bridge.emit('raceFinished', { ...result, prizePhp });
   }

@@ -71,7 +71,7 @@ export class TalyerPerformanceSystem implements GameSystem {
     this.quote = { view, signature: this.signature() };
     this.bridge.emit('performanceQuote', view);
   }
-  private commit(quoteId: string): CommandOutcome {
+  private commit(quoteId: string): CommandOutcome | Promise<CommandOutcome> {
     const rejection = this.rejection();
     if (rejection) { this.clearQuote(); return { rejected: rejection }; }
     const quote = this.quote;
@@ -80,6 +80,12 @@ export class TalyerPerformanceSystem implements GameSystem {
     const current = this.preview(quote.view.itemId, quote.view.operation);
     if ('rejected' in current) { this.clearQuote(); return current; }
     if (current.laborPhp !== quote.view.laborPhp) { this.clearQuote(); return { rejected: 'Labor changed. Request a fresh quote.' }; }
+    if (this.session.persistent) {
+      this.committing = true;
+      return this.session.execute({ type: current.operation === 'install' ? 'part_install' : 'part_remove', operationTag: `performance:${quoteId}`, vehicleId: this.vehicle.id, partId: current.itemId }).then(receipt => {
+        this.clearQuote(); this.bridge.emit('performanceInstalled', { name: String(receipt.details.name), operation: current.operation, laborPhp: Number(receipt.details.laborPhp) });
+      }).finally(() => { this.committing = false; this.publish(); });
+    }
     // Inventory validates before invoking payment. A rejection cannot charge or displace parts.
     const pay = () => {
       const paid = this.session.spend(current.laborPhp, { kind: 'performance_labor', source: 'talyer',

@@ -1,5 +1,10 @@
 "use client";
 
+import { bindPersistenceStore } from '@/state/persistenceStore';
+import { playerApi } from '@/lib/player/playerApi';
+import { runtimeBootstrap } from '@/lib/player/runtimeBootstrap';
+
+
 import { useEffect, useRef } from "react";
 import { bindGameUiStore, useGameUiStore } from "@/state/gameUiStore";
 import { bindGraphicsStore } from "@/state/graphicsStore";
@@ -11,12 +16,13 @@ import { bindAutoPartsStore } from '@/state/autoPartsStore';
 import { bindJobStore } from "@/state/jobStore";
 import { bindMarketStore } from "@/state/marketStore";
 import { bindSocialStore } from "@/state/socialStore";
+import type { RuntimeBootstrap } from '@/lib/player/runtimeBootstrap';
 
 /**
  * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
  * Lifecycle only — no game logic belongs in this component.
  */
-export function GameCanvas() {
+export function GameCanvas({ bootstrap }: { bootstrap?: RuntimeBootstrap }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -30,7 +36,7 @@ export function GameCanvas() {
       .then(({ createGame }) => {
         if (cancelled) return;
 
-        const game = createGame(canvas);
+        const game = createGame(canvas, { bootstrap, repository: bootstrap ? playerApi : undefined, hydrate: runtimeBootstrap });
         // Bind before start() so no early event is missed.
         const unbinders = [
           bindGameUiStore(game),
@@ -42,7 +48,8 @@ export function GameCanvas() {
           bindAutoPartsStore(game.events),
           bindJobStore(game.events),
           bindMarketStore(game.events),
-          bindSocialStore(game.events),
+          bindPersistenceStore(game.events),
+          bindSocialStore(game.events, undefined, bootstrap?.social),
         ];
         game.start();
 
@@ -61,7 +68,7 @@ export function GameCanvas() {
       cancelled = true;
       teardown?.();
     };
-  }, []);
+  }, [bootstrap]);
 
   return <canvas ref={canvasRef} className="block h-full w-full touch-none outline-none" />;
 }

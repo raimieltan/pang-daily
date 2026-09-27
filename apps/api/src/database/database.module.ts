@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DatabaseService } from './database.service';
+import { AuthRepository } from './auth.repository';
+import { PlayerRepository } from './player.repository';
 
-@Module({ providers: [DatabaseService], exports: [DatabaseService] })
+import { EconomyRepository } from './economy.repository';
+
+@Module({ providers: [DatabaseService, AuthRepository, PlayerRepository, EconomyRepository], exports: [DatabaseService, AuthRepository, PlayerRepository, EconomyRepository] })
 export class DatabaseModule {}

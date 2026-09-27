@@ -57,6 +57,7 @@ import { WheelSystem } from "../vehicles/WheelSystem";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
 import { PLAYER_CARS, STARTER_SEDAN, playerCar } from "../vehicles/VehicleDefinition";
+import { VehicleModel } from "../vehicles/VehicleModel";
 import { HomeGarage } from "../vehicles/HomeGarage";
 import { loadActiveCar, saveActiveCar } from "../vehicles/garageStorage";
 import { HOME_SECOND_BAY, HUB_LAYOUT } from "../world/hub/hubLayout";
@@ -74,7 +75,7 @@ import { buildChunk, WorldKit } from "../world/WorldChunk";
  * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
-  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory, socialStorage, restart }) {
+  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory, socialStorage, garageStorage, ownedVehicleDefinitionIds, restart }) {
     const params = new URLSearchParams(window.location.search);
     const havok = await loadHavok();
     if (signal.aborted) return;
@@ -115,7 +116,9 @@ export const hubScene: SceneDefinition = {
     const requestedSpawn = params.get("spawn");
     const handling = params.get("handling");
     // `?car=` wins for testing; otherwise whichever car was last picked at home.
-    const driven = playerCar(params.get("car") ?? loadActiveCar());
+  const requestedCar = params.get("car") ?? loadActiveCar(garageStorage);
+  const driven = playerCar(ownedVehicleDefinitionIds && !ownedVehicleDefinitionIds.includes(requestedCar ?? '')
+    ? loadActiveCar(garageStorage) : requestedCar);
     player = await PlayerVehicle.create(scene, world, controls, bridge, {
       definition: driven,
       spawnPoints,
@@ -138,24 +141,32 @@ export const hubScene: SceneDefinition = {
     }));
     player.onPlaced = () => modes.vehiclePlaced();
     // The other owned car waits at home; getting in it rebuilds the scene around that car.
-    const parked = Object.values(PLAYER_CARS).find((car) => car !== driven)!;
-    const garage = await HomeGarage.create(scene, parked, toVehiclePose(HOME_SECOND_BAY), modes, inventory, (car) => {
-      saveActiveCar(car.spec.id);
+  const parked = Object.values(PLAYER_CARS).find((car) => car !== driven && (!ownedVehicleDefinitionIds || ownedVehicleDefinitionIds.includes(car.spec.id)));
+    const garage = parked ? await HomeGarage.create(scene, parked, toVehiclePose(HOME_SECOND_BAY), modes, inventory, async (car) => {
+      saveActiveCar(car.spec.id, garageStorage);
       const url = new URL(window.location.href);
       url.searchParams.delete("car");
       url.searchParams.delete("spawn");
       window.history.replaceState(window.history.state, "", url);
       restart();
-    });
-    if (signal.aborted) return garage.dispose();
-    addSystem(garage);
+    }) : null;
+    if (signal.aborted) return garage?.dispose();
+    if (garage) addSystem(garage);
+    // NPC templates are world content, independent of player ownership.
+    const otherDefinition = Object.values(PLAYER_CARS).find(car => car !== driven)!;
+    const npcTemplate = garage ? null : await VehicleModel.load(scene, otherDefinition.spec);
+    if (signal.aborted) return npcTemplate?.dispose();
+    if (npcTemplate) {
+      npcTemplate.root.setEnabled(false);
+      addSystem({ name: 'npcCarTemplate', dispose: () => npcTemplate.dispose() });
+    }
     const lightCar = (car: PlayerVehicle) => lighting.attachCar(modes, [...car.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
     const litCar = player;
     lightCar(litCar);
     litCar.onVisualsChanged = () => lightCar(litCar);
     addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
     // NPC cars clone whichever owned car their build names; both are loaded by now.
-    const npcModels = () => ({ [driven.spec.id]: player.visual.model, [parked.spec.id]: garage.model });
+    const npcModels = () => ({ [driven.spec.id]: player.visual.model, [otherDefinition.spec.id]: garage?.model ?? npcTemplate! });
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES, ...RACE_CALENDAR],
       { models: npcModels, wallet: session, access: new SocialOpportunityService(bridge, socialStorage).raceRejection }));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
@@ -165,13 +176,13 @@ export const hubScene: SceneDefinition = {
       fuelLiters: () => session.summary(maintainedCar.definition.spec).fuelLiters ?? 0,
       boards: zones.filter((zone) => zone.action === "browse_jobs"), marker: new JobMarker(scene),
     });
-    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage.interactions, race.interactions, jobSystem.interactions]));
+    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions]));
     const dialogue = addSystem(new DialogueController(bridge, input, socialStorage));
     for (const action of ['talk_contact', 'order_coffee', 'hang_out'] as const) {
       interactions.handle(action, (target) => target.dialogueId && CONVERSATIONS.some((item) => item.id === target.dialogueId) ? dialogue.open(target.dialogueId) : undefined);
     }
     modes.useInteractions(interactions);
-    garage.connect(interactions);
+    garage?.connect(interactions);
     race.connect(interactions);
     jobSystem.connect(interactions);
     const talyer = () => talyerRejection({
@@ -206,7 +217,7 @@ export const hubScene: SceneDefinition = {
     }, dispose() {} });
     const car = player;
     const roadUser = () => ({ x: car.position.x, y: car.position.y, z: car.position.z, speed: car.speed, heading: Math.atan2(car.forward.x, car.forward.z) });
-    const sedanModel = driven === STARTER_SEDAN ? player.visual.model : garage.model;
+    const sedanModel = driven === STARTER_SEDAN ? player.visual.model : garage?.model ?? npcTemplate!;
     const traffic = addSystem(new TrafficSystem(scene, kit, world, sedanModel, TRAFFIC_LANES, roadUser, () => lighting.mood.headlight));
     const listener = () => modes.position;
     const npcSound = (sound: import('../traffic/RoadsidePeople').NpcSound) => bridge.emit('npcSound', sound);

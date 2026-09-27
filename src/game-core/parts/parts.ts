@@ -23,6 +23,7 @@ export type PartCategory = 'wheels' | 'tires' | 'suspension' | 'brakes' | 'drive
  */
 export type PartTemplate = {
   marketplaceAvailable?: boolean;
+  compatibleVehicleIds?: readonly string[];
   id: string; name: string; category: PartCategory; fits: string; component: ServiceComponent | null;
   slots: readonly PartSlot[]; priceRange: readonly [number, number]; conditionRange: readonly [number, number]; weight: number;
 };
@@ -52,16 +53,16 @@ export const PART_TEMPLATES: readonly PartTemplate[] = [
       weight: part.rarity === 'rare' ? 1 : part.rarity === 'uncommon' ? 2 : 3 };
   }),
   { id: 'used_coilovers_01', name: 'Used coilovers (adjustable)', category: 'suspension', fits: 'Most 90s sedans', component: 'suspension', slots: ['shocks', 'springs'], priceRange: [6500, 9000], conditionRange: [.35, .85], weight: 2 },
-  { id: 'stock_shocks_set', name: 'Stock shocks, set of 4', category: 'suspension', fits: 'Banwa Dalagan', component: 'suspension', slots: ['shocks'], priceRange: [1800, 2600], conditionRange: [.3, .9], weight: 3 },
+  { id: 'stock_shocks_set', compatibleVehicleIds: ['banwa_dalagan_1996'], name: 'Stock shocks, set of 4', category: 'suspension', fits: 'Banwa Dalagan', component: 'suspension', slots: ['shocks'], priceRange: [1800, 2600], conditionRange: [.3, .9], weight: 3 },
   { id: 'lowering_springs', name: 'Lowering springs', category: 'suspension', fits: 'Universal-ish', component: 'suspension', slots: ['springs'], priceRange: [2500, 3800], conditionRange: [.45, .95], weight: 2 },
   wheels('mags_15_4x100', 3),
   wheels('steelies_14', 2),
   { id: 'tires_195_55', name: 'Tires 195/55 R15, 4 pcs', category: 'tires', fits: '15" rims', component: 'tires', slots: ['tires'], priceRange: [4000, 6500], conditionRange: [.2, .85], weight: 3 },
-  { id: 'brake_pads_front', name: 'Front brake pads + rotors', category: 'brakes', fits: 'Banwa Dalagan', component: 'brakes', slots: ['brakes_front'], priceRange: [1200, 2000], conditionRange: [.25, .9], weight: 3 },
-  { id: 'surplus_alternator', name: 'Japan surplus alternator', category: 'engine', fits: '4A / 4E family', component: 'engine', slots: ['alternator'], priceRange: [2200, 3500], conditionRange: [.2, .9], weight: 2 },
-  { id: 'surplus_head', name: 'Surplus cylinder head', category: 'engine', fits: '4A family', component: 'engine', slots: ['cylinder_head'], priceRange: [8000, 13000], conditionRange: [.15, .85], weight: 1 },
-  { id: 'gearbox_5spd', name: '5-speed manual gearbox', category: 'drivetrain', fits: 'Banwa Dalagan', component: 'transmission', slots: ['gearbox'], priceRange: [9000, 14000], conditionRange: [.2, .85], weight: 1 },
-  { id: 'clutch_kit', name: 'Clutch kit (disc + pressure plate)', category: 'drivetrain', fits: 'Banwa Dalagan', component: 'transmission', slots: ['clutch'], priceRange: [2500, 4200], conditionRange: [.3, .95], weight: 2 },
+  { id: 'brake_pads_front', compatibleVehicleIds: ['banwa_dalagan_1996'], name: 'Front brake pads + rotors', category: 'brakes', fits: 'Banwa Dalagan', component: 'brakes', slots: ['brakes_front'], priceRange: [1200, 2000], conditionRange: [.25, .9], weight: 3 },
+  { id: 'surplus_alternator', compatibleVehicleIds: ['banwa_dalagan_1996'], name: 'Japan surplus alternator', category: 'engine', fits: '4A / 4E family', component: 'engine', slots: ['alternator'], priceRange: [2200, 3500], conditionRange: [.2, .9], weight: 2 },
+  { id: 'surplus_head', compatibleVehicleIds: ['banwa_dalagan_1996'], name: 'Surplus cylinder head', category: 'engine', fits: '4A family', component: 'engine', slots: ['cylinder_head'], priceRange: [8000, 13000], conditionRange: [.15, .85], weight: 1 },
+  { id: 'gearbox_5spd', compatibleVehicleIds: ['banwa_dalagan_1996'], name: '5-speed manual gearbox', category: 'drivetrain', fits: 'Banwa Dalagan', component: 'transmission', slots: ['gearbox'], priceRange: [9000, 14000], conditionRange: [.2, .85], weight: 1 },
+  { id: 'clutch_kit', compatibleVehicleIds: ['banwa_dalagan_1996'], name: 'Clutch kit (disc + pressure plate)', category: 'drivetrain', fits: 'Banwa Dalagan', component: 'transmission', slots: ['clutch'], priceRange: [2500, 4200], conditionRange: [.3, .95], weight: 2 },
   { id: 'muffler_canister', name: 'Canister muffler', category: 'exhaust', fits: '2" pipe', component: null, slots: ['exhaust'], priceRange: [1500, 2800], conditionRange: [.4, 1], weight: 2 },
   { id: 'projector_headlights', name: 'Projector headlights, pair', category: 'lighting', fits: 'Banwa Dalagan', component: null, slots: ['headlight_l', 'headlight_r'], priceRange: [3000, 5200], conditionRange: [.35, .95], weight: 2 },
   { id: 'bucket_seat', name: 'Bucket seat w/ rails', category: 'interior', fits: 'Universal rails', component: null, slots: ['seat_driver'], priceRange: [4500, 8000], conditionRange: [.35, .9], weight: 1 },

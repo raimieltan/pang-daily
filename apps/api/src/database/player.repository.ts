@@ -1,0 +1,123 @@
+import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BOOTSTRAP_VERSION, type PlayerBootstrap } from '@pang-daily/contracts';
+import { SOCIAL_CONTENT } from '@pang-daily/game-core/social/catalog';
+import { createSocialState } from '@pang-daily/game-core/social/SocialSession';
+import { getReputationProgress } from '@pang-daily/game-core/social/reputation';
+import { DatabaseService } from './database.service';
+import type { StarterState } from '../player/starter-state';
+
+function incomplete(): never {
+  throw new ConflictException({ code: 'PLAYER_STATE_INCOMPLETE', message: 'Your saved profile is incomplete. Progress has not been reset.', recovery: 'contact_support' });
+}
+@Injectable()
+export class PlayerRepository {
+  constructor(@Inject(DatabaseService) private readonly db: DatabaseService) {}
+  async bootstrap(userId: string, starter: StarterState, requestId: string): Promise<PlayerBootstrap> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.db.client.$transaction(async (tx) => {
+          // Every initializer for this identity takes the same lock. Serialization failures are retried.
+          await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId}::uuid FOR UPDATE`;
+          const user = await tx.user.findUnique({ where: { id: userId }, include: { player: true } });
+          if (!user || user.deactivatedAt) throw new UnauthorizedException({ code: 'AUTH_REQUIRED', message: 'Sign in to continue.' });
+          if (!user.player) {
+            const playerId = randomUUID(), vehicleId = randomUUID();
+            await tx.playerProfile.create({ data: { id: playerId, userId, displayName: starter.displayName,
+              saveVersion: { create: { schemaVersion: starter.saveVersion, contentVersion: starter.contentVersion } },
+              wallet: { create: {} }, inventory: { create: {} },
+              npcs: { create: starter.npcIds.map(npcId => ({ npcId, ...(npcId === starter.rival.npcId ? { rival: { create: { rivalVehicleContentId: starter.rival.vehicleContentId } } } : {}) })) },
+              reputation: { create: starter.sceneIds.map(sceneId => ({ sceneId })) },
+              crews: { create: starter.crewIds.map(crewId => ({ crewId, membership: { create: {} } })) },
+              unlocks: { create: { unlockId: 'hub_access', locationContentId: starter.hubId, source: 'new_game', sourceReference: 'initialization' } },
+              chapters: { create: { chapterId: starter.chapterId } },
+              vehicles: { create: { id: vehicleId, definitionId: starter.vehicle.definitionId, acquisitionKey: 'starter_vehicle',
+                paint: starter.vehicle.paint, rideHeightM: starter.vehicle.rideHeightM,
+                condition: { create: { ...starter.vehicle.condition, fuelLiters: starter.vehicle.fuelLiters } } } },
+            } });
+            await tx.playerProfile.update({ where: { id: playerId }, data: { activeVehicleId: vehicleId } });
+            await tx.transaction.create({ data: { playerId, sequence: 1n, amountCentavos: starter.startingCentavos,
+              balanceBeforeCentavos: 0n, balanceAfterCentavos: starter.startingCentavos, kind: 'starting_cash',
+              source: 'new_game', sourceReference: 'initialization', description: 'Starting cash', requestId } });
+            await tx.wallet.update({ where: { playerId }, data: { balanceCentavos: starter.startingCentavos, revision: 1n } });
+          }
+          // Repeatable snapshot covers every include/query in this transaction.
+          const player = await tx.playerProfile.findUnique({ where: { userId }, include: {
+            saveVersion: true, wallet: true, vehicles: { where: { retiredAt: null }, include: { condition: true, installations: { include: { slots: true } } } },
+            inventory: { include: { parts: { include: { transaction: { select: { sequence: true } } } } } },
+            npcs: { include: { flags: true, milestones: true, favors: { include: { job: true } }, rival: true } },
+            reputation: true, reputationSources: true, crews: { include: { membership: true } },
+            jobs: { orderBy: [{ acceptedAt: 'asc' }, { id: 'asc' }] },
+            races: { orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], take: 20 },
+            unlocks: true, chapters: { include: { markers: true } },
+            socialEvents: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], include: { effects: true } },
+          } });
+          if (!player || player.archivedAt || !player.wallet || !player.saveVersion || !player.inventory || !player.activeVehicleId ||
+            !player.vehicles.some(vehicle => vehicle.id === player.activeVehicleId) || player.vehicles.some(vehicle => !vehicle.condition) ||
+            !starter.npcIds.every(id => player.npcs.some(npc => npc.npcId === id)) ||
+            !player.npcs.some(npc => npc.npcId === starter.rival.npcId && npc.rival) ||
+            !starter.sceneIds.every(id => player.reputation.some(scene => scene.sceneId === id)) ||
+            !starter.crewIds.every(id => player.crews.some(crew => crew.crewId === id && crew.membership)) ||
+            !player.unlocks.some(unlock => unlock.unlockId === 'hub_access') || !player.chapters.some(chapter => chapter.chapterId === starter.chapterId)) incomplete();
+          if (player.saveVersion.schemaVersion !== starter.saveVersion || player.saveVersion.contentVersion !== starter.contentVersion) {
+            throw new ConflictException({ code: 'SAVE_VERSION_INCOMPATIBLE', message: 'This save needs a compatible game version or migration.', recovery: 'update_or_migrate' });
+          }
+          const counts = await tx.raceResult.groupBy({ by: ['rivalNpcId', 'outcome'], where: { playerId: player.id }, _count: { _all: true } });
+          const latestRivalRaces = await tx.raceResult.findMany({ where: { playerId: player.id, rivalNpcId: { not: null }, outcome: { not: 'started' } },
+            distinct: ['rivalNpcId'], orderBy: [{ startedAt: 'desc' }, { id: 'desc' }] });
+          const social = createSocialState(SOCIAL_CONTENT);
+          for (const npc of player.npcs) {
+            social.npcs[npc.npcId] = { introduced: npc.introduced, trust: npc.trust, respect: npc.respect,
+              relationshipFlags: npc.flags.map(flag => flag.flagId), favorIds: npc.favors.map(favor => favor.favorId), eventIds: npc.milestones.map(event => event.eventContentId) };
+            for (const favor of npc.favors) social.favors[favor.favorId] = { favorId: favor.favorId, npcId: npc.npcId, status: favor.status, runId: favor.job?.runId ?? null };
+          }
+          for (const scene of player.reputation) social.reputation[scene.sceneId] = { sceneId: scene.sceneId, points: scene.points };
+          for (const reward of player.reputationSources) social.reputationRewards[reward.sourceKey] = { sourceKey: reward.sourceKey, count: reward.count };
+          for (const crew of player.crews) social.crews[crew.crewId] = { crewId: crew.crewId, points: crew.points, introduced: crew.introduced,
+            invitation: crew.invitation, membership: crew.membership!.status, joins: crew.membership!.joins };
+          for (const unlock of player.unlocks) if (SOCIAL_CONTENT.unlocks.some(item => item.id === unlock.unlockId)) social.unlocks[unlock.unlockId] = { unlockId: unlock.unlockId, unlocked: true };
+          const scenePoints = new Map<string, number>();
+          social.appliedEvents = player.socialEvents.map(event => {
+            const before = scenePoints.get(event.sceneId ?? '') ?? 0;
+            const after = before + (event.reputationDelta ?? 0);
+            if (event.sceneId) scenePoints.set(event.sceneId, after);
+            return { eventId: event.eventId, sourceId: event.sourceId, sourceKey: event.sourceKey, fingerprint: event.fingerprint,
+              type: event.type, targetId: event.targetContentId, contextId: event.contextContentId, reason: event.reason,
+              effects: event.effects.map(effect => ({ npcId: effect.npcId, trustDelta: effect.trustDelta, respectDelta: effect.respectDelta, flagsAdded: effect.flagsAdded, flagsRemoved: effect.flagsRemoved })),
+              ...(event.sceneId && event.reputationSourceKey && event.reputationDelta !== null ? { reputation: { sceneId: event.sceneId,
+                sourceKey: event.reputationSourceKey, pointsDelta: event.reputationDelta, fromTier: getReputationProgress(before).tier, toTier: getReputationProgress(after).tier } } : {}) };
+          });
+          return { bootstrapVersion: BOOTSTRAP_VERSION, saveVersion: starter.saveVersion, contentVersion: starter.contentVersion,
+            revision: player.saveVersion.revision.toString(), profile: { id: player.id, displayName: player.displayName, activeVehicleId: player.activeVehicleId },
+            economy: { balanceCentavos: player.wallet.balanceCentavos.toString(), revision: player.wallet.revision.toString() },
+            vehicles: player.vehicles.map(vehicle => ({ id: vehicle.id, definitionId: vehicle.definitionId, condition: Object.fromEntries(
+              Object.keys(starter.vehicle.condition).map(key => [key, Number(vehicle.condition![key as keyof typeof starter.vehicle.condition])])) as PlayerBootstrap['vehicles'][number]['condition'],
+              conditionRevision: vehicle.condition!.revision.toString(), fuelLiters: Number(vehicle.condition!.fuelLiters), paint: vehicle.paint,
+              rideHeightM: Number(vehicle.rideHeightM), stockSpoilerRemoved: vehicle.stockSpoilerRemoved })),
+            inventory: { revision: player.inventory.revision.toString(), parts: player.inventory.parts.map(part => ({ id: part.id, definitionId: part.partDefinitionId,
+              acquisitionKey: part.acquisitionKey, condition: part.condition === null ? null : Number(part.condition), revealedBy: part.revealedBy, finish: part.finish,
+              origin: part.origin, sourceReference: part.sourceReference, sellerId: part.sellerId, paidCentavos: part.paidCentavos?.toString() ?? null, purchaseSequence: part.transaction?.sequence.toString() ?? null,
+              advertisedGrade: part.advertisedGrade, acquiredAt: part.acquiredAt.toISOString(), retired: part.retiredAt !== null })),
+              installed: player.vehicles.flatMap(vehicle => vehicle.installations.map(installation => ({ ownedPartId: installation.ownedPartId, vehicleId: vehicle.id, slots: installation.slots.map(slot => slot.slotId) }))) },
+            social: { state: social, rivals: player.npcs.flatMap(npc => npc.rival ? [{ npcId: npc.npcId,
+              vehicleContentId: npc.rival.rivalVehicleContentId, metAtHub: npc.rival.metAtHub,
+              wins: counts.find(row => row.rivalNpcId === npc.npcId && row.outcome === 'win')?._count._all ?? 0,
+              losses: counts.find(row => row.rivalNpcId === npc.npcId && row.outcome === 'loss')?._count._all ?? 0,
+              dnfs: counts.find(row => row.rivalNpcId === npc.npcId && row.outcome === 'dnf')?._count._all ?? 0,
+              latestOutcome: (latestRivalRaces.find(race => race.rivalNpcId === npc.npcId)?.outcome as 'win' | 'loss' | 'dnf' | undefined) ?? null }] : []) },
+            progression: { jobs: player.jobs.map(job => ({ runId: job.runId, definitionId: job.jobDefinitionId, status: job.status,
+              objectiveIndex: job.objectiveIndex, elapsedMs: job.elapsedMs.toString(), cargoLoaded: job.cargoLoaded, cargoDamage: Number(job.cargoDamage), reason: job.reason })),
+              recentRaces: player.races.map(race => ({ attemptId: race.attemptId, definitionId: race.raceDefinitionId, vehicleId: race.vehicleId,
+                rivalNpcId: race.rivalNpcId, outcome: race.outcome, position: race.position, elapsedMs: race.elapsedMs?.toString() ?? null })),
+              unlockedLocations: player.unlocks.map(unlock => ({ unlockId: unlock.unlockId, locationId: unlock.locationContentId })),
+              chapters: player.chapters.map(chapter => ({ id: chapter.chapterId, currentBeatId: chapter.currentBeatId,
+                completedAt: chapter.completedAt?.toISOString() ?? null, markers: chapter.markers.map(marker => marker.markerId) })) } };
+        }, { isolationLevel: 'Serializable', timeout: 15000 });
+      } catch (error) {
+        if (attempt < 2 && error && typeof error === 'object' && 'code' in error && ['P2034', 'P2002'].includes(String(error.code))) continue;
+        throw error;
+      }
+    }
+    throw new Error('Unreachable bootstrap retry');
+  }
+}

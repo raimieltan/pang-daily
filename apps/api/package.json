@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "yarn build && concurrently --kill-others -n compiler,server \"tsc -p tsconfig.json --watch\" \"node --watch dist/src/main.js\"",
-    "build": "yarn db:generate && tsc -p tsconfig.json",
+    "build": "yarn --cwd ../.. build:shared && yarn db:generate && tsc -p tsconfig.json",
     "start": "node dist/src/main.js",
-    "typecheck": "yarn db:generate && tsc -p tsconfig.json --noEmit",
-    "test": "yarn build && node --test dist/test/config.test.js",
+    "typecheck": "yarn --cwd ../.. build:shared && yarn db:generate && tsc -p tsconfig.json --noEmit",
+    "test": "yarn build && node --test dist/test/config.test.js dist/test/password.test.js",
     "test:integration": "yarn build && node scripts/integration.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/migrate.mjs",
@@ -24,10 +24,13 @@
     "dotenv": "^17.2.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@pang-daily/contracts": "0.1.0",
+    "@pang-daily/game-core": "0.1.0"
   },
   "devDependencies": {
     "prisma": "^7.0.0",
-    "tsx": "^4.20.0"
+    "tsx": "^4.20.0",
+    "@types/express": "^5.0.0"
   }
 }

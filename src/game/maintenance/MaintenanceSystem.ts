@@ -54,7 +54,12 @@ export class MaintenanceSystem implements GameSystem {
         if (rejection) { this.closeQuote(); return { rejected: rejection }; }
         this.flush();
         if (!this.quote || this.quote.id !== quoteId) return { rejected: 'Ask Mang Boy for a current repair quote.' };
-        const receipt = session.repair(this.definition, this.quote, components);
+        const quote = this.quote;
+        if (session.persistent) return session.execute({ type: 'vehicle_repair', operationTag: `repair:${quote.id}:${[...components].sort().join(',')}`, vehicleId: this.definition.id, components, ...(quote.benefitId ? { benefitId: quote.benefitId } : {}) }).then(remote => {
+          bridge.emit('repairCompleted', { vehicleId: this.definition.id, components, costPhp: Number(remote.details.costPhp), walletPhp: session.snapshot().walletPhp, transactionId: Number(remote.sequence) });
+          this.quote = session.quote(this.definition); bridge.emit('repairQuote', this.quote);
+        });
+        const receipt = session.repair(this.definition, quote, components);
         if ('rejected' in receipt) return receipt;
         bridge.emit('repairCompleted', receipt);
         this.quote = session.quote(this.definition);

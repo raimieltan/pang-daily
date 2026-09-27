@@ -25,6 +25,7 @@ import type {
 } from "./types";
 
 export type GameEventMap = {
+  persistenceError: string | null;
   contactsOpened: boolean;
   socialViewChanged: import('../../game-core/social/presentation').SocialView;
   socialChangesApplied: import('../../game-core/social/presentation').SocialNotice[];

@@ -1,11 +1,9 @@
-import { GameCanvas } from "@/components/game/GameCanvas";
-import { HudOverlay } from "@/components/hud/HudOverlay";
+import { GameEntry } from '@/components/auth/GameEntry';
 
 export default function Home() {
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-background">
-      <GameCanvas />
-      <HudOverlay />
+      <GameEntry />
     </main>
   );
 }

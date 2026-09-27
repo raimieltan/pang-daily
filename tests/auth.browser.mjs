@@ -1,0 +1,43 @@
+import { chromium, expect } from '@playwright/test';
+
+const base = process.env.AUTH_BROWSER_BASE_URL ?? 'http://localhost:3000';
+const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+const name = `browser_${Date.now()}`;
+const password = 'browser-fixture-password';
+try {
+  await page.goto(base);
+  await expect(page.getByRole('heading', { name: 'Continue your daily' })).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create an account', exact: true }).click();
+  await page.getByLabel('Username', { exact: true }).fill(name);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('FINDING SIGNAL', { exact: true })).toHaveCount(0, { timeout: 60000 });
+  await expect(page.getByText(/Failed to start:/)).toHaveCount(0);
+  const bootstrap = await page.evaluate(async () => (await fetch('/api/player/bootstrap', { cache: 'no-store' })).json());
+  expect(bootstrap.economy.balanceCentavos).toBe('500000');
+  expect(bootstrap.saveVersion).toBe(2);
+  expect(bootstrap.profile.displayName).toBe(name);
+  const cookie = (await context.cookies()).find(cookie => cookie.name === 'pang_session');
+  expect(cookie.httpOnly).toBe(true);
+  await page.reload();
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 30000 });
+  const returning = await page.evaluate(async () => (await fetch('/api/player/bootstrap', { cache: 'no-store' })).json());
+  expect(returning.profile.id).toBe(bootstrap.profile.id);
+  expect(returning.vehicles[0].id).toBe(bootstrap.vehicles[0].id);
+  expect(returning.economy.balanceCentavos).toBe('500000');
+  await page.getByRole('button', { name: `Sign out ${name}` }).click();
+  await expect(page.getByRole('heading', { name: 'Continue your daily' })).toBeVisible();
+  expect(await page.evaluate(async () => (await fetch('/api/player/bootstrap')).status)).toBe(401);
+  await page.getByLabel('Username', { exact: true }).fill(name);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 30000 });
+  expect(errors).toEqual([]);
+  console.log('PASS browser registration, actual game entry, server bootstrap, reload, logout and returning login');
+} finally { await context.close(); await browser.close(); }

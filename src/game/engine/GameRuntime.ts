@@ -1,3 +1,4 @@
+import { ServerPersistence, type ServerPlayerRepository } from '../persistence/ServerPersistence';
 import { SocialOpportunityService } from '../social/SocialOpportunityService';
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { GameBridge, type GameCommands, type GameEventSource } from "../bridge";
@@ -11,6 +12,12 @@ import { loadInventorySession, loadMarketplaceSession } from "../marketplace/mar
 import { SocialEventBridge } from "../social/SocialEventBridge";
 import { MarketplaceService } from "../marketplace/MarketplaceService";
 import { grantCustomizationTestKit } from '../vehicles/developmentParts';
+import { VehicleSession } from '../../game-core/maintenance/VehicleSession';
+import { InventorySession } from '../../game-core/inventory/InventorySession';
+import { JobSession } from '../../game-core/jobs/JobSession';
+import { SOCIAL_SESSION_KEY } from '../social/socialStorage';
+import { saveActiveCar } from '../vehicles/garageStorage';
+import type { RuntimeBootstrap } from '../../game-core/persistence/RuntimeBootstrap';
 
 const STATS_INTERVAL_MS = 500;
 /** Clamp so a backgrounded tab doesn't produce one giant simulation step on return. */
@@ -20,6 +27,9 @@ const DEV_WALLET_PHP = 1_000_000;
 
 export type GameRuntimeOptions = {
   initialScene?: SceneId;
+  bootstrap?: RuntimeBootstrap;
+  repository?: ServerPlayerRepository;
+  hydrate?: (dto: import("@pang-daily/contracts").PlayerBootstrap) => RuntimeBootstrap;
 };
 
 /**
@@ -49,6 +59,8 @@ export class GameRuntime {
   private readonly opportunities: SocialOpportunityService;
   private started = false;
   private disposed = false;
+  private persistence?: ServerPersistence;
+  private saveElapsed = 0;
 
   constructor(canvas: HTMLCanvasElement, options: GameRuntimeOptions = {}) {
     this.initialScene = options.initialScene ?? INITIAL_SCENE;
@@ -57,26 +69,38 @@ export class GameRuntime {
 
     const { emit, handle } = this.bridge.runtime;
     let storage: Storage | undefined;
-    try { storage = window.sessionStorage; } catch { /* The runtime still keeps session state in memory. */ }
-    const session = loadVehicleSession(storage);
+    if (!options.bootstrap) {
+      try { storage = window.sessionStorage; } catch { /* The runtime still keeps session state in memory. */ }
+    }
+    const session = options.bootstrap ? new VehicleSession(options.bootstrap.vehicles) : loadVehicleSession(storage);
     const devTopUp = DEV_WALLET_PHP - session.snapshot().walletPhp;
-    if (process.env.NODE_ENV === "development" && devTopUp > 0) {
+    if (!options.bootstrap && process.env.NODE_ENV === "development" && devTopUp > 0) {
       session.earn(Math.round(devTopUp * 100) / 100, { kind: "dev_grant", description: "Dev cash top-up", source: "dev" });
     }
 
     // The phone outlives scenes, so the marketplace is runtime-wide like pause.
-    const inventory = loadInventorySession(storage);
-    if (process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
+    const inventory = options.bootstrap ? new InventorySession(options.bootstrap.inventory) : loadInventorySession(storage);
+    if (!options.bootstrap && process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
     const socialFallback = new Map<string, string>();
     const socialStorage = storage ?? {
       getItem: (key: string) => socialFallback.get(key) ?? null,
       setItem: (key: string, value: string) => { socialFallback.set(key, value); },
     };
+    if (options.bootstrap) {
+      socialStorage.setItem(SOCIAL_SESSION_KEY, JSON.stringify(options.bootstrap.social));
+      saveActiveCar(options.bootstrap.activeDefinitionId, socialStorage);
+    }
     this.opportunities = new SocialOpportunityService(this.bridge.runtime, socialStorage);
     const access = this.opportunities.access;
     session.useSocialAccess(access);
+    const jobs = options.bootstrap ? new JobSession(session, HUB_JOBS, options.bootstrap.jobs) : loadJobSession(session, HUB_JOBS, storage);
+    if (options.bootstrap && options.repository && options.hydrate) {
+      this.persistence = new ServerPersistence(options.repository, options.hydrate, options.bootstrap, session, inventory, jobs, message => emit('persistenceError', message));
+      session.usePersistence(this.persistence); inventory.usePersistence(this.persistence);
+    }
     const marketplace = loadMarketplaceSession(session, inventory, storage);
     marketplace.useSocialAccess(access);
+    if (this.persistence) marketplace.usePersistence(this.persistence);
     this.market = new MarketplaceService(this.bridge.runtime, marketplace);
     this.social = new SocialEventBridge(this.events, socialStorage, error => emit('error', { message: `Social event rejected: ${error.message}` }), (progress, tierChange) => {
       emit('socialReputationUpdated', progress);
@@ -90,7 +114,8 @@ export class GameRuntime {
         const reason = error instanceof Error ? error.message : String(error);
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
-    }, session, loadJobSession(session, HUB_JOBS, storage), this.market, inventory, socialStorage);
+    }, session, jobs,
+      this.market, inventory, socialStorage, options.bootstrap ? { ownedVehicleDefinitionIds: options.bootstrap.ownedDefinitionIds, garageStorage: socialStorage } : undefined);
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);
@@ -112,6 +137,7 @@ export class GameRuntime {
       this.setPaused(this.contactsWasPaused);
     });
     // Runtime-wide commands; gameplay commands are registered by scene systems.
+    handle('retryPersistence', () => this.persistence?.checkpoint());
     handle("pause", () => this.setPaused(true));
     handle("resume", () => this.setPaused(false));
     handle("switchScene", ({ sceneId }) => void this.scenes.switchTo(sceneId));
@@ -129,6 +155,7 @@ export class GameRuntime {
     if (this.disposed) return;
     this.disposed = true;
     this.resizeObserver.disconnect();
+    this.persistence?.dispose();
     this.audio.dispose();
     this.market.dispose();
     this.engine.stopRenderLoop();
@@ -149,6 +176,8 @@ export class GameRuntime {
       this.scenes.update(dt);
       this.market.update(dt);
       this.opportunities.update(dt);
+      this.saveElapsed += dt;
+      if (this.saveElapsed >= 20) { this.saveElapsed = 0; this.persistence?.checkpoint(); }
     }
     // Keep rendering while paused so resizes and camera orbit still draw; systems stay frozen.
     this.scenes.render();

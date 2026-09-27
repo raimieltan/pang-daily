@@ -1,3 +1,4 @@
+import type { PersistencePort } from '../persistence/PersistencePort';
 import { discountedPrice, type SocialAccess } from '../social/eligibility';
 import { opportunity } from '../social/opportunities';
 import { z } from 'zod';
@@ -39,6 +40,30 @@ const purchaseKey = (listingId: string) => `marketplace:${listingId}`;
  */
 export class MarketplaceSession {
   private state: MarketSave;
+  private remote?: PersistencePort & { marketplace(): Promise<ListingView[]> };
+  get persistent() { return !!this.remote; }
+  private remoteListings: ListingView[] = [];
+  private remoteLoadedAt = 0;
+  usePersistence(remote: PersistencePort & { marketplace(): Promise<ListingView[]> }) { this.remote = remote; this.state.listings = []; }
+  async refresh() {
+    if (!this.remote) { this.sync(); return; }
+    this.remoteListings = await this.remote.marketplace(); this.remoteLoadedAt = this.now(); this.listeners.forEach(listener => listener());
+  }
+  async buyConfirmed(listingId: string, offerId?: string): Promise<PartPurchase | { rejected: string }> {
+    if (!this.remote) return this.buy(listingId, offerId);
+    const receipt = await this.remote.execute({ type: 'market_purchase', listingId, ...(offerId ? { offerId } : {}) });
+    const item = receipt.resourceId && this.inventory.item(receipt.resourceId);
+    if (!item) throw new Error('The purchase committed but its inventory could not be loaded. Reload your save.');
+    this.remoteListings = this.remoteListings.filter(listing => listing.id !== listingId);
+    this.listeners.forEach(listener => listener());
+    return { listingId, sellerId: String(receipt.details.sellerId), part: this.partView(item), pricePhp: Number(receipt.details.pricePhp), transactionId: Number(receipt.sequence) };
+  }
+  async inspectConfirmed(itemId: string): Promise<PartInspection | { rejected: string }> {
+    if (!this.remote) return this.inspect(itemId);
+    const receipt = await this.remote.execute({ type: 'part_inspect', partId: itemId });
+    const item = this.inventory.item(itemId); if (!item) throw new Error('Inspected part could not be loaded.');
+    return { part: this.partView(item), feePhp: MECHANIC_INSPECTION_PHP, transactionId: Number(receipt.sequence) };
+  }
   private socialAccess?: SocialAccess;
   useSocialAccess(access: SocialAccess) { this.socialAccess = access; }
   private readonly listeners = new Set<() => void>();
@@ -59,6 +84,7 @@ export class MarketplaceSession {
 
   /** Drops expired listings and posts fresh ones. The first fill staggers expiry so the board turns over gradually. */
   sync(initial = false): boolean {
+    if (this.remote) return false;
     const now = this.now(), before = this.state.listings.length;
     this.state.listings = this.state.listings.filter(l => l.expiresAt > now);
     let changed = this.state.listings.length !== before;
@@ -77,10 +103,12 @@ export class MarketplaceSession {
   view(): MarketplaceView {
     const now = this.now();
     const listings = [...this.state.listings].sort((a, b) => b.postedAt - a.postedAt);
+    const age = Math.max(0, Math.floor((now - this.remoteLoadedAt) / 1000));
+    const remoteViews = this.remoteListings.map(listing => ({ ...listing, expiresInSeconds: Math.max(0, listing.expiresInSeconds - age), postedSecondsAgo: listing.postedSecondsAgo + age }));
     return {
-      listings: listings.map(l => ({ ...listingView(l, now), ...this.offer(l) })), parts: this.inventory.items().map(item => this.partView(item)),
+      listings: this.remote ? structuredClone(remoteViews) : listings.map(l => ({ ...listingView(l, now), ...this.offer(l) })), parts: this.inventory.items().map(item => this.partView(item)),
       inspectionFeePhp: MECHANIC_INSPECTION_PHP,
-      nextExpirySeconds: listings.length ? Math.max(0, Math.ceil((Math.min(...listings.map(l => l.expiresAt)) - now) / 1000)) : null,
+      nextExpirySeconds: this.remote ? (remoteViews.length ? Math.min(...remoteViews.map(view => view.expiresInSeconds)) : 0) : listings.length ? Math.max(0, Math.ceil((Math.min(...listings.map(l => l.expiresAt)) - now) / 1000)) : null,
     };
   }
 

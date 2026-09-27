@@ -1,3 +1,4 @@
+import type { SocialState } from '@/game-core/social/contract';
 import { socialView, type SocialView, type SocialNotice } from '@/game-core/social/presentation';
 import { create } from 'zustand';
 import type { GameEventSource } from '@/game/bridge';
@@ -17,10 +18,10 @@ export const useSocialStore = create<State>((set) => ({
 }));
 
 /** Low-frequency derived recognition for UI, sourced from the same save and selector as gates. */
-export function bindSocialStore(events: GameEventSource, storage?: SocialStoragePort): () => void {
+export function bindSocialStore(events: GameEventSource, storage?: SocialStoragePort, bootstrapState?: SocialState): () => void {
  try {
-  const selected = storage ?? window.sessionStorage;
-  useSocialStore.setState({ opportunityNotices: [] as { id: string; name: string }[], view: socialView(loadSocialSession(selected).snapshot()), contactsOpen: false, notices: [], progress: getReputationProgress(loadSocialSession(selected).snapshot()), tierNotice: null });
+  const state = bootstrapState ?? loadSocialSession(storage ?? window.sessionStorage).snapshot();
+  useSocialStore.setState({ opportunityNotices: [] as { id: string; name: string }[], view: socialView(state), contactsOpen: false, notices: [], progress: getReputationProgress(state), tierNotice: null });
  } catch {
   useSocialStore.setState(initial());
  }

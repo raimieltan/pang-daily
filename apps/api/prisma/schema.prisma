@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
 
@@ -8,9 +8,573 @@ datasource db {
   provider = "postgresql"
 }
 
-// Infrastructure metadata only. Player/save models belong to subsequent tickets.
+// Database-wide compatibility version; per-player versions are separate.
 model SchemaVersion {
   id        Int      @id
   version   Int
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+enum JobStatus {
+  accepted
+  active
+  completed
+  failed
+  abandoned
+}
+
+enum RaceOutcome {
+  started
+  win
+  loss
+  dnf
+}
+
+enum InvitationStatus {
+  none
+  invited
+  accepted
+  declined
+}
+
+enum MembershipStatus {
+  none
+  member
+  left
+}
+
+enum FavorStatus {
+  offered
+  accepted
+  completed
+  failed
+  abandoned
+}
+
+enum PartOrigin {
+  parts_shop
+  marketplace
+  grant
+}
+
+enum RevealMethod {
+  mechanic
+  known
+}
+
+enum PaintFinish {
+  body_color
+  primer
+  mismatched
+  bare_plastic
+  fake_carbon
+  damaged
+}
+
+enum ListingGrade {
+  like_new
+  good
+  fair
+  as_is
+}
+
+enum CommandStatus {
+  pending
+  succeeded
+  rejected
+}
+
+model User {
+  credential       LocalCredential?
+  sessions         AuthSession[]
+  id               String           @id @default(uuid()) @db.Uuid
+  identityProvider String
+  identitySubject  String
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  deactivatedAt    DateTime?        @db.Timestamptz(3)
+  player           PlayerProfile?
+
+  @@unique([identityProvider, identitySubject])
+}
+
+model PlayerProfile {
+  marketplaceListings MarketplaceListing[]
+  activeVehicleId   String?                  @db.Uuid
+  activeVehicle     Vehicle?                 @relation("ActiveVehicle", fields: [activeVehicleId, id], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  id                String                   @id @default(uuid()) @db.Uuid
+  userId            String                   @unique @db.Uuid
+  displayName       String                   @db.VarChar(80)
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                 @updatedAt @db.Timestamptz(3)
+  archivedAt        DateTime?                @db.Timestamptz(3)
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  saveVersion       PlayerSaveVersion?
+  wallet            Wallet?
+  inventory         Inventory?
+  vehicles          Vehicle[]                @relation("OwnedVehicles")
+  jobs              JobProgress[]
+  races             RaceResult[]
+  npcs              NpcRelationship[]
+  reputation        SceneReputation[]
+  reputationSources ReputationRewardSource[]
+  crews             PlayerCrewStanding[]
+  unlocks           LocationUnlock[]
+  chapters          ChapterProgress[]
+  commands          IdempotencyRecord[]
+  socialEvents      SocialEvent[]
+}
+
+model PlayerSaveVersion {
+  playerId         String        @id @db.Uuid
+  schemaVersion    Int           @default(2)
+  contentVersion   String
+  revision         BigInt        @default(0)
+  legacyImportedAt DateTime?     @db.Timestamptz(3)
+  legacyImportKey  String?       @unique
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
+  player           PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model Wallet {
+  playerId        String        @id @db.Uuid
+  balanceCentavos BigInt        @default(0)
+  revision        BigInt        @default(0)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+  player          PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  transactions    Transaction[]
+}
+
+model Transaction {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  playerId              String                 @db.Uuid
+  sequence              BigInt
+  amountCentavos        BigInt
+  balanceBeforeCentavos BigInt
+  balanceAfterCentavos  BigInt
+  kind                  String
+  source                String
+  sourceReference       String
+  sourceLine            String                 @default("primary")
+  description           String
+  requestId             String
+  vehicleId             String?                @db.Uuid
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  wallet                Wallet                 @relation(fields: [playerId], references: [playerId], onDelete: Restrict, onUpdate: Restrict)
+  vehicle               Vehicle?               @relation(fields: [vehicleId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  components            TransactionComponent[]
+  parts                 OwnedPart[]
+  job                   JobProgress?
+  race                  RaceResult?
+
+  @@unique([id, playerId])
+  @@unique([playerId, sequence])
+  @@unique([playerId, source, sourceReference, sourceLine])
+  @@index([playerId, createdAt, id])
+  @@index([vehicleId, playerId])
+}
+
+model TransactionComponent {
+  transactionId String      @db.Uuid
+  componentId   String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([transactionId, componentId])
+}
+
+model Vehicle {
+  activeFor           PlayerProfile[]   @relation("ActiveVehicle")
+  id                  String            @id @default(uuid()) @db.Uuid
+  playerId            String            @db.Uuid
+  definitionId        String
+  acquisitionKey      String
+  acquiredAt          DateTime          @default(now()) @db.Timestamptz(3)
+  retiredAt           DateTime?         @db.Timestamptz(3)
+  paint               String            @db.VarChar(7)
+  rideHeightM         Decimal           @default(0) @db.Decimal(5, 3)
+  stockSpoilerRemoved Boolean           @default(false)
+  updatedAt           DateTime          @updatedAt @db.Timestamptz(3)
+  player              PlayerProfile     @relation("OwnedVehicles", fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  condition           VehicleCondition?
+  installations       InstalledPart[]
+  transactions        Transaction[]
+  races               RaceResult[]
+
+  @@unique([id, playerId])
+  @@unique([playerId, acquisitionKey])
+  @@index([playerId, retiredAt])
+  @@index([playerId, definitionId])
+}
+
+model VehicleCondition {
+  mileageMeters BigInt @default(0)
+  vehicleId    String   @id @db.Uuid
+  revision     BigInt   @default(0)
+  engine       Decimal  @db.Decimal(9, 8)
+  transmission Decimal  @db.Decimal(9, 8)
+  suspension   Decimal  @db.Decimal(9, 8)
+  brakes       Decimal  @db.Decimal(9, 8)
+  tires        Decimal  @db.Decimal(9, 8)
+  body         Decimal  @db.Decimal(9, 8)
+  electrical   Decimal  @db.Decimal(9, 8)
+  clutch       Decimal  @db.Decimal(9, 8)
+  cooling      Decimal  @db.Decimal(9, 8)
+  fuelLiters   Decimal  @db.Decimal(9, 3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model Inventory {
+  playerId  String        @id @db.Uuid
+  revision  BigInt        @default(0)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
+  player    PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  parts     OwnedPart[]
+}
+
+model OwnedPart {
+  id               String         @id @default(uuid()) @db.Uuid
+  playerId         String         @db.Uuid
+  partDefinitionId String
+  acquisitionKey   String
+  condition        Decimal?       @db.Decimal(9, 8)
+  revealedBy       RevealMethod?
+  finish           PaintFinish?
+  origin           PartOrigin
+  sourceReference  String
+  sellerId         String?
+  paidCentavos     BigInt?
+  advertisedGrade  ListingGrade?
+  transactionId    String?        @db.Uuid
+  acquiredAt       DateTime       @default(now()) @db.Timestamptz(3)
+  retiredAt        DateTime?      @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+  inventory        Inventory      @relation(fields: [playerId], references: [playerId], onDelete: Restrict, onUpdate: Restrict)
+  transaction      Transaction?   @relation(fields: [transactionId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  installation     InstalledPart?
+
+  @@unique([id, playerId])
+  @@unique([playerId, acquisitionKey])
+  @@index([playerId, retiredAt, partDefinitionId])
+  @@index([transactionId, playerId])
+}
+
+model InstalledPart {
+  ownedPartId String              @id @db.Uuid
+  playerId    String              @db.Uuid
+  vehicleId   String              @db.Uuid
+  installedAt DateTime            @default(now()) @db.Timestamptz(3)
+  part        OwnedPart           @relation(fields: [ownedPartId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  vehicle     Vehicle             @relation(fields: [vehicleId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  slots       InstalledPartSlot[]
+
+  @@unique([ownedPartId, playerId])
+  @@unique([ownedPartId, playerId, vehicleId])
+  @@index([vehicleId, playerId])
+}
+
+model InstalledPartSlot {
+  playerId     String        @db.Uuid
+  vehicleId    String        @db.Uuid
+  slotId       String
+  ownedPartId  String        @db.Uuid
+  installation InstalledPart @relation(fields: [ownedPartId, playerId, vehicleId], references: [ownedPartId, playerId, vehicleId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([vehicleId, slotId])
+  @@index([ownedPartId, playerId, vehicleId])
+}
+
+model JobProgress {
+  id                  String          @id @default(uuid()) @db.Uuid
+  playerId            String          @db.Uuid
+  runId               String
+  jobDefinitionId     String
+  status              JobStatus       @default(accepted)
+  objectiveIndex      Int             @default(0)
+  elapsedMs           BigInt          @default(0)
+  cargoLoaded         Boolean         @default(false)
+  cargoDamage         Decimal         @default(0) @db.Decimal(9, 8)
+  reason              String?
+  payoutTransactionId String?         @unique @db.Uuid
+  acceptedAt          DateTime        @default(now()) @db.Timestamptz(3)
+  completedAt         DateTime?       @db.Timestamptz(3)
+  updatedAt           DateTime        @updatedAt @db.Timestamptz(3)
+  player              PlayerProfile   @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  payout              Transaction?    @relation(fields: [payoutTransactionId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  favors              FavorProgress[]
+
+  @@unique([payoutTransactionId, playerId])
+  @@unique([playerId, runId])
+  @@unique([id, playerId])
+  @@index([playerId, jobDefinitionId, status])
+  @@index([playerId, acceptedAt, id])
+}
+
+model RaceResult {
+  checkpointIndex Int @default(0)
+  lastCheckpointElapsedMs BigInt @default(0)
+  id                    String        @id @default(uuid()) @db.Uuid
+  playerId              String        @db.Uuid
+  attemptId             String
+  raceDefinitionId      String
+  vehicleId             String        @db.Uuid
+  rivalNpcId            String?
+  rivalVehicleContentId String?
+  outcome               RaceOutcome   @default(started)
+  position              Int?
+  elapsedMs             BigInt?
+  payoutTransactionId   String?       @unique @db.Uuid
+  startedAt             DateTime      @default(now()) @db.Timestamptz(3)
+  completedAt           DateTime?     @db.Timestamptz(3)
+  player                PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  vehicle               Vehicle       @relation(fields: [vehicleId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+  payout                Transaction?  @relation(fields: [payoutTransactionId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([payoutTransactionId, playerId])
+  @@unique([playerId, attemptId])
+  @@index([playerId, completedAt, id])
+  @@index([playerId, raceDefinitionId, outcome])
+  @@index([playerId, rivalNpcId, startedAt])
+  @@index([vehicleId, playerId])
+}
+
+model NpcRelationship {
+  eventEffects SocialEventEffect[]
+  playerId     String                @db.Uuid
+  npcId        String
+  introduced   Boolean               @default(false)
+  trust        Int                   @default(50)
+  respect      Int                   @default(50)
+  updatedAt    DateTime              @updatedAt @db.Timestamptz(3)
+  player       PlayerProfile         @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  flags        NpcRelationshipFlag[]
+  milestones   NpcMilestone[]
+  favors       FavorProgress[]
+  rival        RivalState?
+
+  @@id([playerId, npcId])
+}
+
+model NpcRelationshipFlag {
+  playerId     String          @db.Uuid
+  npcId        String
+  flagId       String
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+  relationship NpcRelationship @relation(fields: [playerId, npcId], references: [playerId, npcId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, npcId, flagId])
+}
+
+model NpcMilestone {
+  playerId       String          @db.Uuid
+  npcId          String
+  eventContentId String
+  occurredAt     DateTime        @default(now()) @db.Timestamptz(3)
+  relationship   NpcRelationship @relation(fields: [playerId, npcId], references: [playerId, npcId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, npcId, eventContentId])
+  @@index([playerId, npcId, occurredAt])
+}
+
+model FavorProgress {
+  playerId      String          @db.Uuid
+  favorId       String
+  npcId         String
+  status        FavorStatus     @default(offered)
+  jobProgressId String?         @db.Uuid
+  updatedAt     DateTime        @updatedAt @db.Timestamptz(3)
+  relationship  NpcRelationship @relation(fields: [playerId, npcId], references: [playerId, npcId], onDelete: Restrict, onUpdate: Restrict)
+  job           JobProgress?    @relation(fields: [jobProgressId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, favorId])
+  @@index([playerId, npcId])
+  @@index([jobProgressId, playerId])
+}
+
+model SceneReputation {
+  playerId  String        @db.Uuid
+  sceneId   String
+  points    Int           @default(0)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
+  player    PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, sceneId])
+}
+
+model ReputationRewardSource {
+  playerId  String        @db.Uuid
+  sourceKey String
+  count     Int           @default(0)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
+  player    PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, sourceKey])
+}
+
+model PlayerCrewStanding {
+  playerId   String           @db.Uuid
+  crewId     String
+  points     Int              @default(0)
+  introduced Boolean          @default(false)
+  invitation InvitationStatus @default(none)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(3)
+  player     PlayerProfile    @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  membership CrewMembership?
+
+  @@id([playerId, crewId])
+}
+
+model CrewMembership {
+  playerId  String             @db.Uuid
+  crewId    String
+  status    MembershipStatus   @default(none)
+  joins     Int                @default(0)
+  joinedAt  DateTime?          @db.Timestamptz(3)
+  leftAt    DateTime?          @db.Timestamptz(3)
+  updatedAt DateTime           @updatedAt @db.Timestamptz(3)
+  standing  PlayerCrewStanding @relation(fields: [playerId, crewId], references: [playerId, crewId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, crewId])
+}
+
+model RivalState {
+  playerId              String          @db.Uuid
+  npcId                 String
+  rivalVehicleContentId String
+  metAtHub              Boolean         @default(false)
+  updatedAt             DateTime        @updatedAt @db.Timestamptz(3)
+  relationship          NpcRelationship @relation(fields: [playerId, npcId], references: [playerId, npcId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, npcId])
+}
+
+model LocationUnlock {
+  playerId          String        @db.Uuid
+  unlockId          String
+  locationContentId String?
+  source            String
+  sourceReference   String
+  unlockedAt        DateTime      @default(now()) @db.Timestamptz(3)
+  player            PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, unlockId])
+  @@index([playerId, locationContentId])
+}
+
+model ChapterProgress {
+  playerId      String          @db.Uuid
+  chapterId     String
+  currentBeatId String?
+  completedAt   DateTime?       @db.Timestamptz(3)
+  updatedAt     DateTime        @updatedAt @db.Timestamptz(3)
+  player        PlayerProfile   @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  markers       ChapterMarker[]
+
+  @@id([playerId, chapterId])
+}
+
+model ChapterMarker {
+  playerId        String          @db.Uuid
+  chapterId       String
+  markerId        String
+  sourceReference String
+  completedAt     DateTime        @default(now()) @db.Timestamptz(3)
+  chapter         ChapterProgress @relation(fields: [playerId, chapterId], references: [playerId, chapterId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([playerId, chapterId, markerId])
+}
+
+model IdempotencyRecord {
+  id              String        @id @default(uuid()) @db.Uuid
+  playerId        String        @db.Uuid
+  scope           String
+  key             String
+  requestHash     String        @db.VarChar(64)
+  requestId       String
+  status          CommandStatus @default(pending)
+  resourceId      String?
+  responseVersion Int           @default(1)
+  responseStatus  Int?
+  response        Json?
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  completedAt     DateTime?     @db.Timestamptz(3)
+  player          PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([playerId, scope, key])
+  @@index([status, createdAt])
+}
+
+model SocialEvent {
+  id                  String              @id @default(uuid()) @db.Uuid
+  playerId            String              @db.Uuid
+  eventId             String
+  sourceId            String
+  sourceKey           String
+  fingerprint         String
+  type                String
+  targetContentId     String
+  contextContentId    String
+  reason              String
+  sceneId             String?
+  reputationSourceKey String?
+  reputationDelta     Int?
+  createdAt           DateTime            @default(now()) @db.Timestamptz(3)
+  player              PlayerProfile       @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  effects             SocialEventEffect[]
+
+  @@unique([id, playerId])
+  @@unique([playerId, eventId])
+  @@unique([playerId, sourceKey])
+  @@index([playerId, createdAt, id])
+  @@index([playerId, type, targetContentId, contextContentId])
+}
+
+model SocialEventEffect {
+  relationship  NpcRelationship @relation(fields: [playerId, npcId], references: [playerId, npcId], onDelete: Restrict, onUpdate: Restrict)
+  socialEventId String          @db.Uuid
+  playerId      String          @db.Uuid
+  npcId         String
+  trustDelta    Int
+  respectDelta  Int
+  flagsAdded    String[]
+  flagsRemoved  String[]
+  event         SocialEvent     @relation(fields: [socialEventId, playerId], references: [id, playerId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([socialEventId, npcId])
+}
+
+model LocalCredential {
+  userId       String   @id @db.Uuid
+  username     String   @unique @db.VarChar(32)
+  passwordHash String
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model AuthSession {
+  tokenHash String   @id @db.VarChar(64)
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model MarketplaceListing {
+ id String @id @default(uuid()) @db.Uuid
+ playerId String @db.Uuid
+ definitionId String
+ sellerId String
+ locationId String
+ askingCentavos BigInt
+ advertisedGrade ListingGrade
+ actualCondition Decimal @db.Decimal(9, 8)
+ blurb String
+ photoSeed Int
+ postedAt DateTime @default(now()) @db.Timestamptz(3)
+ expiresAt DateTime @db.Timestamptz(3)
+ soldAt DateTime? @db.Timestamptz(3)
+ player PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+ @@index([playerId, soldAt, expiresAt])
 }

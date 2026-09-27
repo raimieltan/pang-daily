@@ -24,7 +24,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       // Also verifies that deployment migrations were applied.
       const metadata = await this.client.schemaVersion.findUnique({ where: { id: 1 } });
-      return metadata !== null && metadata.version >= 1;
+      return metadata !== null && metadata.version === 4;
     } catch {
       this.logger.warn('Database readiness check failed');
       return false;

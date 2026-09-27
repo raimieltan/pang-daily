@@ -41,7 +41,8 @@ export class SceneManager<Id extends string> {
     private readonly jobs = new JobSession(session, HUB_JOBS),
     private readonly market: SceneContext["market"] = { useWorkshop: () => () => {} },
   private readonly inventory = new InventorySession(),
-  private readonly socialStorage: SceneContext['socialStorage'] = { getItem: () => null, setItem: () => {} },
+    private readonly socialStorage: SceneContext['socialStorage'] = { getItem: () => null, setItem: () => {} },
+    private readonly playerContext?: Pick<SceneContext, 'ownedVehicleDefinitionIds' | 'garageStorage'>,
   ) {}
 
   setPaused(paused: boolean): void {
@@ -80,6 +81,7 @@ export class SceneManager<Id extends string> {
       jobs: this.jobs,
       inventory: this.inventory,
       socialStorage: this.socialStorage,
+      ...this.playerContext,
       market: {
         useWorkshop: (workshop) => {
           const release = this.market.useWorkshop(workshop);

@@ -9,7 +9,7 @@ test('migrated PostgreSQL, liveness, readiness, CORS, and unavailable database',
     await app.listen(0, '127.0.0.1');
     const base = await app.getUrl();
     const database = app.get(DatabaseService);
-    assert.equal((await database.client.schemaVersion.findUniqueOrThrow({ where: { id: 1 } })).version, 1);
+    assert.equal((await database.client.schemaVersion.findUniqueOrThrow({ where: { id: 1 } })).version, 4);
     assert.equal((await fetch(`${base}/api/health/live`)).status, 200);
     const ready = await fetch(`${base}/api/health`, { headers: { Origin: 'http://localhost:3000' } });
     assert.equal(ready.status, 200);
@@ -22,7 +22,12 @@ test('migrated PostgreSQL, liveness, readiness, CORS, and unavailable database',
     try {
       const unavailable = await fetch(`${base}/api/health`);
       assert.equal(unavailable.status, 503);
-      assert.deepEqual(await unavailable.json(), { status: 'not_ready', application: 'alive', database: 'down' });
+      const failure = await unavailable.json();
+      assert.equal(failure.status, 'not_ready');
+      assert.equal(failure.application, 'alive');
+      assert.equal(failure.database, 'down');
+      assert.equal(failure.statusCode, 503);
+      assert.ok(failure.requestId);
       assert.equal((await fetch(`${base}/api/health/live`)).status, 200);
     } finally {
       await database.client.$executeRawUnsafe('ALTER TABLE "SchemaVersion_offline" RENAME TO "SchemaVersion"');

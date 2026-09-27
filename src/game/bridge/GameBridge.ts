@@ -16,7 +16,10 @@ export interface RuntimePort {
  */
 export class GameBridge {
   private readonly events = new GameEvents();
-  private readonly bus = new CommandBus();
+  private readonly bus = new CommandBus((command, reason) => {
+    this.events.emit('commandRejected', { command, reason });
+    this.events.emit('persistenceError', reason);
+  });
 
   readonly ui: { events: GameEventSource; commands: GameCommands } = {
     events: { on: this.events.on.bind(this.events) },

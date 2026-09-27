@@ -18,4 +18,4 @@ function run(command, args) {
 run('yarn', ['prisma', 'migrate', 'deploy']);
 run('yarn', ['db:seed']);
 run('yarn', ['db:seed']);
-run('node', ['--test', 'dist/test/integration.test.js']);
+run('node', ['--test', '--test-concurrency=1', 'dist/test/integration.test.js', 'dist/test/schema.test.js', 'dist/test/auth.test.js', 'dist/test/economy.test.js']);

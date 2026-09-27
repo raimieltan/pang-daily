@@ -8,7 +8,7 @@ import { resolveInteraction, type Interactable, type InteractionAction } from ".
 export type InteractableSource = () => Iterable<Interactable>;
 
 /** Carries out an action in the engine. Return `{ rejected }` to refuse (shown like a refused command). */
-export type InteractionHandler = (interactable: Interactable) => CommandOutcome;
+export type InteractionHandler = (interactable: Interactable) => CommandOutcome | Promise<CommandOutcome>;
 
 export type InteractionFocus = {
   readonly position: Vector3;
@@ -62,11 +62,16 @@ export class InteractionSystem implements GameSystem {
     this.update();
   }
 
-  trigger(): CommandOutcome {
+  trigger(): CommandOutcome | Promise<CommandOutcome> {
     this.refresh();
     const target = this.focused;
     if (!target) return { rejected: "Nothing to do here" };
     const outcome = this.handlers.get(target.action)?.(target);
+    if (outcome instanceof Promise) return outcome.then(result => {
+      if (result) return result;
+      this.bridge.emit('interactionTriggered', { interactionId: target.id, action: target.action, locationId: target.locationId ?? null });
+      this.refresh();
+    });
     if (outcome) return outcome;
     this.bridge.emit("interactionTriggered", {
       interactionId: target.id,

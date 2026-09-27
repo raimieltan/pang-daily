@@ -199,7 +199,8 @@ export class PlayerModes implements GameSystem {
     this.bridge.emit("playerModeChanged", { mode, vehicleId: driving ? vehicle.id : null });
   }
 
-  private report(command: GameCommandName, outcome: CommandOutcome): void {
+  private report(command: GameCommandName, outcome: CommandOutcome | Promise<CommandOutcome>): void {
+    if (outcome instanceof Promise) { void outcome.then(result => this.report(command, result), error => this.report(command, { rejected: error instanceof Error ? error.message : String(error) })); return; }
     if (outcome) this.bridge.emit("commandRejected", { command, reason: outcome.rejected });
   }
 }

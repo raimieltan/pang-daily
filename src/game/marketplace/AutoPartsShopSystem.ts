@@ -52,14 +52,18 @@ export class AutoPartsShopSystem implements GameSystem {
     this.quote = { id: `auto-parts-${this.id}-${++this.serial}`, product: { ...product } };
     this.bridge.emit('autoPartsQuote', this.quote);
   }
-  private buy(quoteId: string): CommandOutcome {
+  private buy(quoteId: string): CommandOutcome | Promise<CommandOutcome> {
     const rejection = this.rejection(); if (rejection) { this.close(); return { rejected: rejection }; }
     if (!this.open || !this.quote || this.quote.id !== quoteId) return { rejected: 'Select a part for a fresh purchase quote.' };
     const quote = this.quote;
     if (AUTO_PARTS_STOCK.find(p => p.partId === quote.product.partId)?.pricePhp !== quote.product.pricePhp) { this.clearQuote(); return { rejected: 'The price changed. Select the part again.' }; }
-    this.clearQuote(); // Consume before notifying wallet/inventory subscribers: duplicate clicks cannot pay twice.
+    // Clear only after server confirmation; failures keep the same quote retryable.
+    if (this.wallet.persistent) return this.wallet.execute({ type: 'part_purchase', operationTag: `shop:${quote.id}`, definitionId: quote.product.partId }).then(remote => {
+      this.clearQuote(); this.bridge.emit('autoPartPurchased', { itemId: remote.resourceId!, name: String(remote.details.name), pricePhp: Number(remote.details.pricePhp), transactionId: Number(remote.sequence) });
+    });
     const purchase = this.shop.buy(quote.product.partId);
     if ('rejected' in purchase) return purchase;
+    this.clearQuote();
     this.bridge.emit('autoPartPurchased', purchase);
   }
   update() { if (this.open && this.rejection()) this.close(); }

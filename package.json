@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "yarn build:api && next build",
+    "dev": "yarn dev:web",
+    "build": "yarn build:api && next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "dev:web": "next dev",
+    "typecheck": "yarn build:shared && tsc --noEmit",
+    "test": "yarn build:shared && vitest run",
+    "dev:web": "yarn build:shared && next dev",
     "dev:api": "yarn workspace @pang-daily/api dev",
-    "dev:stack": "yarn db:up && yarn db:deploy && concurrently --kill-others -n web,api \"yarn dev:web\" \"yarn dev:api\"",
+    "dev:stack": "yarn build:shared && yarn db:up && yarn db:deploy && concurrently --kill-others -n web,api \"yarn dev:web\" \"yarn dev:api\"",
     "build:api": "yarn workspace @pang-daily/api build",
     "typecheck:api": "yarn workspace @pang-daily/api typecheck",
     "test:api": "yarn workspace @pang-daily/api test",
@@ -23,7 +23,10 @@
     "db:migrate": "yarn workspace @pang-daily/api db:migrate",
     "db:deploy": "yarn workspace @pang-daily/api db:deploy",
     "db:reset": "yarn workspace @pang-daily/api db:reset",
-    "db:seed": "yarn workspace @pang-daily/api db:seed"
+    "db:seed": "yarn workspace @pang-daily/api db:seed",
+    "build:shared": "yarn workspace @pang-daily/game-core build && yarn workspace @pang-daily/contracts build",
+    "test:auth:browser": "yarn build:shared && node tests/auth.browser.mjs",
+    "test:economy:browser": "yarn build:shared && node tests/economy.browser.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",
@@ -35,7 +38,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^4.6.5",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "@pang-daily/contracts": "0.1.0"
   },
   "devDependencies": {
     "@babylonjs/inspector": "^9.28.0",
@@ -58,7 +62,8 @@
   },
   "packageManager": "yarn@1.22.22",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "engines": {
     "node": ">=22.12.0"

@@ -36,6 +36,8 @@ export class JobSystem implements GameSystem {
   private board: Interactable | null = null;
   private lastImpact: number;
   private saveElapsed = 0;
+  private beginning = false;
+  private beginRetry = 0;
   private viewElapsed = 0;
   private lastView: string | null = null;
   private lastStep = '';
@@ -44,7 +46,7 @@ export class JobSystem implements GameSystem {
   constructor(private readonly bridge: RuntimePort, private readonly jobs: JobSession, private readonly world: JobWorld) {
     this.lastImpact = world.vehicle.impactSerial;
     this.release.push(bridge.handle('acceptJob', ({ jobId }) => this.accept(jobId)));
-    this.release.push(bridge.handle('abandonJob', () => this.report(this.jobs.abandon())));
+    this.release.push(bridge.handle('abandonJob', () => this.jobs.persistent ? this.jobs.abandonConfirmed().then(step => this.report(step)) : this.report(this.jobs.abandon())));
     this.release.push(bridge.handle('dismissJobBoard', () => this.closeBoard()));
     bridge.emit('jobBoard', null);
     this.publish(true);
@@ -67,8 +69,18 @@ export class JobSystem implements GameSystem {
   update(dt: number): void {
     if (this.board && this.boardRejection(this.board)) this.closeBoard();
     const run = this.jobs.current;
+    this.beginRetry = Math.max(0, this.beginRetry - dt);
     if (run?.status === 'accepted') {
-      if (!('rejected' in this.jobs.begin(this.context()))) this.publish(true);
+      if (this.jobs.persistent) {
+        const job = this.jobs.definition(run.jobId)!;
+        if (!this.beginning && this.beginRetry === 0 && !startBlocker(job, this.context())) {
+          this.beginning = true;
+          void this.jobs.beginConfirmed(this.context()).then(result => {
+            if ('rejected' in result) this.bridge.emit('commandRejected', { command: 'acceptJob', reason: result.rejected });
+            else this.publish(true);
+          }, error => this.bridge.emit('persistenceError', `Job start was not saved: ${error instanceof Error ? error.message : String(error)}`)).finally(() => { this.beginning = false; this.beginRetry = 2; });
+        }
+      } else if (!('rejected' in this.jobs.begin(this.context()))) this.publish(true);
     } else if (run?.status === 'active') {
       if (this.world.racing()) this.end(this.jobs.fail('You left the job for a race.'));
       else this.end(this.jobs.tick(dt));
@@ -92,12 +104,16 @@ export class JobSystem implements GameSystem {
     this.bridge.emit('jobBoard', null);
   }
 
-  private accept(jobId: string): CommandOutcome {
+  private accept(jobId: string): CommandOutcome | Promise<CommandOutcome> {
     if (!this.board) return { rejected: 'Check a job board first.' };
     const rejection = this.boardRejection(this.board);
     if (rejection) { this.closeBoard(); return { rejected: rejection }; }
     const job = this.jobs.definition(jobId);
     if (!job || !job.offeredAt.includes(this.board.id)) return { rejected: 'That job is not offered here.' };
+    if (this.jobs.persistent) return this.jobs.acceptConfirmed(jobId).then(run => {
+      if ('rejected' in run) return run;
+      this.closeBoard(); this.publish(true);
+    });
     const run = this.jobs.accept(jobId);
     if ('rejected' in run) return run;
     this.closeBoard();
@@ -128,13 +144,13 @@ export class JobSystem implements GameSystem {
     return null;
   }
 
-  private reachStop(objectiveId: string): CommandOutcome {
+  private reachStop(objectiveId: string): CommandOutcome | Promise<CommandOutcome> {
     const run = this.jobs.current, job = run && this.jobs.definition(run.jobId);
     const objective = run && job ? currentObjective(run, job) : null;
     if (!objective) return { rejected: 'No job in progress.' };
     const rejection = this.stopRejection(objective);
     if (rejection) return { rejected: rejection };
-    return this.report(this.jobs.completeObjective(objectiveId));
+    return this.jobs.persistent ? this.jobs.completeConfirmed(objectiveId).then(step => this.report(step)) : this.report(this.jobs.completeObjective(objectiveId));
   }
 
   private stopRejection(objective: JobObjective): string | null {
@@ -154,7 +170,8 @@ export class JobSystem implements GameSystem {
     if (!step) return;
     if (step.ended) {
       const job = this.jobs.definition(step.ended.jobId)!;
-      this.bridge.emit('jobEnded', jobResult(step.ended, job));
+      if (this.jobs.persistent && step.ended.status === 'failed') void this.jobs.confirmFailed(step.ended).then(() => this.bridge.emit('jobEnded', jobResult(step.ended!, job)), error => this.bridge.emit('persistenceError', `Job outcome was not saved: ${error instanceof Error ? error.message : String(error)}`));
+      else this.bridge.emit('jobEnded', jobResult(step.ended, job));
     }
     // Timer ticks wait for the throttle; stops, damage and endings show at once.
     const key = `${step.run.runId}:${step.run.status}:${step.run.objectiveIndex}:${step.run.cargoDamage}`;

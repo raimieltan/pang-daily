@@ -14,6 +14,7 @@ import type { RaceId, SpawnPointId } from "./types";
 import type { ServiceComponent } from "../../game-core/maintenance/condition";
 
 export type GameCommandMap = {
+  retryPersistence: void;
   openContacts: void;
   closeContacts: void;
   openAutoPartsShop: void;
@@ -89,7 +90,7 @@ type CommandArgs<K extends GameCommandName> = GameCommandMap[K] extends void ? [
 /** Return `{ rejected }` to refuse a command; returning nothing means it was accepted. */
 export type CommandOutcome = void | { rejected: string };
 
-export type CommandHandler<K extends GameCommandName> = (payload: GameCommandMap[K]) => CommandOutcome;
+export type CommandHandler<K extends GameCommandName> = (payload: GameCommandMap[K]) => CommandOutcome | Promise<CommandOutcome>;
 
 export type DispatchResult = { ok: true } | { ok: false; reason: string };
 
@@ -98,6 +99,7 @@ export type DispatchResult = { ok: true } | { ok: false; reason: string };
  * the race system handles `startRace`, the scene handles `spawnAt`, and so on.
  */
 export class CommandBus {
+  constructor(private readonly onRejected?: (command: GameCommandName, reason: string) => void) {}
   private handlers = new Map<GameCommandName, CommandHandler<never>>();
 
   handle<K extends GameCommandName>(command: K, handler: CommandHandler<K>): () => void {
@@ -113,6 +115,10 @@ export class CommandBus {
     if (!handler) return { ok: false, reason: `"${command}" is not available right now` };
     try {
       const outcome = handler(args[0] as GameCommandMap[K]);
+      if (outcome instanceof Promise) {
+        void outcome.then(result => { if (result) this.onRejected?.(command, result.rejected); }, error => this.onRejected?.(command, error instanceof Error ? error.message : String(error)));
+        return { ok: true };
+      }
       return outcome ? { ok: false, reason: outcome.rejected } : { ok: true };
     } catch (error) {
       return { ok: false, reason: error instanceof Error ? error.message : String(error) };
@@ -126,6 +132,7 @@ export class CommandBus {
 
 /** The ergonomic, React-facing form of `GameCommandMap`. */
 export interface GameCommands {
+  retryPersistence(): void;
   openContacts(): void;
   closeContacts(): void;
   openAutoPartsShop(): void;
@@ -179,6 +186,7 @@ type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>)
 
 export function createGameCommands(dispatch: Dispatch): GameCommands {
   return {
+    retryPersistence: () => dispatch('retryPersistence'),
     openContacts: () => dispatch('openContacts'),
     closeContacts: () => dispatch('closeContacts'),
     openAutoPartsShop: () => dispatch('openAutoPartsShop'),

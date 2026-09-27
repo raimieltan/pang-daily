@@ -24,6 +24,8 @@ export interface GameSystem {
 
 /** Handed to a scene's `setup`. The Scene itself is created and disposed by the SceneManager. */
 export interface SceneContext {
+  readonly ownedVehicleDefinitionIds?: readonly string[];
+  readonly garageStorage?: Pick<Storage, 'getItem' | 'setItem'>;
   readonly engine: AbstractEngine;
   readonly scene: Scene;
   /** Aborted when this scene is superseded or the runtime is disposed. Pass to async loaders. */

@@ -74,6 +74,7 @@ export class ExteriorSystem implements GameSystem {
         if (!vehicle.setStockSpoilerVisible || !vehicle.definition.spec.visual.model.attachments.some(a => a.slot === 'spoiler')) {
           return { rejected: 'This car does not have a removable spoiler.' };
         }
+        if (inventory.persistent) return inventory.execute({ type: 'vehicle_appearance', vehicleId: vehicle.id, spoilerMode: mode }).then(() => undefined);
         inventory.setSpoilerMode(vehicle.id, mode);
       }),
       bridge.handle('refinishBodyPart', ({ itemId, finish }) => this.refinish(itemId, finish)),
@@ -83,7 +84,7 @@ export class ExteriorSystem implements GameSystem {
     if (this.pending === 0) this.publish();
   }
 
-  private equip(itemId: string, finish: PaintFinish | null | undefined): CommandOutcome {
+  private equip(itemId: string, finish: PaintFinish | null | undefined): CommandOutcome | Promise<CommandOutcome> {
     const rejection = this.workshopRejection();
     if (rejection) return { rejected: rejection };
     const item = this.inventory.item(itemId);
@@ -96,6 +97,10 @@ export class ExteriorSystem implements GameSystem {
     if (finish !== undefined && finish !== null && !canRefinish(part, finish)) return { rejected: `Can't do ${finish.replace('_', ' ')} on that part.` };
     const where = this.inventory.installation(itemId);
     if (where && where.vehicleId !== this.vehicle.id) return { rejected: 'That part is on another car. Take it off first.' };
+    if (this.inventory.persistent) {
+      if (where) return finish !== undefined ? this.inventory.execute({ type: 'part_refinish', partId: itemId, finish }).then(() => undefined) : undefined;
+      return this.inventory.execute({ type: 'part_install', vehicleId: this.vehicle.id, partId: itemId, ...(finish !== undefined ? { finish } : {}) }).then(() => undefined);
+    }
     if (finish !== undefined) this.inventory.refinish(itemId, finish);
     if (where) { this.sync(); return; }
     const installed = this.inventory.install(this.vehicle.id, itemId);
@@ -103,7 +108,7 @@ export class ExteriorSystem implements GameSystem {
   }
 
   /** Resprays a part wherever it is; a fitted one restyles on the next sync. */
-  private refinish(itemId: string, finish: PaintFinish | null): CommandOutcome {
+  private refinish(itemId: string, finish: PaintFinish | null): CommandOutcome | Promise<CommandOutcome> {
     const rejection = this.workshopRejection();
     if (rejection) return { rejected: rejection };
     const item = this.inventory.item(itemId);
@@ -111,17 +116,19 @@ export class ExteriorSystem implements GameSystem {
     const part = bodyPart(item.partId);
     if (!part) return { rejected: 'That is not a body part.' };
     if (finish !== null && !canRefinish(part, finish)) return { rejected: `Can't do ${finish.replace('_', ' ')} on that part.` };
+    if (this.inventory.persistent) return this.inventory.execute({ type: 'part_refinish', partId: itemId, finish }).then(() => undefined);
     const done = this.inventory.refinish(itemId, finish);
     return 'rejected' in done ? done : undefined;
   }
 
-  private remove(itemId: string): CommandOutcome {
+  private remove(itemId: string): CommandOutcome | Promise<CommandOutcome> {
     const rejection = this.workshopRejection();
     if (rejection) return { rejected: rejection };
     const item = this.inventory.item(itemId);
     if (!item || !bodyPart(item.partId)) return { rejected: 'That is not a body part.' };
     const where = this.inventory.installation(itemId);
     if (!where || where.vehicleId !== this.vehicle.id) return { rejected: 'That part is not on your car.' };
+    if (this.inventory.persistent) return this.inventory.execute({ type: 'part_remove', vehicleId: this.vehicle.id, partId: itemId }).then(() => undefined);
     const removed = this.inventory.uninstall(itemId);
     return 'rejected' in removed ? removed : undefined;
   }

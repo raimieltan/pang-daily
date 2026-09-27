@@ -30,6 +30,10 @@ export class FuelSystem implements GameSystem {
         this.quote = null; bridge.emit('fuelQuote', null);
         return { rejected: 'Fuel level changed. Choose a new quantity.' };
       }
+      if (session.persistent) return session.execute({ type: 'fuel_purchase', operationTag: `fuel:${quote.id}`, vehicleId: definition.id, milliliters: Math.round(quote.liters * 1000) }).then(remote => {
+        this.quote = null; bridge.emit('fuelQuote', null);
+        bridge.emit('fuelPurchased', { liters: Number(remote.details.liters), costPhp: Number(remote.details.costPhp) });
+      });
       const result = session.refuel(definition, { liters: quote.liters });
       if ('rejected' in result) return result;
       this.quote = null;

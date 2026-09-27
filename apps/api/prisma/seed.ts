@@ -8,7 +8,7 @@ async function seed() {
   const client = new PrismaClient({ adapter: new PrismaPg({ connectionString: config.DATABASE_URL }) });
   try {
     // Idempotent infrastructure seed; content definitions stay in game-core.
-    await client.schemaVersion.upsert({ where: { id: 1 }, update: {}, create: { id: 1, version: 1 } });
+    await client.schemaVersion.upsert({ where: { id: 1 }, update: {}, create: { id: 1, version: 4 } });
   } finally {
     await client.$disconnect();
   }

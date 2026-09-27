@@ -1,3 +1,4 @@
+import type { PersistencePort, PersistentIntent } from '../persistence/PersistencePort';
 import { discountedPrice, type SocialAccess } from '../social/eligibility';
 import { opportunity } from '../social/opportunities';
 import { centavos, moneySchema, transactionSchema, quoteFuel, FUEL_CAPACITY_LITERS, MAINTENANCE_SERVICES, type MoneySource, type FuelRequest, type MaintenanceService } from '../economy/economy';
@@ -8,9 +9,10 @@ import { applyConditionLoss, repairLines, SERVICE_COMPONENTS, type ConditionLoss
 export const STARTING_WALLET_PHP = 5000;
 const ownedSchema = z.object({ condition: vehicleConditionSchema, revision: z.number().int().nonnegative(), fuelLiters: z.number().min(0).max(FUEL_CAPACITY_LITERS) });
 const sessionSchema = z.object({ version: z.literal(2), walletPhp: moneySchema,
+  checkpoint: z.object({ balancePhp: moneySchema, sequence: z.number().int().nonnegative() }).optional(),
   vehicles: z.record(z.string(), ownedSchema), transactions: z.array(transactionSchema) }).refine(state => {
     try {
-      let balance = 0, id = 0;
+      let balance = centavos(state.checkpoint?.balancePhp ?? 0), id = state.checkpoint?.sequence ?? 0;
       for (const tx of state.transactions) {
         if (tx.id <= id || centavos(tx.balanceBeforePhp) !== balance || balance + centavos(tx.amountPhp) !== centavos(tx.balancePhp)) return false;
         balance = centavos(tx.balancePhp); id = tx.id;
@@ -39,6 +41,11 @@ export type RepairReceipt = { vehicleId: string; components: ServiceComponent[];
 /** Session authority: economy and owned-car data outlive every Babylon scene. */
 export class VehicleSession {
   private state: SessionSnapshot;
+  private remote?: PersistencePort;
+  get persistent() { return !!this.remote; }
+  usePersistence(remote: PersistencePort) { this.remote = remote; }
+  execute(action: PersistentIntent) { if (!this.remote) throw new Error('Server persistence is not configured.'); return this.remote.execute(action); }
+  applyServerSnapshot(saved: SessionSnapshot) { this.state = sessionSchema.parse(saved); this.changed(); }
   private quoteSerial = 0;
   private socialAccess?: SocialAccess;
   useSocialAccess(access: SocialAccess) { this.socialAccess = access; }
@@ -52,6 +59,7 @@ export class VehicleSession {
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   ensureVehicle(definition: VehicleDefinition) {
     if (this.state.vehicles[definition.id]) return;
+    if (this.remote) throw new Error('This vehicle is not owned by the current player.');
     this.state.vehicles[definition.id] = { condition: { ...definition.condition.typical }, revision: 0, fuelLiters: FUEL_CAPACITY_LITERS };
     this.changed();
   }
@@ -106,6 +114,7 @@ export class VehicleSession {
     return result;
   }
   private payment(amountPhp: number, source: MoneySource, vehicleId: string | null = null, components: ServiceComponent[] = []) {
+    if (this.remote) return { rejected: 'Money can only change through a server-confirmed action.' };
     let balancePhp: number;
     try {
       const delta = centavos(amountPhp), balance = centavos(this.state.walletPhp) + delta;
@@ -113,7 +122,7 @@ export class VehicleSession {
       if (balance < 0) return { rejected: 'Not enough money.' };
       balancePhp = balance / 100;
     } catch { return { rejected: 'Invalid amount.' }; }
-    const parsed = transactionSchema.safeParse({ ...source, id: (this.state.transactions.at(-1)?.id ?? 0) + 1,
+    const parsed = transactionSchema.safeParse({ ...source, id: (this.state.transactions.at(-1)?.id ?? this.state.checkpoint?.sequence ?? 0) + 1,
       timestamp: new Date().toISOString(), amountPhp, balanceBeforePhp: this.state.walletPhp, balancePhp, vehicleId, components });
     if (!parsed.success) return { rejected: 'Invalid transaction metadata.' };
     this.state.walletPhp = balancePhp; this.state.transactions.push(parsed.data);

@@ -13,7 +13,7 @@ export type JobOutcomes = z.infer<typeof outcomesSchema>;
 /** A run that just ended. Only `completed` carries a payout (`bonusPhp` of it from the job's bonus). */
 export type JobEnded = JobRun & { status: 'completed' | 'failed' | 'abandoned'; payoutPhp: number; bonusPhp: number };
 export type JobStep = { run: JobRun; ended: JobEnded | null };
-type Wallet = Pick<VehicleSession, 'earn' | 'snapshot'>;
+type Wallet = Pick<VehicleSession, 'earn' | 'snapshot'> & Partial<Pick<VehicleSession, 'persistent' | 'execute'>>;
 
 /**
  * Job authority: at most one run at a time, outlives scenes, persists the run in progress and
@@ -23,6 +23,7 @@ type Wallet = Pick<VehicleSession, 'earn' | 'snapshot'>;
  */
 export class JobSession {
   private state: JobSave;
+  get persistent() { return this.wallet.persistent === true; }
   private readonly listeners = new Set<() => void>();
   private readonly byId: ReadonlyMap<string, JobDefinition>;
 
@@ -41,15 +42,55 @@ export class JobSession {
   definition(jobId: string): JobDefinition | undefined { return this.byId.get(jobId); }
   get current(): JobRun | null { return this.state.current && { ...this.state.current }; }
   outcomes(jobId: string): JobOutcomes { return { ...(this.state.history[jobId] ?? { completed: 0, failed: 0, abandoned: 0 }) }; }
+  applyServerSnapshot(saved: JobSave) {
+    const next = jobSaveSchema.parse(saved), current = this.state.current;
+    if (current && next.current?.runId === current.runId) {
+      next.current.elapsedSeconds = Math.max(next.current.elapsedSeconds, current.elapsedSeconds);
+      next.current.cargoDamage = Math.max(next.current.cargoDamage, current.cargoDamage);
+    }
+    this.state = next; this.changed();
+  }
   snapshot(): JobSave { return structuredClone(this.state); }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
 
+  async acceptConfirmed(jobId: string): Promise<JobRun | Rejection> {
+    if (!this.wallet.persistent || !this.wallet.execute) return this.accept(jobId);
+    await this.wallet.execute({ type: 'job_start', definitionId: jobId });
+    return this.current ?? { rejected: 'The accepted job could not be loaded.' };
+  }
+  async completeConfirmed(objectiveId: string): Promise<JobStep | Rejection> {
+    if (!this.wallet.persistent || !this.wallet.execute) return this.completeObjective(objectiveId);
+    const [run, job] = this.active();
+    if (!run || !job) return { rejected: 'No job in progress.' };
+    const next = completeObjective(run, job, objectiveId); if ('rejected' in next) return next;
+    const receipt = await this.wallet.execute({ type: 'job_objective', runId: run.runId, objectiveId, elapsedMs: Math.round(run.elapsedSeconds * 1000), cargoDamage: run.cargoDamage });
+    if (!receipt.details.completed) return { run: this.current ?? next, ended: null };
+    const ended: JobEnded = { ...next, status: 'completed', transactionId: Number(receipt.sequence), payoutPhp: Number(receipt.details.payoutPhp), bonusPhp: Number(receipt.details.bonusPhp) };
+    return { run: ended, ended };
+  }
+  async abandonConfirmed(): Promise<JobStep | Rejection> {
+    if (!this.wallet.persistent || !this.wallet.execute) return this.abandon();
+    const run = this.current; if (!run) return { rejected: 'No job in progress.' };
+    await this.wallet.execute({ type: 'job_end', runId: run.runId, outcome: 'abandoned', reason: 'Job abandoned.' });
+    const ended: JobEnded = { ...run, status: 'abandoned', reason: 'Job abandoned.', payoutPhp: 0, bonusPhp: 0 };
+    return { run: ended, ended };
+  }
+  async confirmFailed(ended: JobEnded) {
+    if (this.wallet.persistent && this.wallet.execute && ended.status === 'failed') await this.wallet.execute({ type: 'job_end', runId: ended.runId, outcome: 'failed', reason: ended.reason ?? 'Job failed.' });
+  }
   accept(jobId: string): JobRun | Rejection {
     const job = this.byId.get(jobId);
     if (!job) return { rejected: 'Unknown job.' };
     if (this.state.current) return { rejected: 'Finish or abandon your current job first.' };
     this.state.current = acceptJob(job, `${job.id}#${++this.state.serial}`);
     this.changed(); return { ...this.state.current };
+  }
+  async beginConfirmed(ctx: JobContext): Promise<JobRun | Rejection> {
+    if (!this.wallet.persistent || !this.wallet.execute) return this.begin(ctx);
+    const [run, job] = this.active(); if (!run || !job) return { rejected: 'No job accepted.' };
+    const next = beginJob(run, job, ctx); if ('rejected' in next) return next;
+    await this.wallet.execute({ type: 'job_begin', runId: run.runId });
+    return this.current ?? { rejected: 'The started job could not be loaded.' };
   }
   begin(ctx: JobContext): JobRun | Rejection {
     const [run, job] = this.active();

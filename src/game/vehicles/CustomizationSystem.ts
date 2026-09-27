@@ -36,12 +36,13 @@ export class CustomizationSystem implements GameSystem {
     const { visual } = this.vehicle.definition.spec;
     return this.inventory.appearance(this.vehicle.id) ?? { paint: visual.defaultPaint, rideHeightM: visual.rideHeight.defaultM };
   }
-  private change(patch: Partial<VehicleAppearance>): CommandOutcome {
+  private change(patch: Partial<VehicleAppearance>): CommandOutcome | Promise<CommandOutcome> {
     const rejected = this.rejection();
     if (rejected) return { rejected };
     const value = { ...this.value(), ...patch };
     const { minM, maxM } = this.vehicle.definition.spec.visual.rideHeight;
     if (!Number.isFinite(value.rideHeightM) || value.rideHeightM < minM || value.rideHeightM > maxM) return { rejected: 'That ride height is outside this car’s suspension range.' };
+    if (this.inventory.persistent) return this.inventory.execute({ type: 'vehicle_appearance', vehicleId: this.vehicle.id, ...patch }).then(() => undefined);
     const result = this.inventory.setAppearance(this.vehicle.id, value);
     return 'rejected' in result ? result : undefined;
   }

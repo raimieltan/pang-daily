@@ -1,5 +1,6 @@
 "use client";
 
+import { usePersistenceStore } from '@/state/persistenceStore';
 import { ContactsApp } from './ContactsApp';
 import { SocialFeedback } from './SocialFeedback';
 import { useSocialStore } from '@/state/socialStore';
@@ -34,6 +35,7 @@ const SCENES: { id: SceneId; label: string }[] = [
 
 /** Presentation-only overlay. Reads the UI store and sends intents via commands. */
 export function HudOverlay() {
+  const saveError = usePersistenceStore(s => s.error);
   const [toolsOpen, setToolsOpen] = useState(false);
   const intro = useHudStore(s => s.raceIntro);
   const settings = useGraphicsStore(s => s.settings);
@@ -50,6 +52,10 @@ export function HudOverlay() {
 
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
+      {saveError && <div role="alert" className="pointer-events-auto absolute top-14 left-3 right-3 z-50 rounded border border-red-400/50 bg-black/90 p-3 text-sm text-red-200">
+        <p>Progress could not be saved: {saveError}</p>
+        <button type="button" className="mt-2 underline" onClick={() => useGameUiStore.getState().commands?.retryPersistence()}>Retry save</button>
+      </div>}
       <header className="relative z-20 flex items-start justify-between gap-4">
         <div>
           <p className="tape-brand">PANG DAILY</p>

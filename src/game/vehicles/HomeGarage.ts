@@ -44,7 +44,7 @@ export class HomeGarage implements GameSystem {
     readonly model: VehicleModel,
     pose: VehiclePose,
     private readonly player: GaragePlayer,
-    private readonly onSwitch: (car: VehicleRuntimeDefinition) => void,
+    private readonly onSwitch: (car: VehicleRuntimeDefinition) => void | Promise<void>,
     inventory: InventorySession,
   ) {
     const scene = model.root.getScene();
@@ -78,7 +78,7 @@ export class HomeGarage implements GameSystem {
   }
 
   static async create(scene: Scene, car: VehicleRuntimeDefinition, pose: VehiclePose, player: GaragePlayer,
-    inventory: InventorySession, onSwitch: (car: VehicleRuntimeDefinition) => void,
+    inventory: InventorySession, onSwitch: (car: VehicleRuntimeDefinition) => void | Promise<void>,
     source?: string | ArrayBufferView): Promise<HomeGarage> {
     const model = await VehicleModel.load(scene, car.spec, source);
     return new HomeGarage(car, model, pose, player, onSwitch, inventory);
@@ -96,7 +96,7 @@ export class HomeGarage implements GameSystem {
   connect(interactions: InteractionSystem): () => void {
     return interactions.handle('switch_vehicle', (target) => {
       if (target.target !== this.car.spec.id) return { rejected: "That's not your car" };
-      this.onSwitch(this.car);
+      return this.onSwitch(this.car);
     });
   }
 

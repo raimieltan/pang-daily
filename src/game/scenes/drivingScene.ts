@@ -17,6 +17,7 @@ import { WheelSystem } from "../vehicles/WheelSystem";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
 import { playerCar } from "../vehicles/VehicleDefinition";
+import { loadActiveCar } from "../vehicles/garageStorage";
 import { buildDebugRoad } from "../world/debugRoad";
 import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
 
@@ -28,7 +29,7 @@ import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
  * Palette follows ART_DIRECTION §5: charcoal night, asphalt, sodium-orange fill.
  */
 export const drivingScene: SceneDefinition = {
-  async setup({ scene, addSystem, bridge, signal, session, inventory }) {
+  async setup({ scene, addSystem, bridge, signal, session, inventory, garageStorage, ownedVehicleDefinitionIds }) {
     scene.clearColor = new Color4(0.06, 0.06, 0.07, 1);
     scene.fogMode = Scene.FOGMODE_EXP2;
     scene.fogDensity = 0.004;
@@ -64,7 +65,8 @@ export const drivingScene: SceneDefinition = {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("handling");
     player = await PlayerVehicle.create(scene, world, controls, bridge, {
-      definition: playerCar(params.get("car")),
+      definition: playerCar(ownedVehicleDefinitionIds && !ownedVehicleDefinitionIds.includes(params.get("car") ?? "")
+        ? loadActiveCar(garageStorage) : params.get("car")),
       spawnPoints: road.spawnPoints,
       initialSpawn: "start",
       presetId: requested && isHandlingPresetId(requested) ? requested : undefined,

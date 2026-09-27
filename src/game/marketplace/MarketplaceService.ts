@@ -15,13 +15,14 @@ const VIEW_INTERVAL_S = 1;
 export class MarketplaceService {
   private open = false;
   private elapsed = 0;
+  private refreshing = false;
   private workshop: Workshop | null = null;
   private readonly release: (() => void)[];
 
   constructor(private readonly bridge: RuntimePort, private readonly market: MarketplaceSession) {
     this.release = [
       market.subscribe(() => this.publish()),
-      bridge.handle('openMarketplace', () => { this.open = true; market.sync(); this.publish(); }),
+      bridge.handle('openMarketplace', () => { this.open = true; if (market.persistent) return market.refresh().then(() => this.publish()); market.sync(); this.publish(); }),
       bridge.handle('closeMarketplace', () => { this.open = false; bridge.emit('marketplace', null); }),
       bridge.handle('buyListing', ({ listingId, offerId }) => this.buy(listingId, offerId)),
       bridge.handle('inspectPart', ({ partId }) => this.inspect(partId)),
@@ -39,19 +40,25 @@ export class MarketplaceService {
     this.elapsed += dt;
     if (this.elapsed < VIEW_INTERVAL_S) return;
     this.elapsed = 0;
+    if (this.market.persistent && this.open && !this.refreshing && this.market.view().nextExpirySeconds === 0) {
+      this.refreshing = true;
+      void this.market.refresh().catch(error => this.bridge.emit('persistenceError', `Marketplace could not refresh: ${error instanceof Error ? error.message : String(error)}`)).finally(() => { this.refreshing = false; });
+    }
     // Expiry runs even with the phone closed, so the board has moved on when you come back.
     if (!this.market.sync() && this.open) this.publish();
   }
 
-  private buy(listingId: string, offerId?: string): CommandOutcome {
+  private buy(listingId: string, offerId?: string): CommandOutcome | Promise<CommandOutcome> {
+    if (this.market.persistent) return this.market.buyConfirmed(listingId, offerId).then(result => { if ('rejected' in result) return result; this.bridge.emit('partPurchased', result); });
     const result = this.market.buy(listingId, offerId);
     if ('rejected' in result) return result;
     this.bridge.emit('partPurchased', result);
   }
 
-  private inspect(partId: string): CommandOutcome {
+  private inspect(partId: string): CommandOutcome | Promise<CommandOutcome> {
     const rejection = this.workshop ? this.workshop.rejection() : NO_WORKSHOP;
     if (rejection) return { rejected: rejection };
+    if (this.market.persistent) return this.market.inspectConfirmed(partId).then(result => { if ('rejected' in result) return result; this.bridge.emit('partInspected', result); });
     const result = this.market.inspect(partId);
     if ('rejected' in result) return result;
     this.bridge.emit('partInspected', result);
