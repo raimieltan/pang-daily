@@ -41,6 +41,8 @@ export const jobDefinitionSchema = z.object({
   offeredAt: z.array(z.string().min(1)).min(1),
   requirements: z.object({ mode: playerModeSchema.optional(), minFuelLiters: z.number().positive().optional() }).default({}),
   objectives: z.array(objectiveSchema).min(1),
+  /** Optional authored delay after a terminal run; enforced from durable completedAt. */
+  cooldownSeconds: z.number().int().positive().optional(),
   /** Failure: the run is lost once this many seconds pass while active. */
   timeLimitSeconds: z.number().positive().optional(),
   /** Failure: cargo damage above `maxDamage`; each impact adds strength × `impactDamage`. A passenger's damage is their patience. */

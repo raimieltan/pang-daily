@@ -64,7 +64,7 @@ test('PAN-74 representative state is relational, exact, owner-linked, and suppor
     await tx.idempotencyRecord.create({ data: { playerId: player.id, scope: 'job.complete', key: 'request-1',
       requestHash: 'a'.repeat(64), requestId: randomUUID(), status: 'succeeded', completedAt: new Date(), responseStatus: 200,
       resourceId: job.id, response: { runId: job.runId } } });
-    await tx.socialEvent.create({ data: { playerId: player.id, eventId: 'event-1', sourceId: 'dialogue-1', sourceKey: 'dialogue:casey:intro',
+    await tx.socialEvent.create({ data: { playerId: player.id, sequence: 1, eventId: 'event-1', sourceId: 'dialogue-1', sourceKey: 'dialogue:casey:intro',
       fingerprint: 'canonical-input-hash', type: 'dialogue', targetContentId: 'casey', contextContentId: 'intro', reason: 'Introduction',
       effects: { create: { npcId: 'casey', trustDelta: 1, respectDelta: 0, flagsAdded: [], flagsRemoved: [] } } } });
     assert.equal((await tx.wallet.findUniqueOrThrow({ where: { playerId: player.id } })).balanceCentavos, 500001n);

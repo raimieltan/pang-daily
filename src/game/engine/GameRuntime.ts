@@ -1,3 +1,4 @@
+import type { SocialStoragePort } from '../social/socialStorage';
 import { ServerPersistence, type ServerPlayerRepository } from '../persistence/ServerPersistence';
 import { SocialOpportunityService } from '../social/SocialOpportunityService';
 import { Engine } from "@babylonjs/core/Engines/engine";
@@ -82,12 +83,16 @@ export class GameRuntime {
     const inventory = options.bootstrap ? new InventorySession(options.bootstrap.inventory) : loadInventorySession(storage);
     if (!options.bootstrap && process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
     const socialFallback = new Map<string, string>();
-    const socialStorage = storage ?? {
+    let loadedSocial = options.bootstrap?.social;
+    const baseSocialStorage = storage ?? {
       getItem: (key: string) => socialFallback.get(key) ?? null,
       setItem: (key: string, value: string) => { socialFallback.set(key, value); },
     };
+    const socialStorage: SocialStoragePort = options.bootstrap ? {
+      getItem: key => key === SOCIAL_SESSION_KEY ? JSON.stringify(loadedSocial) : baseSocialStorage.getItem(key),
+      setItem: (key, value) => { if (key === SOCIAL_SESSION_KEY) throw new Error('Social state is server-owned.'); baseSocialStorage.setItem(key, value); },
+    } : baseSocialStorage;
     if (options.bootstrap) {
-      socialStorage.setItem(SOCIAL_SESSION_KEY, JSON.stringify(options.bootstrap.social));
       saveActiveCar(options.bootstrap.activeDefinitionId, socialStorage);
     }
     this.opportunities = new SocialOpportunityService(this.bridge.runtime, socialStorage);
@@ -95,8 +100,10 @@ export class GameRuntime {
     session.useSocialAccess(access);
     const jobs = options.bootstrap ? new JobSession(session, HUB_JOBS, options.bootstrap.jobs) : loadJobSession(session, HUB_JOBS, storage);
     if (options.bootstrap && options.repository && options.hydrate) {
-      this.persistence = new ServerPersistence(options.repository, options.hydrate, options.bootstrap, session, inventory, jobs, message => emit('persistenceError', message));
+      this.persistence = new ServerPersistence(options.repository, options.hydrate, options.bootstrap, session, inventory, jobs, message => emit('persistenceError', message), fresh => { loadedSocial = fresh.social; });
+      socialStorage.executeSocial = intent => this.persistence!.execute(intent);
       session.usePersistence(this.persistence); inventory.usePersistence(this.persistence);
+      for (const race of options.bootstrap.interruptedRaces ?? []) void this.persistence.execute({ type: 'race_complete', ...race, finish: false }).catch(error => emit('persistenceError', `Interrupted race could not be saved: ${error instanceof Error ? error.message : String(error)}`));
     }
     const marketplace = loadMarketplaceSession(session, inventory, storage);
     marketplace.useSocialAccess(access);

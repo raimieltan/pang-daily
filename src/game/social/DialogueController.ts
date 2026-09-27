@@ -15,6 +15,8 @@ export class DialogueController implements GameSystem {
  private nodeId: string | null = null;
  private selectedChoiceId: string | null = null;
  private ready = true;
+ private pending = false;
+ private generation = 0;
  private readonly release: (() => void)[];
 
  constructor(private readonly bridge: RuntimePort, private readonly input: InputManager, private readonly storage: SocialStoragePort) {
@@ -30,17 +32,25 @@ export class DialogueController implements GameSystem {
    const session = loadSocialSession(this.storage);
    const first = resolveConversation(dialogueId, session.snapshot());
    const npc = SOCIAL_CONTENT.npcs.find((item) => item.dialogueEntryId === dialogueId)!;
-   session.applyEvent({ type: 'dialogue', eventId: `dialogue:${npc.id}:${dialogueId}`, sourceId: dialogueId, npcId: npc.id, dialogueId });
+   if (!this.storage.executeSocial) session.applyEvent({ type: 'dialogue', eventId: `dialogue:${npc.id}:${dialogueId}`, sourceId: dialogueId, npcId: npc.id, dialogueId });
    this.dialogueId = dialogueId;
    this.nodeId = first.node.id;
    this.selectedChoiceId = null;
    this.ready = !this.input.held('interact');
    this.input.setContext('dialogue');
    this.publish();
+   if (this.storage.executeSocial) {
+    const generation = ++this.generation;
+    this.pending = true;
+    void this.storage.executeSocial({ type: 'social_introduce', dialogueId }).then(() => {
+     if (generation === this.generation) this.publish();
+    }, error => { if (generation === this.generation) { this.close(); this.bridge.emit('persistenceError', `Conversation was not saved: ${error instanceof Error ? error.message : String(error)}`); } }).finally(() => { if (generation === this.generation) this.pending = false; });
+   }
   } catch (error) { this.close(); return { rejected: error instanceof Error ? error.message : String(error) }; }
  }
 
  choose(choiceId: string): Outcome {
+  if (this.pending) return { rejected: 'Conversation is saving' };
   if (!this.dialogueId || !this.nodeId) return { rejected: 'conversation closed' };
   try {
    const definition = CONVERSATIONS.find((item) => item.id === this.dialogueId)!;
@@ -52,6 +62,16 @@ export class DialogueController implements GameSystem {
     this.publish();
     return { rejected: 'unavailable dialogue choice' };
    }
+   if (this.storage.executeSocial) {
+    const generation = this.generation;
+    this.pending = true;
+    void this.storage.executeSocial({ type: 'social_choice', dialogueId: this.dialogueId, nodeId: this.nodeId, choiceId }).then(receipt => {
+     if (generation !== this.generation) return;
+     if (!receipt.details.duplicate) this.nodeId = choice.nextNodeId ?? this.nodeId;
+     this.selectedChoiceId = null; this.publish();
+    }, error => { if (generation === this.generation) { this.publish(); this.bridge.emit('persistenceError', `Dialogue choice was not saved: ${error instanceof Error ? error.message : String(error)}`); } }).finally(() => { if (generation === this.generation) this.pending = false; });
+    return;
+   }
    const result = session.chooseConversation(this.dialogueId, this.nodeId, choiceId);
    if (result.status === 'duplicate') { this.publish(); return { rejected: 'dialogue choice already consumed' }; }
    this.nodeId = choice.nextNodeId ?? this.nodeId;
@@ -62,6 +82,7 @@ export class DialogueController implements GameSystem {
 
  close(): void {
   if (!this.dialogueId) return;
+  this.generation++; this.pending = false;
   this.dialogueId = null; this.nodeId = null; this.selectedChoiceId = null;
   this.input.setContext('gameplay');
   this.bridge.emit('dialogueViewChanged', null);

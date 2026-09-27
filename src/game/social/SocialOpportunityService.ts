@@ -1,3 +1,4 @@
+import { getReputationProgress } from '@/game-core/social/reputation';
 import { socialView, socialChanges } from '@/game-core/social/presentation';
 import type { SocialState } from '@/game-core/social/contract';
 import { FIRST_RIVAL, rivalHistory } from '@/game-core/social/rivalHistory';
@@ -29,9 +30,16 @@ export class SocialOpportunityService {
   this.elapsed = 0;
   try {
    const session = loadSocialSession(this.storage);
-   const discoveries = session.discoverOpportunities();
+   const discoveries = this.storage.executeSocial
+    ? SOCIAL_OPPORTUNITIES.filter(rule => session.snapshot().unlocks[rule.id]?.unlocked && !this.previous.unlocks[rule.id]?.unlocked).map(({ id, name }) => ({ id, name }))
+    : session.discoverOpportunities();
    const next = session.snapshot();
    const view = socialView(next);
+   if (this.storage.executeSocial) {
+    const old = getReputationProgress(this.previous), progress = getReputationProgress(next);
+    this.bridge.emit('socialReputationUpdated', progress);
+    if (old.tier !== progress.tier) this.bridge.emit('socialTierChanged', { sceneId: progress.sceneId, from: old.tier, to: progress.tier, points: progress.points });
+   }
    for (const notice of discoveries.filter(notice => view.opportunities.some(item => item.id === notice.id))) this.bridge.emit('socialOpportunityDiscovered', notice);
    const serialized = JSON.stringify(view);
    if (serialized !== this.published) {

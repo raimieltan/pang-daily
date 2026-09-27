@@ -51,3 +51,20 @@ it('publishes only changed public views at low frequency and does not replay cha
  expect(changes).toHaveLength(1);
  bridge.dispose();
 });
+
+it('authenticated threshold feedback reads server snapshots without locally discovering unlocks', async () => {
+ const { createSocialState } = await import('@/game-core/social/SocialSession');
+ const { SOCIAL_CONTENT } = await import('@/game-core/social/catalog');
+ let state = createSocialState(SOCIAL_CONTENT);
+ const storage = { getItem: () => JSON.stringify(state), setItem: () => { throw new Error('Local write'); }, executeSocial: async () => { throw new Error('Discovery should not issue commands'); } };
+ const bridge = new GameBridge(), service = new SocialOpportunityService(bridge.runtime, storage), tiers: unknown[] = [], discoveries: string[] = [];
+ bridge.ui.events.on('socialTierChanged', value => tiers.push(value));
+ bridge.ui.events.on('socialOpportunityDiscovered', value => discoveries.push(value.id));
+ state = structuredClone(state); state.npcs.casey.introduced = true; state.npcs.casey.eventIds = ['met_casey_at_kyo']; state.reputation.iloilo_scene = { sceneId: 'iloilo_scene', points: 12 };
+ service.update(1);
+ expect(tiers).toEqual([{ sceneId: 'iloilo_scene', from: 'Unknown', to: 'Regular', points: 12 }]);
+ expect(discoveries).toEqual([]); expect(state.unlocks).toEqual({});
+ state.unlocks.casey_wall_invitation = { unlockId: 'casey_wall_invitation', unlocked: true };
+ service.update(1); service.update(1); expect(discoveries).toEqual(['casey_wall_invitation']); expect(tiers).toHaveLength(1);
+ bridge.dispose();
+});

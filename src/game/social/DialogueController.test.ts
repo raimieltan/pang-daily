@@ -45,3 +45,38 @@ describe('world dialogue controller', () => {
   s.controller.dispose(); s.input.dispose(); s.bridge.dispose();
  });
 });
+
+it('authenticated dialogue waits for server state, rejects local assignments, and keeps an unsaved choice available', async () => {
+ const { SocialSession, createSocialState } = await import('@/game-core/social/SocialSession');
+ const { SOCIAL_CONTENT } = await import('@/game-core/social/catalog');
+ const { SOCIAL_SESSION_KEY } = await import('./socialStorage');
+ let state = createSocialState(SOCIAL_CONTENT);
+ let confirm!: () => void;
+ let fail = false;
+ const storage = {
+  getItem: (key: string) => key === SOCIAL_SESSION_KEY ? JSON.stringify(state) : null,
+  setItem: () => { throw new Error('Direct social assignment'); },
+  executeSocial: async (intent: import('@/game-core/persistence/PersistencePort').PersistentIntent) => {
+   await new Promise<void>(resolve => { confirm = resolve; });
+   if (fail) throw new Error('Offline');
+   const session = new SocialSession(SOCIAL_CONTENT, state);
+   if (intent.type === 'social_introduce') session.applyEvent({ type: 'dialogue', eventId: 'intro', sourceId: 'talyer_mang_boy', dialogueId: 'talyer_mang_boy', npcId: 'mang_boy' });
+   else session.chooseConversation(String(intent.dialogueId), String(intent.nodeId), String(intent.choiceId));
+   state = session.snapshot();
+   return { resourceId: null, transactionId: null, sequence: null, amountCentavos: '0', balanceCentavos: '500000', details: {} };
+  },
+ };
+ const bridge = new GameBridge(), input = new InputManager(new EventTarget(), undefined, () => []);
+ const controller = new DialogueController(bridge.runtime, input, storage);
+ const flush = async () => { confirm(); await new Promise(resolve => setTimeout(resolve, 0)); };
+ try {
+  controller.open('talyer_mang_boy');
+  expect(state.npcs.mang_boy.introduced).toBe(false);
+  expect(controller.choose('promise_help')).toHaveProperty('rejected');
+  await flush(); expect(state.npcs.mang_boy.introduced).toBe(true);
+  expect(() => loadSocialSession(storage).chooseConversation('talyer_mang_boy', 'mang_first', 'promise_help')).toThrow('server command');
+  controller.choose('promise_help'); expect(state.npcs.mang_boy.trust).toBe(50);
+  fail = true; await flush(); expect(state.npcs.mang_boy.trust).toBe(50);
+  fail = false; controller.choose('promise_help'); await flush(); expect(state.npcs.mang_boy.trust).toBe(52);
+ } finally { controller.dispose(); input.dispose(); bridge.dispose(); }
+});

@@ -20,7 +20,7 @@ export class ServerPersistence implements PersistencePort {
   private operationKeys = new Map<string, string>();
   constructor(private readonly repository: ServerPlayerRepository, private readonly hydrate: (dto: PlayerBootstrap) => RuntimeBootstrap,
     initial: RuntimeBootstrap, private readonly wallet: VehicleSession, private readonly inventory: InventorySession,
-    private readonly jobs: JobSession, private readonly report: (message: string | null) => void) { this.durable = structuredClone(initial); }
+    private readonly jobs: JobSession, private readonly report: (message: string | null) => void, private readonly refreshProgression?: (fresh: RuntimeBootstrap) => void) { this.durable = structuredClone(initial); }
   execute(intent: PersistentIntent): Promise<CommandReceipt> {
     const fingerprint = JSON.stringify(intent);
     const running = this.inFlight.get(fingerprint); if (running) return running;
@@ -96,6 +96,7 @@ export class ServerPersistence implements PersistencePort {
     this.wallet.applyServerSnapshot(fresh.vehicles);
     this.inventory.applyServerSnapshot(fresh.inventory);
     this.jobs.applyServerSnapshot(fresh.jobs);
+    this.refreshProgression?.(fresh);
     this.pending.delete(fingerprint); this.report(null);
     return pending.receipt;
   }

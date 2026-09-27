@@ -107,3 +107,17 @@ describe('server-confirmed runtime persistence', () => {
     expect(repository.command).toHaveBeenCalledOnce();
   });
 });
+
+it('publishes refreshed social and chapter state only after a committed snapshot is loaded', async () => {
+ const s = setup(), refresh = vi.fn();
+ const initial = runtimeBootstrap(s.dto);
+ const gateway = new ServerPersistence(s.repository, runtimeBootstrap, initial, s.wallet, s.inventory, s.jobs, s.report, refresh);
+ s.dto.social.state.npcs.mang_boy.introduced = true;
+ s.dto.progression.chapters = [{ id: 'chapter_1', currentBeatId: 'complete_first_job', completedAt: null, markers: ['meet_mang_boy'] }];
+ vi.mocked(s.repository.bootstrap).mockRejectedValueOnce(new Error('Read failed'));
+ const intent = { type: 'social_introduce', dialogueId: 'talyer_mang_boy' };
+ await expect(gateway.execute(intent)).rejects.toThrow('Read failed'); expect(refresh).not.toHaveBeenCalled();
+ await gateway.execute(intent);
+ expect(s.repository.command).toHaveBeenCalledOnce();
+ expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ social: s.dto.social.state, chapters: s.dto.progression.chapters }));
+});

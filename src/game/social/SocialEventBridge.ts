@@ -10,6 +10,7 @@ export class SocialEventBridge {
  private readonly release: (() => void)[] = [];
 
  constructor(events: GameEventSource, private readonly storage: SocialStoragePort, private readonly onError: (error: Error) => void = () => {}, private readonly onReputation?: (progress: ReputationProgress, tierChange?: { sceneId: string; from: ReputationTier; to: ReputationTier; points: number }) => void) {
+  if (storage.executeSocial) return; // Gameplay commands already commit their social effects on the server.
   this.receive(() => this.session.recoverInterruptedRaces());
   this.release.push(events.on('raceAttemptStarted', attempt => this.receive(() => {
    if (SOCIAL_RACE_RIVALS[attempt.raceId] !== attempt.npcId) return;

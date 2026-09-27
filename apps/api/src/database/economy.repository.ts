@@ -18,12 +18,13 @@ import { completeObjective, jobPayout, type JobRun } from '@pang-daily/game-core
 import { FUEL_PRICE_PHP_PER_LITER } from '@pang-daily/game-core/economy/economy';
 import { raceEconomy } from '@pang-daily/game-core/economy/raceRules';
 import { SOCIAL_REPEAT_LIMITS } from '@pang-daily/game-core/social/rules';
-import { createSocialState } from '@pang-daily/game-core/social/SocialSession';
-import { SOCIAL_CONTENT } from '@pang-daily/game-core/social/catalog';
 import { evaluateEligibility } from '@pang-daily/game-core/social/eligibility';
 import { SOCIAL_OPPORTUNITIES, opportunity } from '@pang-daily/game-core/social/opportunities';
 import type { Prisma } from '../generated/prisma/client';
 import { DatabaseService } from './database.service';
+import { loadSocialState } from './social-state';
+import { progressSocial } from './social-progression';
+import { advanceChapter } from './chapter-state';
 
 type Tx = Prisma.TransactionClient;
 function refuse(code: string, message: string): never { throw new ConflictException({ code, message }); }
@@ -50,17 +51,7 @@ export class EconomyRepository {
     if (!row) missing(); return row;
   }
   private async eligible(tx: Tx, playerId: string, opportunityId: string) {
-    const state = createSocialState(SOCIAL_CONTENT);
-    const [npcs, crews, reputation, unlocks] = await Promise.all([
-      tx.npcRelationship.findMany({ where: { playerId }, include: { flags: true, milestones: true, favors: true } }),
-      tx.playerCrewStanding.findMany({ where: { playerId }, include: { membership: true } }),
-      tx.sceneReputation.findMany({ where: { playerId } }), tx.locationUnlock.findMany({ where: { playerId } }),
-    ]);
-    for (const row of npcs) for (const favor of row.favors) state.favors[favor.favorId] = { favorId: favor.favorId, npcId: row.npcId, status: favor.status, runId: null };
-    for (const row of npcs) state.npcs[row.npcId] = { introduced: row.introduced, trust: row.trust, respect: row.respect, relationshipFlags: row.flags.map(f => f.flagId), favorIds: [], eventIds: row.milestones.map(m => m.eventContentId) };
-    for (const row of crews) state.crews[row.crewId] = { crewId: row.crewId, points: row.points, introduced: row.introduced, invitation: row.invitation, membership: row.membership?.status ?? 'none', joins: row.membership?.joins ?? 0 };
-    for (const row of reputation) state.reputation[row.sceneId] = { sceneId: row.sceneId, points: row.points };
-    for (const row of unlocks) state.unlocks[row.unlockId] = { unlockId: row.unlockId, unlocked: true };
+    const state = await loadSocialState(tx, playerId);
     return evaluateEligibility(opportunity(opportunityId), state).eligible;
   }
   private async inventory(tx: Tx, playerId: string) {
@@ -108,6 +99,10 @@ export class EconomyRepository {
       };
       const a = command.action;
       switch (a.type) {
+        case 'social_introduce': case 'social_choice': break;
+        case 'chapter_continue': {
+          await advanceChapter(tx, playerId, command.key, a.beatId); receipt.resourceId = a.chapterId; break;
+        }
         case 'part_purchase': {
           const product = AUTO_PARTS_STOCK.find(p => p.partId === a.definitionId);
           if (!product) throw new BadRequestException({ code: 'UNKNOWN_SHOP_PART', message: 'This part is not stocked at the shop.' });
@@ -249,6 +244,10 @@ export class EconomyRepository {
           if (await tx.jobProgress.count({ where: { playerId, status: { in: ['accepted','active'] } } })) refuse('JOB_ACTIVE', 'Finish or abandon your current job first.');
           if (await tx.raceResult.count({ where: { playerId, outcome: 'started' } })) refuse('RACE_ACTIVE', 'Finish or abandon the race before starting a job.');
           if (job.requirements.minFuelLiters) { const car = await this.vehicle(tx, playerId, player.activeVehicleId!); if (Number(car.condition!.fuelLiters) < job.requirements.minFuelLiters) refuse('JOB_FUEL_REQUIRED', 'This job requires more fuel.'); }
+          if (job.cooldownSeconds) {
+            const last = await tx.jobProgress.findFirst({ where: { playerId, jobDefinitionId: job.id, completedAt: { not: null } }, orderBy: { completedAt: 'desc' } });
+            if (last?.completedAt && Date.now() - last.completedAt.getTime() < job.cooldownSeconds * 1000) refuse('JOB_COOLDOWN', 'This job is still cooling down.');
+          }
           const count = await tx.jobProgress.count({ where: { playerId } });
           const runId = `${job.id}#${count + 1}`;
           await tx.jobProgress.create({ data: { playerId, runId, jobDefinitionId: job.id, status: 'accepted' } }); receipt.resourceId = runId; break;
@@ -294,13 +293,17 @@ export class EconomyRepository {
           // Opportunity requirements are evaluated from server social rows, never client flags.
           const gate = ['terrace_sprint','pahuway_descent','the_wall','midnight_run'].includes(race.id) ? SOCIAL_OPPORTUNITIES.find(o => o.benefit.kind === 'race' && o.benefit.raceId === race.id) : undefined;
           if (gate && !await this.eligible(tx, playerId, gate.id)) refuse('RACE_LOCKED', 'This race is not unlocked.');
-          await tx.jobProgress.updateMany({ where: { playerId, status: { in: ['accepted','active'] } }, data: { status: 'failed', reason: 'You left the job for a race.', completedAt: new Date() } });
+          const interrupted = await tx.jobProgress.findMany({ where: { playerId, status: { in: ['accepted', 'active'] } } });
+          for (const job of interrupted) {
+            await tx.jobProgress.update({ where: { id: job.id }, data: { status: 'failed', reason: 'You left the job for a race.', completedAt: new Date() } });
+            await progressSocial(tx, playerId, { type: 'job_end', runId: job.runId, outcome: 'failed', reason: 'You left the job for a race.' }, { ...receipt, resourceId: job.runId });
+          }
           await tx.raceResult.create({ data: { playerId, attemptId: a.attemptId, raceDefinitionId: race.id, vehicleId: vehicle.id, rivalNpcId: race.npcId, rivalVehicleContentId: race.rivalVehicleId } }); receipt.resourceId = a.attemptId; break;
         }
         case 'race_checkpoint': case 'race_complete': {
           const row = await tx.raceResult.findUnique({ where: { playerId_attemptId: { playerId, attemptId: a.attemptId } } }); if (!row) missing();
           const race = raceEconomy(row.raceDefinitionId); if (!race) refuse('UNKNOWN_RACE', 'Unknown race definition.');
-          if (row.outcome !== 'started') { receipt.resourceId = row.attemptId; receipt.details = { prizePhp: 0, outcome: row.outcome, duplicate: true }; break; }
+          if (row.outcome !== 'started') { if (a.type === 'race_complete' && (a.elapsedMs !== Number(row.elapsedMs) || a.finish !== (row.outcome !== 'dnf'))) refuse('RACE_RESULT_CONFLICT', 'This attempt already has a different result.'); receipt.resourceId = row.attemptId; receipt.details = { prizePhp: 0, outcome: row.outcome, position: row.position ?? 2, duplicate: true }; break; }
           if (a.elapsedMs < Number(row.lastCheckpointElapsedMs) || a.elapsedMs > Date.now() - row.startedAt.getTime() + 5000) refuse('INVALID_RACE_TIME', 'Invalid race elapsed time.');
           if (a.type === 'race_checkpoint') {
             if (a.checkpointIndex <= row.checkpointIndex) { receipt.resourceId = row.attemptId; break; }
@@ -312,7 +315,7 @@ export class EconomyRepository {
           const rewards = await tx.transaction.count({ where: { playerId, kind: 'RACE_REWARD', source: `race:${race.id}` } });
           const prizePhp = outcome === 'win' && rewards < SOCIAL_REPEAT_LIMITS.racePerRoute ? race.prizePhp : 0;
           const paid = prizePhp ? await pay(php(prizePhp), 'RACE_REWARD', `race:${race.id}`, row.attemptId, `Won ${race.id}`, row.vehicleId) : null;
-          await tx.raceResult.update({ where: { id: row.id }, data: { outcome, position: outcome === 'win' ? 1 : 2, elapsedMs: BigInt(a.elapsedMs), completedAt: new Date(), payoutTransactionId: paid?.id } });
+          await tx.raceResult.update({ where: { id: row.id }, data: { outcome, position: outcome === 'dnf' ? null : outcome === 'win' ? 1 : 2, elapsedMs: BigInt(a.elapsedMs), completedAt: new Date(), payoutTransactionId: paid?.id } });
           receipt.resourceId = row.attemptId; receipt.details = { prizePhp, outcome, position: outcome === 'win' ? 1 : 2 }; break;
         }
         case 'refund': {
@@ -324,6 +327,8 @@ export class EconomyRepository {
           await pay(-original.amountCentavos, 'REFUND', 'part_refund', original.id, 'Returned purchased part'); receipt.resourceId = part.id; break;
         }
       }
+      await progressSocial(tx, playerId, a, receipt);
+      await advanceChapter(tx, playerId, receipt.resourceId ?? command.key);
       if (['part_purchase','market_purchase','part_sell','part_install','part_remove','part_refinish','part_inspect','refund','vehicle_appearance'].includes(a.type)) await tx.inventory.update({ where: { playerId }, data: { revision: { increment: 1 } } });
       await tx.playerSaveVersion.update({ where: { playerId }, data: { revision: { increment: 1 } } });
       await tx.idempotencyRecord.create({ data: { playerId, scope: 'player_command', key: command.key, requestHash: hash, requestId, status: 'succeeded', resourceId: receipt.resourceId, responseStatus: 200, response: receipt as unknown as Prisma.InputJsonValue, completedAt: new Date() } });

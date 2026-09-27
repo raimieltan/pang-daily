@@ -1,9 +1,7 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BOOTSTRAP_VERSION, type PlayerBootstrap } from '@pang-daily/contracts';
-import { SOCIAL_CONTENT } from '@pang-daily/game-core/social/catalog';
-import { createSocialState } from '@pang-daily/game-core/social/SocialSession';
-import { getReputationProgress } from '@pang-daily/game-core/social/reputation';
+import { loadSocialState } from './social-state';
 import { DatabaseService } from './database.service';
 import type { StarterState } from '../player/starter-state';
 
@@ -30,7 +28,7 @@ export class PlayerRepository {
               reputation: { create: starter.sceneIds.map(sceneId => ({ sceneId })) },
               crews: { create: starter.crewIds.map(crewId => ({ crewId, membership: { create: {} } })) },
               unlocks: { create: { unlockId: 'hub_access', locationContentId: starter.hubId, source: 'new_game', sourceReference: 'initialization' } },
-              chapters: { create: { chapterId: starter.chapterId } },
+              chapters: { create: { chapterId: starter.chapterId, currentBeatId: 'meet_mang_boy' } },
               vehicles: { create: { id: vehicleId, definitionId: starter.vehicle.definitionId, acquisitionKey: 'starter_vehicle',
                 paint: starter.vehicle.paint, rideHeightM: starter.vehicle.rideHeightM,
                 condition: { create: { ...starter.vehicle.condition, fuelLiters: starter.vehicle.fuelLiters } } } },
@@ -50,7 +48,6 @@ export class PlayerRepository {
             jobs: { orderBy: [{ acceptedAt: 'asc' }, { id: 'asc' }] },
             races: { orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], take: 20 },
             unlocks: true, chapters: { include: { markers: true } },
-            socialEvents: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], include: { effects: true } },
           } });
           if (!player || player.archivedAt || !player.wallet || !player.saveVersion || !player.inventory || !player.activeVehicleId ||
             !player.vehicles.some(vehicle => vehicle.id === player.activeVehicleId) || player.vehicles.some(vehicle => !vehicle.condition) ||
@@ -65,28 +62,9 @@ export class PlayerRepository {
           const counts = await tx.raceResult.groupBy({ by: ['rivalNpcId', 'outcome'], where: { playerId: player.id }, _count: { _all: true } });
           const latestRivalRaces = await tx.raceResult.findMany({ where: { playerId: player.id, rivalNpcId: { not: null }, outcome: { not: 'started' } },
             distinct: ['rivalNpcId'], orderBy: [{ startedAt: 'desc' }, { id: 'desc' }] });
-          const social = createSocialState(SOCIAL_CONTENT);
-          for (const npc of player.npcs) {
-            social.npcs[npc.npcId] = { introduced: npc.introduced, trust: npc.trust, respect: npc.respect,
-              relationshipFlags: npc.flags.map(flag => flag.flagId), favorIds: npc.favors.map(favor => favor.favorId), eventIds: npc.milestones.map(event => event.eventContentId) };
-            for (const favor of npc.favors) social.favors[favor.favorId] = { favorId: favor.favorId, npcId: npc.npcId, status: favor.status, runId: favor.job?.runId ?? null };
-          }
-          for (const scene of player.reputation) social.reputation[scene.sceneId] = { sceneId: scene.sceneId, points: scene.points };
-          for (const reward of player.reputationSources) social.reputationRewards[reward.sourceKey] = { sourceKey: reward.sourceKey, count: reward.count };
-          for (const crew of player.crews) social.crews[crew.crewId] = { crewId: crew.crewId, points: crew.points, introduced: crew.introduced,
-            invitation: crew.invitation, membership: crew.membership!.status, joins: crew.membership!.joins };
-          for (const unlock of player.unlocks) if (SOCIAL_CONTENT.unlocks.some(item => item.id === unlock.unlockId)) social.unlocks[unlock.unlockId] = { unlockId: unlock.unlockId, unlocked: true };
-          const scenePoints = new Map<string, number>();
-          social.appliedEvents = player.socialEvents.map(event => {
-            const before = scenePoints.get(event.sceneId ?? '') ?? 0;
-            const after = before + (event.reputationDelta ?? 0);
-            if (event.sceneId) scenePoints.set(event.sceneId, after);
-            return { eventId: event.eventId, sourceId: event.sourceId, sourceKey: event.sourceKey, fingerprint: event.fingerprint,
-              type: event.type, targetId: event.targetContentId, contextId: event.contextContentId, reason: event.reason,
-              effects: event.effects.map(effect => ({ npcId: effect.npcId, trustDelta: effect.trustDelta, respectDelta: effect.respectDelta, flagsAdded: effect.flagsAdded, flagsRemoved: effect.flagsRemoved })),
-              ...(event.sceneId && event.reputationSourceKey && event.reputationDelta !== null ? { reputation: { sceneId: event.sceneId,
-                sourceKey: event.reputationSourceKey, pointsDelta: event.reputationDelta, fromTier: getReputationProgress(before).tier, toTier: getReputationProgress(after).tier } } : {}) };
-          });
+          const best = await tx.raceResult.groupBy({ by: ['raceDefinitionId'], where: { playerId: player.id, outcome: { in: ['win', 'loss'] } }, _min: { elapsedMs: true }, _count: { _all: true } });
+          const wins = await tx.raceResult.groupBy({ by: ['raceDefinitionId'], where: { playerId: player.id, outcome: 'win' }, _count: { _all: true } });
+          const social = await loadSocialState(tx, player.id);
           return { bootstrapVersion: BOOTSTRAP_VERSION, saveVersion: starter.saveVersion, contentVersion: starter.contentVersion,
             revision: player.saveVersion.revision.toString(), profile: { id: player.id, displayName: player.displayName, activeVehicleId: player.activeVehicleId },
             economy: { balanceCentavos: player.wallet.balanceCentavos.toString(), revision: player.wallet.revision.toString() },
@@ -108,7 +86,9 @@ export class PlayerRepository {
             progression: { jobs: player.jobs.map(job => ({ runId: job.runId, definitionId: job.jobDefinitionId, status: job.status,
               objectiveIndex: job.objectiveIndex, elapsedMs: job.elapsedMs.toString(), cargoLoaded: job.cargoLoaded, cargoDamage: Number(job.cargoDamage), reason: job.reason })),
               recentRaces: player.races.map(race => ({ attemptId: race.attemptId, definitionId: race.raceDefinitionId, vehicleId: race.vehicleId,
-                rivalNpcId: race.rivalNpcId, outcome: race.outcome, position: race.position, elapsedMs: race.elapsedMs?.toString() ?? null })),
+                rivalNpcId: race.rivalNpcId, outcome: race.outcome, position: race.position, elapsedMs: race.elapsedMs?.toString() ?? null,
+                completedAt: race.completedAt?.toISOString() ?? null, payoutTransactionId: race.payoutTransactionId, lastCheckpointElapsedMs: race.lastCheckpointElapsedMs.toString() })),
+              bestRaces: best.map(row => ({ definitionId: row.raceDefinitionId, bestElapsedMs: row._min.elapsedMs!.toString(), finishes: row._count._all, wins: wins.find(win => win.raceDefinitionId === row.raceDefinitionId)?._count._all ?? 0 })),
               unlockedLocations: player.unlocks.map(unlock => ({ unlockId: unlock.unlockId, locationId: unlock.locationContentId })),
               chapters: player.chapters.map(chapter => ({ id: chapter.chapterId, currentBeatId: chapter.currentBeatId,
                 completedAt: chapter.completedAt?.toISOString() ?? null, markers: chapter.markers.map(marker => marker.markerId) })) } };

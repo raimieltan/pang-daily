@@ -122,6 +122,7 @@ model PlayerProfile {
   chapters          ChapterProgress[]
   commands          IdempotencyRecord[]
   socialEvents      SocialEvent[]
+  conversations     ConversationProgress[]
 }
 
 model PlayerSaveVersion {
@@ -504,6 +505,7 @@ model IdempotencyRecord {
 }
 
 model SocialEvent {
+  sequence Int
   id                  String              @id @default(uuid()) @db.Uuid
   playerId            String              @db.Uuid
   eventId             String
@@ -522,6 +524,7 @@ model SocialEvent {
   effects             SocialEventEffect[]
 
   @@unique([id, playerId])
+  @@unique([playerId, sequence])
   @@unique([playerId, eventId])
   @@unique([playerId, sourceKey])
   @@index([playerId, createdAt, id])
@@ -577,4 +580,13 @@ model MarketplaceListing {
  soldAt DateTime? @db.Timestamptz(3)
  player PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
  @@index([playerId, soldAt, expiresAt])
+}
+
+model ConversationProgress {
+  playerId String @db.Uuid
+  dialogueId String
+  currentNodeId String
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  player PlayerProfile @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@id([playerId, dialogueId])
 }
