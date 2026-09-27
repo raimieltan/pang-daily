@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "yarn dev:web",
-    "build": "yarn build:api && next build --webpack",
+    "build": "yarn build:api && yarn build:web",
+    "build:web": "yarn build:shared && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "yarn build:shared && tsc --noEmit",
@@ -26,7 +27,8 @@
     "db:seed": "yarn workspace @pang-daily/api db:seed",
     "build:shared": "yarn workspace @pang-daily/game-core build && yarn workspace @pang-daily/contracts build",
     "test:auth:browser": "yarn build:shared && node tests/auth.browser.mjs",
-    "test:economy:browser": "yarn build:shared && node tests/economy.browser.mjs"
+    "test:economy:browser": "yarn build:shared && node tests/economy.browser.mjs",
+    "test:persistence": "node scripts/test-persistence.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",

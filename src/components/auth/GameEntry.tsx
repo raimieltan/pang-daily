@@ -6,8 +6,9 @@ import { HudOverlay } from '@/components/hud/HudOverlay';
 import type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
 import { LegacyTransitionNotice } from './LegacyTransitionNotice';
 import { PlayerApiError, playerService } from '@/lib/player/playerService';
+import { persistenceFailure, type PersistenceFailure } from '@/lib/player/persistenceFailure';
 
-type Entry = { status: 'loading' | 'anonymous' | 'error'; message?: string; requestId?: string } |
+type Entry = { status: 'loading' | 'anonymous' | 'error'; failure?: PersistenceFailure } |
   { status: 'ready'; bootstrap: RuntimeBootstrap; name: string };
 export function GameEntry() {
   const [entry, setEntry] = useState<Entry>({ status: 'loading' });
@@ -18,8 +19,7 @@ export function GameEntry() {
   const [authError, setAuthError] = useState('');
   function failed(error: unknown) {
     if (error instanceof PlayerApiError && error.status === 401) setEntry({ status: 'anonymous' });
-    else setEntry({ status: 'error', message: error instanceof Error ? error.message : 'Unable to load your save. Please retry.',
-      requestId: error instanceof PlayerApiError ? error.requestId : undefined });
+    else setEntry({ status: 'error', failure: persistenceFailure(error) });
   }
   async function load() {
     setEntry({ status: 'loading' });
@@ -62,9 +62,9 @@ export function GameEntry() {
       <p className="text-xs uppercase tracking-[.25em] text-[#e7bb6e]">Pang Daily</p>
       {entry.status === 'loading' ? <p role="status">Loading your save…</p> : entry.status === 'error' ? <>
         <h1 className="text-2xl">Unable to load your save</h1>
-        <p role="alert">{entry.message}</p>
-        {entry.requestId && <p className="text-xs text-white/60">Support reference: {entry.requestId}</p>}
-        <button onClick={() => void load()} className="rounded bg-[#e7bb6e] px-4 py-2 text-black">Retry</button>
+        <p role="alert">{entry.failure?.message}</p>
+        {entry.failure?.requestId && <p className="text-xs text-white/60">Support reference: {entry.failure.requestId}</p>}
+        {entry.failure?.retry && <button onClick={() => void load()} className="rounded bg-[#e7bb6e] px-4 py-2 text-black">Retry</button>}
         <button disabled={busy} onClick={() => void logout()} className="ml-3 underline">Sign out</button>
       </> : <>
         <h1 className="text-2xl">{mode === 'login' ? 'Continue your daily' : 'Start your daily'}</h1>

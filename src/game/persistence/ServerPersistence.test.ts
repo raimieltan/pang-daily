@@ -68,7 +68,7 @@ describe('server-confirmed runtime persistence', () => {
     vi.mocked(repository.command).mockImplementationOnce(async action => {
       expect(action.type).toBe('vehicle_checkpoint');
       if (action.type !== 'vehicle_checkpoint') throw new Error('Wrong operation');
-      dto.vehicles[0].condition = structuredClone(action.condition); dto.vehicles[0].conditionRevision = '1';
+      for (const component of Object.keys(action.conditionLoss) as (keyof typeof action.conditionLoss)[]) dto.vehicles[0].condition[component] -= action.conditionLoss[component]; dto.vehicles[0].conditionRevision = '1';
       wallet.wear(car, { engine: .02, transmission: 0, suspension: 0, brakes: 0, tires: 0 });
       return { resourceId: carId, transactionId: null, sequence: null, amountCentavos: '0', balanceCentavos: '500000', details: {} };
     });

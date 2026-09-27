@@ -11,7 +11,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   constructor(@Inject(API_CONFIG) config: Environment) {
     this.client = new PrismaClient({
-      adapter: new PrismaPg({ connectionString: config.DATABASE_URL, connectionTimeoutMillis: 3000,
+      adapter: new PrismaPg({ connectionString: config.DATABASE_URL, max: config.DB_POOL_MAX, connectionTimeoutMillis: 3000,
         query_timeout: 3000, statement_timeout: 3000 }),
     });
   }
@@ -24,7 +24,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       // Also verifies that deployment migrations were applied.
       const metadata = await this.client.schemaVersion.findUnique({ where: { id: 1 } });
-      return metadata !== null && metadata.version === 4;
+      return metadata !== null && metadata.version === 5;
     } catch {
       this.logger.warn('Database readiness check failed');
       return false;

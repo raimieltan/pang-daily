@@ -38,6 +38,8 @@ export function HudOverlay() {
   const offline = usePersistenceStore(s => s.offline);
   const saving = usePersistenceStore(s => s.saving);
   const saveError = usePersistenceStore(s => s.error);
+  const failure = usePersistenceStore(s => s.failure);
+  const saved = usePersistenceStore(s => s.saved);
   const [toolsOpen, setToolsOpen] = useState(false);
   const intro = useHudStore(s => s.raceIntro);
   const settings = useGraphicsStore(s => s.settings);
@@ -56,9 +58,12 @@ export function HudOverlay() {
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
       {offline && <p role="status" className="absolute bottom-14 left-3 rounded bg-black/90 p-3 text-sm text-amber-200">Offline. Progress requires a connection to save. Reconnect and retry any failed action.</p>}
       {saving && <p role="status" className="absolute top-10 left-3 text-xs text-white/70">Saving progress…</p>}
+      {saved && !saving && !saveError && <p role="status" className="absolute top-10 left-3 text-xs text-emerald-200">Progress saved</p>}
       {saveError && <div role="alert" className="pointer-events-auto absolute top-14 left-3 right-3 z-50 rounded border border-red-400/50 bg-black/90 p-3 text-sm text-red-200">
-        <p>Progress could not be saved: {saveError}</p>
-        <button type="button" className="mt-2 underline" onClick={() => useGameUiStore.getState().commands?.retryPersistence()}>Retry save</button>
+        <p>{failure?.kind === 'authentication' ? 'Session expired' : failure?.kind === 'incompatible' ? 'Save needs attention' : failure?.kind === 'rejection' ? 'Change rejected' : 'Progress could not be saved'}: {failure?.message ?? saveError}</p>
+        {failure?.requestId && <p className="mt-1 text-xs text-white/60">Support reference: {failure.requestId}</p>}
+        {failure?.retry && <button type="button" className="mt-2 underline" onClick={() => useGameUiStore.getState().commands?.retryPersistence()}>Retry save</button>}
+        {failure?.kind === 'authentication' && <button type="button" className="mt-2 underline" onClick={() => window.location.reload()}>Sign in again</button>}
       </div>}
       <header className="relative z-20 flex items-start justify-between gap-4">
         <div>

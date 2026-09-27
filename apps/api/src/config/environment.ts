@@ -19,6 +19,7 @@ const schema = z.object({
   FRONTEND_ORIGINS: z.string().transform((value) => value.split(',').map((item) => item.trim()))
     .pipe(z.array(origin).min(1)),
   SESSION_SECRET: z.string().min(32),
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
 });
 export type Environment = z.infer<typeof schema>;
 

@@ -20,7 +20,8 @@ export class ServerPersistence implements PersistencePort {
   private operationKeys = new Map<string, string>();
   constructor(private readonly repository: ServerPlayerRepository, private readonly hydrate: (dto: PlayerBootstrap) => RuntimeBootstrap,
     initial: RuntimeBootstrap, private readonly wallet: VehicleSession, private readonly inventory: InventorySession,
-    private readonly jobs: JobSession, private readonly report: (message: string | null) => void, private readonly refreshProgression?: (fresh: RuntimeBootstrap) => void, private readonly saving?: (saving: boolean) => void) { this.durable = structuredClone(initial); }
+    private readonly jobs: JobSession, private readonly report: (message: string | null) => void, private readonly refreshProgression?: (fresh: RuntimeBootstrap) => void, private readonly saving?: (saving: boolean) => void,
+    private readonly status?: (error: unknown | null) => void) { this.durable = structuredClone(initial); }
   execute(intent: PersistentIntent): Promise<CommandReceipt> {
     const fingerprint = JSON.stringify(intent);
     const running = this.inFlight.get(fingerprint); if (running) return running;
@@ -34,7 +35,7 @@ export class ServerPersistence implements PersistencePort {
       if (tag && !this.operationKeys.has(tag)) this.operationKeys.set(tag, crypto.randomUUID());
       return this.commit(action, tag ? this.operationKeys.get(tag) : undefined);
     });
-    this.tail = task.catch(error => this.report(error instanceof Error ? error.message : String(error))).finally(() => this.saving?.(false));
+    this.tail = task.catch(error => { this.report(error instanceof Error ? error.message : String(error)); this.status?.(error); }).finally(() => this.saving?.(false));
     this.inFlight.set(fingerprint, task);
     void task.finally(() => this.inFlight.delete(fingerprint)).catch(() => {});
     return task;
@@ -46,7 +47,7 @@ export class ServerPersistence implements PersistencePort {
       for (const fingerprint of [...this.pending.keys()]) await this.commit(JSON.parse(fingerprint) as PlayerAction);
       await this.flushWear();
     });
-    this.tail = task.catch(error => this.report(`Progress was not saved: ${error instanceof Error ? error.message : String(error)}. Retry your last action or keep this tab open.`)).finally(() => this.saving?.(false));
+    this.tail = task.catch(error => { this.report(`Progress was not saved: ${error instanceof Error ? error.message : String(error)}.`); this.status?.(error); }).finally(() => this.saving?.(false));
   }
   private resolve(intent: PersistentIntent): PlayerAction {
     const action = { ...intent };
@@ -66,7 +67,11 @@ export class ServerPersistence implements PersistencePort {
         || Math.floor(current.fuelLiters * 1000) < Math.round(original.fuelLiters * 1000);
       if (!changed) continue;
       await this.commit({ type: 'vehicle_checkpoint', vehicleId: this.durable.instanceIdByDefinition[definitionId],
-        revision: String(original.revision), condition: current.condition, fuelMilliliters: Math.floor(current.fuelLiters * 1000), odometerDeltaMeters: 0 });
+        revision: String(original.revision),
+        conditionLoss: Object.fromEntries(Object.entries(current.condition).map(([component, value]) =>
+          [component, Math.max(0, original.condition[component as keyof typeof original.condition] - value)])) as typeof current.condition,
+        fuelConsumedMilliliters: Math.max(0, Math.round(original.fuelLiters * 1000) - Math.floor(current.fuelLiters * 1000)),
+        odometerDeltaMeters: 0 });
     }
   }
   private async commit(action: PlayerAction, key?: string) {
@@ -76,7 +81,12 @@ export class ServerPersistence implements PersistencePort {
     const before = structuredClone(this.durable.vehicles);
     if (action.type === 'vehicle_checkpoint') {
       const id = Object.keys(this.durable.instanceIdByDefinition).find(id => this.durable.instanceIdByDefinition[id] === action.vehicleId);
-      if (id && before.vehicles[id]) { before.vehicles[id].condition = structuredClone(action.condition); before.vehicles[id].fuelLiters = action.fuelMilliliters / 1000; }
+      if (id && before.vehicles[id]) {
+        for (const component of Object.keys(action.conditionLoss) as (keyof typeof action.conditionLoss)[]) {
+          before.vehicles[id].condition[component] = Math.max(0, before.vehicles[id].condition[component] - action.conditionLoss[component]);
+        }
+        before.vehicles[id].fuelLiters = Math.max(0, before.vehicles[id].fuelLiters - action.fuelConsumedMilliliters / 1000);
+      }
     }
     // A lost response is retried with this same key; a failed refresh never causes another charge.
     try {
@@ -99,7 +109,7 @@ export class ServerPersistence implements PersistencePort {
     this.inventory.applyServerSnapshot(fresh.inventory);
     this.jobs.applyServerSnapshot(fresh.jobs);
     this.refreshProgression?.(fresh);
-    this.pending.delete(fingerprint); this.report(null);
+    this.pending.delete(fingerprint); this.report(null); this.status?.(null);
     return pending.receipt;
   }
   marketplace() { return this.repository.marketplace(); }

@@ -8,6 +8,7 @@ const valid = { SESSION_SECRET: 'test-secret-at-least-32-characters-long', NODE_
 test('valid configuration is typed and comma separated origins are parsed', () => {
   const result = validateEnvironment(valid);
   assert.equal(result.API_PORT, 3002);
+  assert.equal(result.DB_POOL_MAX, 5);
   assert.deepEqual(result.FRONTEND_ORIGINS, ['http://localhost:3000', 'https://example.com']);
 });
 test('missing configuration names each required variable', () => {
@@ -30,6 +31,7 @@ test('invalid settings and short secrets fail without exposing values', () => {
 });
 test('rejects empty, fractional ports and origins with paths', () => {
   for (const API_PORT of ['', '0', '3001.5', 'abc']) assert.throws(() => validateEnvironment({ ...valid, API_PORT }));
+  for (const DB_POOL_MAX of ['0', '21', '2.5']) assert.throws(() => validateEnvironment({ ...valid, DB_POOL_MAX }));
   for (const FRONTEND_ORIGINS of ['', 'http://localhost:3000/', 'https://example.com/path']) {
     assert.throws(() => validateEnvironment({ ...valid, FRONTEND_ORIGINS }));
   }

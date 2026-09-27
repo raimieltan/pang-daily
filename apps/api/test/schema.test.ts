@@ -169,7 +169,7 @@ test('ledger cannot drift, skip sequence, or be rewritten', async () => {
   await invalid(async (tx) => { const a = await fixture(tx); const receipt = await credit(tx, a.player.id); await tx.transaction.delete({ where: { id: receipt.id } }); }, /append-only/i);
 });
 test('SQL-only indexes and version migration exist', async () => {
-  assert.equal((await db.schemaVersion.findUniqueOrThrow({ where: { id: 1 } })).version, 4);
+  assert.equal((await db.schemaVersion.findUniqueOrThrow({ where: { id: 1 } })).version, 5);
   const indexes = await db.$queryRaw<{ indexname: string }[]>`SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname IN ('JobProgress_one_active_per_player', 'CrewMembership_one_active_per_player')`;
   assert.equal(indexes.length, 2);
 });
@@ -198,4 +198,50 @@ test('a receipt without the matching wallet update fails at commit', async () =>
       balanceBeforeCentavos: 0n, balanceAfterCentavos: 1n, kind: 'test', source: 'test', sourceReference: 'one',
       description: 'Unsettled', requestId: randomUUID() } });
   }, /Wallet must match/i);
+});
+
+test('one live vehicle model and one active race per player are database invariants', async () => {
+  await invalid(async tx => {
+    const a = await fixture(tx);
+    await tx.vehicle.create({ data: { playerId: a.player.id, definitionId: 'banwa_dalagan_1996', acquisitionKey: 'duplicate-model', paint: '#123456' } });
+  }, /unique/i);
+  await invalid(async tx => {
+    const a = await fixture(tx);
+    for (const attemptId of ['active-1', 'active-2']) await tx.raceResult.create({ data: {
+      playerId: a.player.id, vehicleId: a.vehicle.id, attemptId, raceDefinitionId: 'barangay_sprint' } });
+  }, /unique/i);
+});
+test('a job and race cannot both be active at transaction commit', async () => {
+  await invalid(async tx => {
+    const a = await fixture(tx);
+    await tx.jobProgress.create({ data: { playerId: a.player.id, runId: 'job-active', jobDefinitionId: 'kyo_ice_run', status: 'active' } });
+    await tx.raceResult.create({ data: { playerId: a.player.id, vehicleId: a.vehicle.id, attemptId: 'race-active', raceDefinitionId: 'barangay_sprint' } });
+  }, /active job and race/i);
+});
+test('reputation, crew join limits and confirmed idempotency receipts are bounded', async () => {
+  await invalid(async tx => {
+    const a = await fixture(tx);
+    await tx.sceneReputation.create({ data: { playerId: a.player.id, sceneId: 'iloilo_scene', points: 161 } });
+  }, /constraint/i);
+  await invalid(async tx => {
+    const a = await fixture(tx);
+    await tx.playerCrewStanding.create({ data: { playerId: a.player.id, crewId: 'kyo_regulars', membership: {
+      create: { status: 'member', joins: 3, joinedAt: new Date() } } } });
+  }, /constraint/i);
+  await invalid(async tx => {
+    const a = await fixture(tx);
+    await tx.idempotencyRecord.create({ data: { playerId: a.player.id, scope: 'player_command', key: randomUUID(), requestHash: 'a'.repeat(64),
+      requestId: randomUUID(), status: 'succeeded', responseStatus: 200, completedAt: new Date() } });
+  }, /constraint/i);
+});
+test('distinct command keys cannot duplicate the same domain reward source', async () => {
+  await invalid(async tx => {
+    const a = await fixture(tx); await credit(tx, a.player.id);
+    for (let sequence = 2n; sequence <= 3n; sequence++) {
+      await tx.transaction.create({ data: { playerId: a.player.id, sequence, amountCentavos: 100n,
+        balanceBeforeCentavos: 500000n + (sequence - 2n) * 100n, balanceAfterCentavos: 500000n + (sequence - 1n) * 100n,
+        kind: 'JOB_REWARD', source: 'job:errand', sourceReference: 'kyo_ice_run#1', description: 'Job reward', requestId: randomUUID() } });
+      await tx.wallet.update({ where: { playerId: a.player.id }, data: { balanceCentavos: 500000n + (sequence - 1n) * 100n, revision: sequence } });
+    }
+  }, /unique/i);
 });

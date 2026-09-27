@@ -9,9 +9,9 @@ export const credentialsSchema = z.strictObject({
   password: z.string().min(8, 'Use at least 8 characters.').max(128),
 });
 export type Credentials = z.infer<typeof credentialsSchema>;
-const exactInteger = z.string().regex(/^\d+$/);
+const exactInteger = z.string().max(19).regex(/^\d+$/);
 const fraction = z.number().min(0).max(1);
-const vehicleCondition = z.object({ engine: fraction, transmission: fraction, suspension: fraction, brakes: fraction,
+const vehicleCondition = z.strictObject({ engine: fraction, transmission: fraction, suspension: fraction, brakes: fraction,
   tires: fraction, body: fraction, electrical: fraction, clutch: fraction, cooling: fraction });
 export const bootstrapSchema = z.object({
   bootstrapVersion: z.literal(BOOTSTRAP_VERSION), saveVersion: z.literal(SAVE_VERSION), contentVersion: z.literal(CONTENT_VERSION),
@@ -57,14 +57,14 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('part_sell'), partId: id }),
     z.strictObject({ type: z.literal('vehicle_purchase'), definitionId: contentId }),
     z.strictObject({ type: z.literal('vehicle_sell'), vehicleId: id }),
-    z.strictObject({ type: z.literal('vehicle_repair'), vehicleId: id, components: z.array(z.enum(['engine','transmission','suspension','brakes','tires','body','electrical','clutch','cooling'])).min(1).max(9), benefitId: z.literal('mang_boy_service').optional() }),
+    z.strictObject({ type: z.literal('vehicle_repair'), vehicleId: id, components: z.array(z.enum(['engine','transmission','suspension','brakes','tires','body','electrical','clutch','cooling'])).min(1).max(9).refine(values => new Set(values).size === values.length, 'Repair components must be unique.'), benefitId: z.literal('mang_boy_service').optional() }),
     z.strictObject({ type: z.literal('fuel_purchase'), vehicleId: id, milliliters: z.number().int().min(1).max(45000) }),
     z.strictObject({ type: z.literal('part_install'), vehicleId: id, partId: id, finish: finish.optional() }),
     z.strictObject({ type: z.literal('part_remove'), vehicleId: id, partId: id }),
     z.strictObject({ type: z.literal('part_refinish'), partId: id, finish }),
     z.strictObject({ type: z.literal('vehicle_appearance'), vehicleId: id, paint: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), rideHeightM: z.number().min(-.15).max(.15).optional(), spoilerMode: z.enum(['none','stock']).optional() }),
     z.strictObject({ type: z.literal('vehicle_select'), vehicleId: id }),
-    z.strictObject({ type: z.literal('vehicle_checkpoint'), vehicleId: id, revision: exactInteger, condition: vehicleCondition, fuelMilliliters: z.number().int().min(0).max(45000), odometerDeltaMeters: z.number().int().min(0).max(100000) }),
+    z.strictObject({ type: z.literal('vehicle_checkpoint'), vehicleId: id, revision: exactInteger, conditionLoss: vehicleCondition, fuelConsumedMilliliters: z.number().int().min(0).max(45000), odometerDeltaMeters: z.number().int().min(0).max(100000) }),
     z.strictObject({ type: z.literal('job_start'), definitionId: contentId }),
     z.strictObject({ type: z.literal('job_begin'), runId: contentId }),
     z.strictObject({ type: z.literal('job_objective'), runId: contentId, objectiveId: contentId, elapsedMs: millisecond, cargoDamage: fraction }),

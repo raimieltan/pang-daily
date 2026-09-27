@@ -1,6 +1,6 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createHash, randomUUID, randomBytes } from 'node:crypto';
-import { SAVE_VERSION, CONTENT_VERSION, type PlayerCommand, type CommandReceipt, type TransactionHistory } from '@pang-daily/contracts';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { randomUUID, randomBytes } from 'node:crypto';
+import { type PlayerCommand, type CommandReceipt, type TransactionHistory } from '@pang-daily/contracts';
 import { getVehicleDefinition } from '@pang-daily/game-core/vehicles/catalog';
 import type { VehicleCondition } from '@pang-daily/game-core/vehicles/VehicleDefinition';
 import { partDefinition } from '@pang-daily/game-core/parts/parts';
@@ -25,22 +25,17 @@ import { DatabaseService } from './database.service';
 import { loadSocialState } from './social-state';
 import { progressSocial } from './social-progression';
 import { advanceChapter } from './chapter-state';
+import { runPlayerCommand } from './player-command';
+import { resolvePlayer } from './player-context';
+import { rejectCommand as refuse, ownedResourceMissing as missing } from '../integrity/errors';
 
 type Tx = Prisma.TransactionClient;
-function refuse(code: string, message: string): never { throw new ConflictException({ code, message }); }
-function missing(): never { throw new NotFoundException({ code: 'OWNED_RESOURCE_NOT_FOUND', message: 'This resource is not available to your player.' }); }
 const php = (amount: number) => { if (!Number.isSafeInteger(amount)) throw new Error('Catalog price must be whole PHP'); return BigInt(amount) * 100n; };
 const condition = (row: Record<string, unknown>): VehicleCondition => Object.fromEntries(['engine','transmission','suspension','brakes','tires','body','electrical','clutch','cooling'].map(key => [key, Number(row[key])])) as VehicleCondition;
 @Injectable()
 export class EconomyRepository {
   private readonly logger = new Logger(EconomyRepository.name);
   constructor(@Inject(DatabaseService) private readonly db: DatabaseService) {}
-  private async player(tx: Tx, userId: string) {
-    const player = await tx.playerProfile.findUnique({ where: { userId }, include: { saveVersion: true } });
-    if (!player || player.archivedAt || !player.saveVersion) refuse('PLAYER_NOT_INITIALIZED', 'Load your profile before performing an action.');
-    if (player.saveVersion.schemaVersion !== SAVE_VERSION || player.saveVersion.contentVersion !== CONTENT_VERSION) refuse('SAVE_VERSION_INCOMPATIBLE', 'Update or migrate this save before performing actions.');
-    return player;
-  }
   private async vehicle(tx: Tx, playerId: string, id: string) {
     const row = await tx.vehicle.findFirst({ where: { id, playerId, retiredAt: null }, include: { condition: true } });
     if (!row || !row.condition) missing();
@@ -70,19 +65,16 @@ export class EconomyRepository {
     await tx.installedPartSlot.deleteMany({ where: { playerId, ownedPartId } });
     await tx.installedPart.deleteMany({ where: { playerId, ownedPartId } });
   }
+  private async settledReceipt(tx: Tx, playerId: string, transactionId: string | null, receipt: CommandReceipt) {
+    if (!transactionId) return receipt;
+    const payout = await tx.transaction.findFirst({ where: { id: transactionId, playerId } });
+    if (!payout) refuse('PLAYER_STATE_INCOMPLETE', 'The saved payout is missing. Progress has not been reset.');
+    return { ...receipt, transactionId: payout.id, sequence: payout.sequence.toString(),
+      amountCentavos: payout.amountCentavos.toString(), balanceCentavos: payout.balanceAfterCentavos.toString() };
+  }
   async execute(userId: string, command: PlayerCommand, requestId: string): Promise<CommandReceipt> {
-    const result = await this.db.client.$transaction(async tx => {
-      const player = await this.player(tx, userId), playerId = player.id;
-      // One lock for every command touching this player's durable state, including no-cost installs.
-      await tx.$queryRaw`SELECT "playerId" FROM "Wallet" WHERE "playerId" = ${playerId}::uuid FOR UPDATE`;
-      const hash = createHash('sha256').update(JSON.stringify(command.action)).digest('hex');
-      const prior = await tx.idempotencyRecord.findUnique({ where: { playerId_scope_key: { playerId, scope: 'player_command', key: command.key } } });
-      if (prior) {
-        this.logger.log(JSON.stringify({ event: 'economy.idempotency_hit', playerId, requestId, key: command.key, action: command.action.type }));
-        if (prior.requestHash !== hash) refuse('IDEMPOTENCY_CONFLICT', 'This request key was already used for another action.');
-        if (prior.status !== 'succeeded' || !prior.response) refuse('COMMAND_PENDING', 'The original action has not completed. Retry it.');
-        return prior.response as unknown as CommandReceipt;
-      }
+    const result = await runPlayerCommand(this.db, userId, command, requestId, async ({ tx, player, command }) => {
+      const playerId = player.id;
       const wallet = await tx.wallet.findUnique({ where: { playerId } });
       if (!wallet) refuse('PLAYER_STATE_INCOMPLETE', 'The wallet is missing. Progress has not been reset.');
       let receipt: CommandReceipt = { resourceId: null, transactionId: null, sequence: null, amountCentavos: '0', balanceCentavos: wallet.balanceCentavos.toString(), details: {} };
@@ -95,6 +87,7 @@ export class EconomyRepository {
           balanceBeforeCentavos: wallet.balanceCentavos, balanceAfterCentavos: balance, kind, source, sourceReference: reference, description, requestId, vehicleId } });
         await tx.wallet.update({ where: { playerId }, data: { balanceCentavos: balance, revision: wallet.revision + 1n } });
         receipt = { ...receipt, transactionId: transaction.id, sequence: transaction.sequence.toString(), amountCentavos: amount.toString(), balanceCentavos: balance.toString() };
+        wallet.balanceCentavos = balance; wallet.revision = transaction.sequence;
         return transaction;
       };
       const a = command.action;
@@ -235,9 +228,14 @@ export class EconomyRepository {
         }
         case 'vehicle_checkpoint': {
           const vehicle = await this.vehicle(tx, playerId, a.vehicleId), current = vehicle.condition!;
-          if (current.revision.toString() !== a.revision) refuse('VEHICLE_REVISION_CONFLICT', 'This vehicle changed in another session. Reload its latest state.');
-          if (Object.entries(a.condition).some(([key, value]) => value > Number(current[key as keyof VehicleCondition]) + 1e-8) || a.fuelMilliliters > Math.round(Number(current.fuelLiters) * 1000)) refuse('INVALID_WEAR_CHECKPOINT', 'Driving checkpoints may only consume fuel and reduce condition.');
-          await tx.vehicleCondition.update({ where: { vehicleId: vehicle.id }, data: { ...a.condition, fuelLiters: a.fuelMilliliters / 1000, mileageMeters: { increment: BigInt(a.odometerDeltaMeters) }, revision: { increment: 1 } } }); receipt.resourceId = vehicle.id; break;
+          if (current.revision.toString() !== a.revision) refuse('VEHICLE_REVISION_CONFLICT', 'This vehicle changed in another session. Reload the latest state.');
+          if (Object.entries(a.conditionLoss).some(([key, loss]) => loss > Number(current[key as keyof VehicleCondition]) + 1e-8) ||
+              a.fuelConsumedMilliliters > Math.round(Number(current.fuelLiters) * 1000)) refuse('INVALID_WEAR_CHECKPOINT', 'Driving loss exceeds the saved condition or fuel.');
+          const worn = Object.fromEntries(Object.entries(a.conditionLoss).map(([key, loss]) => [key, Math.max(0, Number(current[key as keyof VehicleCondition]) - loss)]));
+          await tx.vehicleCondition.update({ where: { vehicleId: vehicle.id }, data: { ...worn,
+            fuelLiters: (Math.round(Number(current.fuelLiters) * 1000) - a.fuelConsumedMilliliters) / 1000,
+            mileageMeters: { increment: BigInt(a.odometerDeltaMeters) }, revision: { increment: 1 } } });
+          receipt.resourceId = vehicle.id; break;
         }
         case 'job_start': {
           const job = HUB_JOBS.find(j => j.id === a.definitionId); if (!job) refuse('UNKNOWN_JOB', 'Unknown job definition.');
@@ -265,7 +263,14 @@ export class EconomyRepository {
           const job = HUB_JOBS.find(j => j.id === row.jobDefinitionId); if (!job) refuse('UNKNOWN_JOB', 'Unknown job definition.');
           const objectiveIndex = job.objectives.findIndex(o => o.id === a.objectiveId);
           if (objectiveIndex < 0) refuse('UNKNOWN_OBJECTIVE', 'Unknown objective.');
-          if (objectiveIndex < row.objectiveIndex) { receipt.resourceId = row.runId; receipt.details = { payoutPhp: 0, duplicate: true }; break; }
+          if (objectiveIndex < row.objectiveIndex) {
+            if (row.status === 'completed' && objectiveIndex === job.objectives.length - 1 &&
+                (a.elapsedMs !== Number(row.elapsedMs) || a.cargoDamage !== Number(row.cargoDamage))) refuse('JOB_RESULT_CONFLICT', 'This job already has a different result.');
+            receipt.resourceId = row.runId;
+            receipt = await this.settledReceipt(tx, playerId, row.payoutTransactionId, receipt);
+            const payoutPhp = Number(BigInt(receipt.amountCentavos)) / 100;
+            receipt.details = { payoutPhp, bonusPhp: payoutPhp ? payoutPhp - job.payoutPhp : 0, completed: row.status === 'completed' }; break;
+          }
           if (row.status !== 'active' || objectiveIndex !== row.objectiveIndex) refuse('JOB_OBJECTIVE_ORDER', 'Complete the current job objective first.');
           if (a.elapsedMs < Number(row.elapsedMs) || a.cargoDamage < Number(row.cargoDamage)) refuse('INVALID_JOB_PROGRESS', 'Job time and cargo damage cannot move backwards.');
           const wallElapsed = Date.now() - row.acceptedAt.getTime();
@@ -303,7 +308,12 @@ export class EconomyRepository {
         case 'race_checkpoint': case 'race_complete': {
           const row = await tx.raceResult.findUnique({ where: { playerId_attemptId: { playerId, attemptId: a.attemptId } } }); if (!row) missing();
           const race = raceEconomy(row.raceDefinitionId); if (!race) refuse('UNKNOWN_RACE', 'Unknown race definition.');
-          if (row.outcome !== 'started') { if (a.type === 'race_complete' && (a.elapsedMs !== Number(row.elapsedMs) || a.finish !== (row.outcome !== 'dnf'))) refuse('RACE_RESULT_CONFLICT', 'This attempt already has a different result.'); receipt.resourceId = row.attemptId; receipt.details = { prizePhp: 0, outcome: row.outcome, position: row.position ?? 2, duplicate: true }; break; }
+          if (row.outcome !== 'started') {
+            if (a.type === 'race_complete' && (a.elapsedMs !== Number(row.elapsedMs) || a.finish !== (row.outcome !== 'dnf'))) refuse('RACE_RESULT_CONFLICT', 'This attempt already has a different result.');
+            receipt.resourceId = row.attemptId;
+            receipt = await this.settledReceipt(tx, playerId, row.payoutTransactionId, receipt);
+            receipt.details = { prizePhp: Number(BigInt(receipt.amountCentavos)) / 100, outcome: row.outcome, position: row.position ?? 2 }; break;
+          }
           if (a.elapsedMs < Number(row.lastCheckpointElapsedMs) || a.elapsedMs > Date.now() - row.startedAt.getTime() + 5000) refuse('INVALID_RACE_TIME', 'Invalid race elapsed time.');
           if (a.type === 'race_checkpoint') {
             if (a.checkpointIndex <= row.checkpointIndex) { receipt.resourceId = row.attemptId; break; }
@@ -326,20 +336,22 @@ export class EconomyRepository {
           await tx.ownedPart.update({ where: { id: part.id }, data: { retiredAt: new Date() } });
           await pay(-original.amountCentavos, 'REFUND', 'part_refund', original.id, 'Returned purchased part'); receipt.resourceId = part.id; break;
         }
+        default: {
+          const unsupported: never = a;
+          throw new BadRequestException({ code: 'INVALID_COMMAND', message: `Unsupported command: ${String(unsupported)}` });
+        }
       }
       await progressSocial(tx, playerId, a, receipt);
       await advanceChapter(tx, playerId, receipt.resourceId ?? command.key);
       if (['part_purchase','market_purchase','part_sell','part_install','part_remove','part_refinish','part_inspect','refund','vehicle_appearance'].includes(a.type)) await tx.inventory.update({ where: { playerId }, data: { revision: { increment: 1 } } });
-      await tx.playerSaveVersion.update({ where: { playerId }, data: { revision: { increment: 1 } } });
-      await tx.idempotencyRecord.create({ data: { playerId, scope: 'player_command', key: command.key, requestHash: hash, requestId, status: 'succeeded', resourceId: receipt.resourceId, responseStatus: 200, response: receipt as unknown as Prisma.InputJsonValue, completedAt: new Date() } });
       return receipt;
-    }, { timeout: 15000 });
+    });
     this.logger.log(JSON.stringify({ event: 'economy.command_completed', requestId, action: command.action.type, transactionId: result.transactionId, resourceId: result.resourceId, amountCentavos: result.amountCentavos }));
     return result;
   }
   async history(userId: string, cursor?: string): Promise<TransactionHistory> {
     return this.db.client.$transaction(async tx => {
-      const player = await this.player(tx, userId), wallet = await tx.wallet.findUniqueOrThrow({ where: { playerId: player.id } });
+      const player = await resolvePlayer(tx, userId), wallet = await tx.wallet.findUniqueOrThrow({ where: { playerId: player.id } });
       const rows = await tx.transaction.findMany({ where: { playerId: player.id, ...(cursor ? { sequence: { lt: BigInt(cursor) } } : {}) }, orderBy: { sequence: 'desc' }, take: 51 });
       const page = rows.slice(0, 50);
       return { balanceCentavos: wallet.balanceCentavos.toString(), revision: wallet.revision.toString(), nextCursor: rows.length > 50 ? page.at(-1)!.sequence.toString() : null,
@@ -348,7 +360,7 @@ export class EconomyRepository {
   }
   async marketplace(userId: string) {
     return this.db.client.$transaction(async tx => {
-      const player = await this.player(tx, userId);
+      const player = await resolvePlayer(tx, userId, true);
       await tx.$queryRaw`SELECT "playerId" FROM "Wallet" WHERE "playerId" = ${player.id}::uuid FOR UPDATE`;
       const now = new Date();
       const rows = await tx.marketplaceListing.findMany({ where: { playerId: player.id, soldAt: null, expiresAt: { gt: now } }, orderBy: { postedAt: 'desc' } });

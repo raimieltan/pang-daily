@@ -80,15 +80,15 @@ test('server economy and garage commands preserve exact ledger and ownership', a
     await t.test('repair and fuel charge exact server costs, persist condition, and reject stale/improving wear', async () => {
       const a = await account(); await grant(a.playerId);
       const vehicle = a.bootstrap.vehicles[0], key = randomUUID();
-      await command(a.cookie, { type: 'vehicle_checkpoint', vehicleId: a.car, revision: vehicle.conditionRevision, condition: { ...vehicle.condition, engine: .5, tires: .3 }, fuelMilliliters: 30000, odometerDeltaMeters: 1200 });
-      assert.equal((await command(a.cookie, { type: 'vehicle_checkpoint', vehicleId: a.car, revision: vehicle.conditionRevision, condition: vehicle.condition, fuelMilliliters: 45000, odometerDeltaMeters: 0 }, randomUUID(), 409)).code, 'VEHICLE_REVISION_CONFLICT');
+      await command(a.cookie, { type: 'vehicle_checkpoint', vehicleId: a.car, revision: vehicle.conditionRevision, conditionLoss: Object.fromEntries(Object.entries(vehicle.condition).map(([key, value]) => [key, key === 'engine' ? value - .5 : key === 'tires' ? value - .3 : 0])) as typeof vehicle.condition, fuelConsumedMilliliters: 15000, odometerDeltaMeters: 1200 });
+      assert.equal((await command(a.cookie, { type: 'vehicle_checkpoint', vehicleId: a.car, revision: vehicle.conditionRevision, conditionLoss: vehicle.condition, fuelConsumedMilliliters: 45000, odometerDeltaMeters: 0 }, randomUUID(), 409)).code, 'VEHICLE_REVISION_CONFLICT');
       const repair = await command(a.cookie, { type: 'vehicle_repair', vehicleId: a.car, components: ['engine','tires'] }, key);
       assert.ok(BigInt(repair.amountCentavos) < 0n); assert.deepEqual(await command(a.cookie, { type: 'vehicle_repair', vehicleId: a.car, components: ['engine','tires'] }, key), repair);
       const fuel = await command(a.cookie, { type: 'fuel_purchase', vehicleId: a.car, milliliters: 1001 });
       assert.equal(fuel.amountCentavos, '-6507');
       const loaded = bootstrapSchema.parse(await (await call('/player/bootstrap', a.cookie)).json());
       assert.equal(loaded.vehicles[0].condition.engine, 1); assert.equal(loaded.vehicles[0].condition.tires, 1); assert.equal(loaded.vehicles[0].fuelLiters, 31.001);
-      assert.equal((await command(a.cookie, { type: 'vehicle_checkpoint', vehicleId: a.car, revision: loaded.vehicles[0].conditionRevision, condition: loaded.vehicles[0].condition, fuelMilliliters: 45000, odometerDeltaMeters: 0 }, randomUUID(), 409)).code, 'INVALID_WEAR_CHECKPOINT');
+      assert.equal((await command(a.cookie, { type: 'vehicle_checkpoint', vehicleId: a.car, revision: loaded.vehicles[0].conditionRevision, conditionLoss: loaded.vehicles[0].condition, fuelConsumedMilliliters: 45000, odometerDeltaMeters: 0 }, randomUUID(), 409)).code, 'INVALID_WEAR_CHECKPOINT');
       assert.equal((await command(a.cookie, { type: 'fuel_purchase', vehicleId: a.car, milliliters: 15000 }, randomUUID(), 409)).code, 'FUEL_CAPACITY_EXCEEDED');
     });
     await t.test('insufficient repair funds leave every component, wallet and receipt unchanged', async () => {
@@ -204,7 +204,7 @@ test('server economy and garage commands preserve exact ledger and ownership', a
       await db.$executeRawUnsafe(`CREATE FUNCTION test_reject_economy_part() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."playerId" = '${a.playerId}'::uuid THEN RAISE EXCEPTION 'injected ownership failure'; END IF; RETURN NEW; END $$`);
       await db.$executeRawUnsafe('CREATE TRIGGER test_reject_economy_part BEFORE INSERT ON "OwnedPart" FOR EACH ROW EXECUTE FUNCTION test_reject_economy_part()');
       try {
-        await command(a.cookie, { type: 'part_purchase', definitionId: product.partId }, key, 503);
+        await command(a.cookie, { type: 'part_purchase', definitionId: product.partId }, key, 500);
         assert.equal(await db.transaction.count({ where: { playerId: a.playerId, kind: 'PART_PURCHASE' } }), 0);
         assert.equal((await db.wallet.findUniqueOrThrow({ where: { playerId: a.playerId } })).balanceCentavos, 600000n);
         assert.equal(await db.idempotencyRecord.count({ where: { playerId: a.playerId, key } }), 0);

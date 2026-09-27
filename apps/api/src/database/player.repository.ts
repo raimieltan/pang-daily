@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BOOTSTRAP_VERSION, type PlayerBootstrap } from '@pang-daily/contracts';
+import { resolvePlayer } from './player-context';
 import { loadSocialState } from './social-state';
 import { DatabaseService } from './database.service';
 import type { StarterState } from '../player/starter-state';
@@ -39,8 +40,10 @@ export class PlayerRepository {
               source: 'new_game', sourceReference: 'initialization', description: 'Starting cash', requestId } });
             await tx.wallet.update({ where: { playerId }, data: { balanceCentavos: starter.startingCentavos, revision: 1n } });
           }
+          // The same actor-linked resolver is used by reads and commands.
+          const actor = await resolvePlayer(tx, userId);
           // Repeatable snapshot covers every include/query in this transaction.
-          const player = await tx.playerProfile.findUnique({ where: { userId }, include: {
+          const player = await tx.playerProfile.findUnique({ where: { id: actor.id }, include: {
             saveVersion: true, wallet: true, vehicles: { where: { retiredAt: null }, include: { condition: true, installations: { include: { slots: true } } } },
             inventory: { include: { parts: { include: { transaction: { select: { sequence: true } } } } } },
             npcs: { include: { flags: true, milestones: true, favors: { include: { job: true } }, rival: true } },

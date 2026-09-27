@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { rejectCommand } from '../integrity/errors';
 import type { PlayerAction, CommandReceipt } from '@pang-daily/contracts';
 import { SOCIAL_CONTENT } from '@pang-daily/game-core/social/catalog';
 import { CONVERSATIONS, resolveConversation } from '@pang-daily/game-core/social/conversation';
@@ -60,7 +60,7 @@ export async function progressSocial(tx: Tx, playerId: string, action: PlayerAct
    }
   }
  } catch (error) {
-  if (error instanceof Error && !('code' in error)) throw new ConflictException({ code: 'INVALID_SOCIAL_ACTION', message: error.message });
+  if (error instanceof Error && !('code' in error)) rejectCommand('INVALID_SOCIAL_ACTION', error.message);
   throw error;
  }
  await saveSocialState(tx, playerId, before, session);

@@ -8,6 +8,8 @@ import { hydratePlayerMeta, usePlayerMetaStore } from '@/state/playerMetaStore';
 import { retireLegacy, browserLegacyStores } from './legacyTransition';
 import { useLegacyTransitionStore } from '@/state/legacyTransitionStore';
 import { usePersistenceStore } from '@/state/persistenceStore';
+import { persistenceFailure } from './persistenceFailure';
+import { PlayerApiError } from './playerApiError';
 
 let sessionGeneration = 0;
 
@@ -20,7 +22,13 @@ function mapPlayer(dto: PlayerBootstrap) {
 export const playerService = {
   async bootstrap(signal?: AbortSignal) {
     const generation = sessionGeneration;
-    const player = mapPlayer(await playerApi.bootstrap(signal));
+    let player: ReturnType<typeof mapPlayer>;
+    const dto = await playerApi.bootstrap(signal);
+    try { player = mapPlayer(dto); }
+    catch (error) {
+      if (error instanceof PlayerApiError) throw error;
+      throw new PlayerApiError(409, 'BOOTSTRAP_INCOMPATIBLE', 'A compatible game version is needed to load this save.');
+    }
     if (generation !== sessionGeneration) throw new Error('This session has ended. Sign in again.');
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     if (!hydratePlayerMeta(player)) throw new Error('The server returned an older save. Please retry.');
@@ -38,7 +46,7 @@ export const playerService = {
     sessionGeneration++;
     usePlayerMetaStore.setState({ player: null });
     useLegacyTransitionStore.setState({ result: null, dismissed: false });
-    usePersistenceStore.setState({ error: null, saving: false });
+    usePersistenceStore.setState({ error: null, failure: null, saving: false, saved: false });
   },
   persistence: ((sessions) => {
     const generation = sessionGeneration;
@@ -57,7 +65,10 @@ export const playerService = {
       return player.runtime;
     }, sessions.initial, sessions.wallet, sessions.inventory, sessions.jobs,
     message => { if (generation === sessionGeneration) sessions.report(message); }, sessions.refresh, saving => {
-      if (generation === sessionGeneration) usePersistenceStore.setState({ saving });
+      if (generation === sessionGeneration) usePersistenceStore.setState({ saving, saved: saving ? false : usePersistenceStore.getState().saved });
+    }, error => {
+      if (generation !== sessionGeneration) return;
+      usePersistenceStore.setState(error ? { failure: persistenceFailure(error), saved: false } : { failure: null, saved: true });
     });
   }) satisfies PersistenceFactory,
 };

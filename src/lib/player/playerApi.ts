@@ -1,10 +1,9 @@
 import { bootstrapSchema, type Credentials, type PlayerBootstrap, type PlayerAction, type CommandReceipt, type TransactionHistory } from '@pang-daily/contracts';
 import { SocialSession } from '@/game-core/social/SocialSession';
 import { SOCIAL_CONTENT } from '@/game-core/social/catalog';
+import { PlayerApiError } from './playerApiError';
+export { PlayerApiError } from './playerApiError';
 
-export class PlayerApiError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly requestId?: string) { super(message); }
-}
 async function request(path: string, method = 'GET', body?: unknown, signal?: AbortSignal) {
   const response = await fetch(`/api${path}`, { method, credentials: 'same-origin', cache: 'no-store', signal,
     headers: { 'X-Pang-Request': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined }).catch(error => {

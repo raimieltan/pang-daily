@@ -48,6 +48,7 @@ const eslintConfig = defineConfig([
     "apps/api/dist/**",
     "packages/*/dist/**",
     "apps/api/src/generated/**",
+    ".next-persistence-test/**",
   ]),
 ]);
 

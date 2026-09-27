@@ -9,7 +9,7 @@ test('migrated PostgreSQL, liveness, readiness, CORS, and unavailable database',
     await app.listen(0, '127.0.0.1');
     const base = await app.getUrl();
     const database = app.get(DatabaseService);
-    assert.equal((await database.client.schemaVersion.findUniqueOrThrow({ where: { id: 1 } })).version, 4);
+    assert.equal((await database.client.schemaVersion.findUniqueOrThrow({ where: { id: 1 } })).version, 5);
     assert.equal((await fetch(`${base}/api/health/live`)).status, 200);
     const ready = await fetch(`${base}/api/health`, { headers: { Origin: 'http://localhost:3000' } });
     assert.equal(ready.status, 200);

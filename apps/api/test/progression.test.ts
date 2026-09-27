@@ -49,7 +49,7 @@ test('durable social and content progression', async t => {
    const a = await account(), b = await account();
    for (const action of [{ type: 'social_introduce', dialogueId: 'casey_intro', trust: 100 }, { type: 'set_reputation', points: 999 }, { type: 'unlock', unlockId: 'midnight_run' }, { type: 'social_choice', playerId: b.playerId, dialogueId: 'casey_intro', nodeId: 'kyo_crew', choiceId: 'crew_accept' }]) assert.equal((await call('/player/commands', a.cookie, { key: randomUUID(), action })).status, 400);
    await introduce(a.cookie, 'casey_intro');
-   assert.equal((await command(a.cookie, { type: 'social_introduce', dialogueId: 'ghost' }, 409)).code, 'INVALID_SOCIAL_ACTION');
+   assert.equal((await command(a.cookie, { type: 'social_introduce', dialogueId: 'ghost' }, 400)).code, 'INVALID_COMMAND_CONTENT');
    await choose(a.cookie, 'casey_intro', 'kyo_crew', 'crew_accept', 409);
    assert.equal((await load(b.cookie)).social.state.npcs.casey.introduced, false);
    const run = await command(a.cookie, { type: 'job_start', definitionId: 'kyo_ice_run' });
@@ -171,7 +171,7 @@ test('durable social and content progression', async t => {
    await db.$executeRawUnsafe('CREATE TRIGGER progression_test_failure BEFORE INSERT ON "SocialEvent" FOR EACH ROW EXECUTE FUNCTION progression_test_failure()');
    const action: PlayerAction = { type: 'job_objective', runId: started.resourceId, objectiveId: definition.objectives.at(-1)!.id, elapsedMs: 0, cargoDamage: 0 }, key = randomUUID();
    try {
-    await command(a.cookie, action, 503, key);
+    await command(a.cookie, action, 500, key);
     const after = await load(a.cookie); assert.deepEqual(after.economy, before.economy); assert.deepEqual(after.social, before.social); assert.deepEqual(after.progression, before.progression);
     assert.equal(await db.transaction.count({ where: { playerId: a.playerId, kind: 'JOB_REWARD' } }), 0);
    } finally {

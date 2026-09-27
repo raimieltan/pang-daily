@@ -42,7 +42,7 @@ The key is unique per player across command types. Reusing it with another paylo
 | `part_install` / `part_remove` | Owned vehicle and physical part; validate sockets, body tags, performance build and workshop rules; charge performance labor where applicable |
 | `part_refinish` / `vehicle_appearance` | Owned part/car; validate finish, paint and catalog suspension range; spoiler changes return an aftermarket wing to inventory |
 | `vehicle_select` | Owned active vehicle UUID; persisted selection used at bootstrap |
-| `vehicle_checkpoint` | Owned car, expected condition revision, condition/fuel checkpoint and bounded distance delta; may only reduce condition/consume fuel, never repair or fill |
+| `vehicle_checkpoint` | Owned car, expected condition revision, nonnegative condition-loss/fuel-consumption intents and bounded distance delta; server derives saved values, never repairs or fills |
 | `job_start` / `job_begin` / `job_objective` / `job_end` | Trusted job ID, durable run ID, ordered objective ID and bounded monotonic time/cargo evidence; derive completion payout and bonus from shared rules |
 | `race_start` / `race_checkpoint` / `race_complete` | Owned car, authored race and durable attempt; ordered checkpoint acknowledgements, bounded time and finish evidence; derive winner and reward from deterministic rival threshold |
 | `refund` | Original owned `PART_PURCHASE` transaction; retire the unsold, uninstalled original item and refund its exact charge once |
@@ -92,3 +92,6 @@ Integration coverage includes concurrent/retried purchases, insufficient funds, 
 Social persistence beyond the money/garage effects remains a separate ticket; client-only social interactions cannot grant a server discount or race unlock until their corresponding validated social rows exist. Legacy local saves still follow the documented fresh-server-save policy in `AUTH_BOOTSTRAP.md`.
 
 Jobs are first accepted and only begin when the local start requirements are met (for example, getting into the car). Active simulation time is monotonic and bounded by server session elapsed time; menu pauses and time spent entering the car do not reduce a job bonus. The server derives rewards from this validated activity evidence and shared content, not a requested payout.
+
+The shared command integrity model and tightened checkpoint contract are documented
+in [M3.5 command integrity](M35_COMMAND_INTEGRITY.md).

@@ -7,7 +7,7 @@
     "build": "yarn --cwd ../.. build:shared && yarn db:generate && tsc -p tsconfig.json",
     "start": "node dist/src/main.js",
     "typecheck": "yarn --cwd ../.. build:shared && yarn db:generate && tsc -p tsconfig.json --noEmit",
-    "test": "yarn build && node --test dist/test/config.test.js dist/test/password.test.js",
+    "test": "yarn build && node --test dist/test/config.test.js dist/test/password.test.js dist/test/integrity-unit.test.js dist/test/observability.test.js",
     "test:integration": "yarn build && node scripts/integration.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/migrate.mjs",

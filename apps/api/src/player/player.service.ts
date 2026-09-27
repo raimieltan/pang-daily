@@ -8,11 +8,15 @@ import { FUEL_CAPACITY_LITERS } from '@pang-daily/game-core/economy/economy';
 import { PlayerRepository } from '../database/player.repository';
 import type { Principal } from '../auth/auth.service';
 import { starterState } from './starter-state';
+import { logEvent } from '../observability';
 
 @Injectable()
 export class PlayerService {
   constructor(@Inject(PlayerRepository) private readonly repository: PlayerRepository) {}
   async bootstrap(principal: Principal, requestId: string) {
+    const started = performance.now();
+    let outcome = 'failure';
+    try {
     const bootstrap = await this.repository.bootstrap(principal.userId, starterState(principal.username), requestId);
     try {
       const dto = bootstrapSchema.parse(bootstrap);
@@ -28,9 +32,14 @@ export class PlayerService {
           throw new Error('Incomplete part installation');
         }
       }
+      outcome = 'success';
       return dto;
     } catch {
       throw new ConflictException({ code: 'PLAYER_STATE_INVALID', message: 'Your save could not be loaded safely. Progress has not been reset.', recovery: 'contact_support' });
+    }
+    } finally {
+      logEvent('persistence.bootstrap', { requestId, actorId: principal.userId,
+        durationMs: Math.round(performance.now() - started), outcome });
     }
   }
 }

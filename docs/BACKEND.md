@@ -1,5 +1,7 @@
 # Backend conventions
 
+Deployment, backups, restore, health checks, and persistence failure logs are documented in [Persistence operations](PERSISTENCE_OPERATIONS.md).
+
 `apps/api` is a Yarn workspace. The web remains at the repository root to preserve existing assets, aliases, and game workflows. API TypeScript uses its own compiler configuration and output; the web compiler excludes it. API generated code and build output are ignored by Git and ESLint.
 
 `main.ts` loads/validates configuration and starts the app. `bootstrap.ts` owns HTTP bootstrap settings. Neither contains domain persistence. `EnvironmentModule` exposes typed configuration through `API_CONFIG`. `DatabaseModule` exports one lifecycle-managed `DatabaseService`; consumers explicitly import the module. `HealthModule` uses this service for readiness.
@@ -8,7 +10,7 @@ Future domain modules group controllers, DTO validation, domain services, and pe
 
 The dependency direction is HTTP controller → domain service → persistence service → Prisma/PostgreSQL. Backend modules must not import React, Zustand state, browser storage, or Babylon runtime code. Pure deterministic game-core calculations can be shared when the module has no browser/runtime dependencies. Client features consume an API adapter and explicit DTOs, never Prisma-generated objects. Do not expose database credentials through `NEXT_PUBLIC_*` variables.
 
-The relational schema and migration rules are defined in [PAN-74](PAN-74_SCHEMA.md), including player ownership, exact money, vehicles/parts, progression, social state, and duplicate protection. Authentication and canonical bootstrap are implemented as described in [AUTH_BOOTSTRAP.md](AUTH_BOOTSTRAP.md). Later tickets implement gameplay domain mutations over this schema. Do not add a generic save JSON blob, temporary player-state table, or frame-level simulation persistence.
+The relational schema and migration rules are defined in [PAN-74](PAN-74_SCHEMA.md), including player ownership, exact money, vehicles/parts, progression, social state, and duplicate protection. Authentication and canonical bootstrap are implemented as described in [AUTH_BOOTSTRAP.md](AUTH_BOOTSTRAP.md). Gameplay mutations now share the [M3.5 command integrity boundary](M35_COMMAND_INTEGRITY.md), including validation, actor resolution, idempotency and transactional receipts. Do not add a generic save JSON blob, temporary player-state table, or frame-level simulation persistence.
 
 A global session guard protects API routes by default; public routes explicitly opt out. Authentication uses an injectable strategy, and auth/player repositories keep Prisma in the database boundary. Shared contracts and pure game-core builds live in `packages/`. Gameplay mutation DTOs, richer request logging, and persistence adapters for the remaining domains belong to their feature/hardening tickets.
 

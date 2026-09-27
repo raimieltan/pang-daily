@@ -22,7 +22,7 @@ try {
   await expect(page.getByText('FINDING SIGNAL', { exact: true })).toHaveCount(0, { timeout: 60000 });
   let state = await load(); const car = state.vehicles[0];
   // Record bounded simulation wear; charge the server's catalog repair/fuel rules.
-  await command({ type: 'vehicle_checkpoint', vehicleId: car.id, revision: car.conditionRevision, condition: { ...car.condition, brakes: .5 }, fuelMilliliters: 44000, odometerDeltaMeters: 1000 });
+  await command({ type: 'vehicle_checkpoint', vehicleId: car.id, revision: car.conditionRevision, conditionLoss: Object.fromEntries(Object.entries(car.condition).map(([key, value]) => [key, key === 'brakes' ? value - .5 : 0])), fuelConsumedMilliliters: 1000, odometerDeltaMeters: 1000 });
   const repairKey = crypto.randomUUID();
   const repair = await command({ type: 'vehicle_repair', vehicleId: car.id, components: ['brakes'] }, repairKey);
   expect(await command({ type: 'vehicle_repair', vehicleId: car.id, components: ['brakes'] }, repairKey)).toEqual(repair);
@@ -30,13 +30,19 @@ try {
   await command({ type: 'vehicle_appearance', vehicleId: car.id, paint: '#4d705b', rideHeightM: -.02 });
   // Earn through ordered job operations; no arbitrary credit/fixture balance endpoint.
   for (let run = 0; run < 8; run++) {
-    const job = await command({ type: 'job_start', definitionId: 'talyer_oil_errand' });
+    const job = await command({ type: 'job_start', definitionId: run === 0 ? 'talyer_oil_errand' : 'kyo_ice_run' });
     await command({ type: 'job_objective', runId: job.resourceId, objectiveId: 'pickup', elapsedMs: 0, cargoDamage: 0 });
-    await command({ type: 'job_objective', runId: job.resourceId, objectiveId: 'dropoff', elapsedMs: 0, cargoDamage: 0 });
+    const finalAction = { type: 'job_objective', runId: job.resourceId, objectiveId: 'dropoff', elapsedMs: 0, cargoDamage: 0 };
+    const finalKey = crypto.randomUUID();
+    const completion = await command(finalAction, finalKey);
+    if (run === 0) expect(await command(finalAction, finalKey)).toEqual(completion);
   }
+  await command({ type: 'social_introduce', dialogueId: 'casey_intro' });
   await page.reload(); await expect(page.locator('canvas')).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('FINDING SIGNAL', { exact: true })).toHaveCount(0, { timeout: 60000 });
   state = await load(); expect(state.vehicles[0].paint).toBe('#4d705b'); expect(state.vehicles[0].condition.brakes).toBe(1); expect(state.vehicles[0].fuelLiters).toBe(45);
+  expect(state.social.state.npcs.casey.introduced).toBe(true);
+  expect(state.progression.jobs.filter(job => job.status === 'completed')).toHaveLength(8);
   // Buy through the actual phone UI; API listings and the runtime wallet agree.
   await page.getByRole('button', { name: 'Phone · Baligya', exact: true }).click();
   const listings = await page.evaluate(async () => (await fetch('/api/player/marketplace')).json());
@@ -52,6 +58,8 @@ try {
   await page.reload(); await expect(page.locator('canvas')).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('FINDING SIGNAL', { exact: true })).toHaveCount(0, { timeout: 60000 });
   const returning = await load(); expect(returning.economy.balanceCentavos).toBe(balance); expect(returning.inventory.parts.some(part => part.id === owned.id)).toBe(true);
+  expect(returning.social.state.npcs.casey.introduced).toBe(true);
+  expect(returning.progression.jobs.filter(job => job.status === 'completed')).toHaveLength(8);
   await page.getByRole('button', { name: 'Phone · Baligya', exact: true }).click();
   await page.getByRole('button', { name: /Your parts/ }).click();
   await expect(page.getByTestId('owned-part').filter({ hasText: listing.title })).toBeVisible();

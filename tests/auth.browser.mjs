@@ -9,7 +9,14 @@ page.on('pageerror', error => errors.push(error.message));
 const name = `browser_${Date.now()}`;
 const password = 'browser-fixture-password';
 try {
+  await page.route('**/api/player/bootstrap', route => route.fulfill({ status: 503, contentType: 'application/json',
+    body: JSON.stringify({ code: 'API_UNAVAILABLE', message: 'Save service unavailable', requestId: 'bootstrap-test' }) }));
   await page.goto(base);
+  await expect(page.getByRole('heading', { name: 'Unable to load your save' })).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.getByText('Support reference: bootstrap-test')).toBeVisible();
+  await page.unroute('**/api/player/bootstrap');
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Continue your daily' })).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
   await page.getByRole('button', { name: 'Create an account', exact: true }).click();
