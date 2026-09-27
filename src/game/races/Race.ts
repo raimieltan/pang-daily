@@ -1,3 +1,5 @@
+import type { RaceRival } from "./rivals";
+
 export type Point = { x: number; y: number; z: number };
 // Babylon Vector3 exposes x/y/z through accessors. Object spread copies its
 // private backing fields instead, so always snapshot coordinates explicitly.
@@ -8,6 +10,8 @@ export type RaceDefinition = {
   id: string; name: string; mode: "point-to-point" | "touge" | "drag";
   start: Point; heading: number; checkpoints: readonly Gate[]; finish: Gate;
   waypoints: readonly Waypoint[];
+  /** Named opponent in a built car; without one it's an anonymous stock Dalagan at the base pace. */
+  rival?: RaceRival;
 };
 export type RacePhase = "READY" | "COUNTDOWN" | "RUNNING" | "FINISHED" | "RESET";
 export type RaceProgress = { raceId: string; phase: RacePhase; countdown: number; elapsedMs: number; checkpoint: number; total: number; next: string; invalidFinish: boolean };
@@ -99,7 +103,7 @@ export class Race {
   private previous: Point;
   constructor(readonly route: RaceDefinition) {
     this.player = new CheckpointProgress(route); this.opponent = new CheckpointProgress(route);
-    this.rival = new WaypointRival(route.waypoints); this.previous = copyPoint(route.start);
+    this.rival = new WaypointRival(route.waypoints, route.rival?.tuning); this.previous = copyPoint(route.start);
   }
   reset() {
     this.phase = "RESET"; this.player.reset(); this.opponent.reset(); this.rival.reset();

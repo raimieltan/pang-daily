@@ -4,17 +4,12 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Material } from '@babylonjs/core/Materials/material';
 import { CreateIcoSphere } from '@babylonjs/core/Meshes/Builders/icoSphereBuilder';
 import type { Mesh } from '@babylonjs/core/Meshes/mesh';
-import { PhysicsBody } from '@babylonjs/core/Physics/v2/physicsBody';
-import { PhysicsShapeBox } from '@babylonjs/core/Physics/v2/physicsShape';
-import { PhysicsMotionType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugin';
 import type { Scene } from '@babylonjs/core/scene';
 import { CharacterVisual } from '../characters/CharacterVisual';
 import { CREW } from '../characters/crew';
 import type { GameSystem } from '../engine/types';
-import { CollisionGroup } from '../physics/PhysicsWorld';
-import { buildCrewCar } from '../vehicles/crewCars';
 import type { WorldKit } from '../world/WorldChunk';
-import { CAFE_CREW, CREW_CARS } from '../world/hub/cafePopulation';
+import { CAFE_CREW } from '../world/hub/cafePopulation';
 import type { NpcSound } from './RoadsidePeople';
 
 /** Vapour puffs per smoker; one thin-instanced ico mesh draws all of them. */
@@ -29,7 +24,6 @@ type Puff = { x: number; y: number; z: number; vx: number; vy: number; vz: numbe
 export class CafeCrew implements GameSystem {
   readonly name = 'cafeCrew';
   private readonly crew: { visual: CharacterVisual; chatter: number; puffs: Puff[]; next: number }[];
-  private readonly cars: { mesh: Mesh; body: PhysicsBody; shape: PhysicsShapeBox }[];
   private readonly smoke: Mesh;
   private readonly smokeMaterial: StandardMaterial;
   private readonly matrices = new Float32Array(CAFE_CREW.length * PUFFS * 16);
@@ -59,19 +53,6 @@ export class CafeCrew implements GameSystem {
     this.smoke.isPickable = false;
     this.smoke.thinInstanceSetBuffer('matrix', this.matrices, 16, false);
     this.smoke.alwaysSelectAsActiveMesh = true;
-
-    this.cars = CREW_CARS.map((car) => {
-      const mesh = buildCrewCar(scene, kit.lit, car.model, car.paint, `crew-car-${car.owner}`);
-      mesh.position.set(car.x, 0, car.z);
-      mesh.rotationQuaternion = Quaternion.RotationYawPitchRoll(car.heading * Math.PI / 180, 0, 0);
-      const body = new PhysicsBody(mesh, PhysicsMotionType.STATIC, false, scene);
-      const shape = new PhysicsShapeBox(new Vector3(0, .75, 0), Quaternion.Identity(), new Vector3(1.8, 1.4, 4.6), scene);
-      shape.filterMembershipMask = CollisionGroup.STATIC;
-      shape.filterCollideMask = CollisionGroup.VEHICLE | CollisionGroup.CHARACTER;
-      shape.material = { friction: .5, restitution: .05 };
-      body.shape = shape;
-      return { mesh, body, shape };
-    });
   }
 
   update(dt: number) {
@@ -81,7 +62,6 @@ export class CafeCrew implements GameSystem {
     const near = distance < 160;
     this.crew.forEach(c => c.visual.root.setEnabled(near));
     this.smoke.setEnabled(near);
-    this.cars.forEach(({ mesh }) => mesh.setEnabled(Math.hypot(mesh.position.x - at.x, mesh.position.z - at.z) < 220));
     if (!near) return;
 
     const { scale, rot, at: pos, m } = this.scratch;
@@ -127,7 +107,6 @@ export class CafeCrew implements GameSystem {
 
   dispose() {
     this.crew.forEach(c => c.visual.root.dispose());
-    this.cars.forEach(({ mesh, body, shape }) => { body.dispose(); shape.dispose(); mesh.dispose(); });
     this.smoke.dispose();
     this.smokeMaterial.dispose();
   }

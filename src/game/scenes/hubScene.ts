@@ -11,6 +11,7 @@ import { CafeParkedCars } from "../traffic/CafeParkedCars";
 import { CafeCrew } from "../traffic/CafeCrew";
 import { NeighborhoodLife } from "../traffic/NeighborhoodLife";
 import { NEIGHBORHOOD_CARS } from "../world/population";
+import { CREW_CARS } from "../world/hub/cafePopulation";
 import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
 import { talyerRejection } from "../maintenance/talyerAccess";
 import { WeatherSystem } from "../weather/WeatherSystem";
@@ -22,6 +23,7 @@ import { CONNECTED_LAYOUT } from "../world/mountain/layout";
 import { MOUNTAIN_RACES } from "../world/mountain/route";
 import { LOCAL_ROUTE } from "../races/localRoute";
 import { RaceSystem } from "../races/RaceSystem";
+import { RACE_CALENDAR } from "../races/raceCalendar";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RenderingGroup } from "@babylonjs/core/Rendering/renderingGroup";
 import { ChaseCamera } from "../cameras/ChaseCamera";
@@ -149,7 +151,10 @@ export const hubScene: SceneDefinition = {
     lightCar(litCar);
     litCar.onVisualsChanged = () => lightCar(litCar);
     addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
-    const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES]));
+    // NPC cars clone whichever owned car their build names; both are loaded by now.
+    const npcModels = () => ({ [driven.spec.id]: player.visual.model, [parked.spec.id]: garage.model });
+    const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES, ...RACE_CALENDAR],
+      { models: npcModels, wallet: session }));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
     const maintainedCar = player;
     const jobSystem = new JobSystem(bridge, jobs, {
@@ -199,10 +204,11 @@ export const hubScene: SceneDefinition = {
     const listener = () => modes.position;
     const npcSound = (sound: import('../traffic/RoadsidePeople').NpcSound) => bridge.emit('npcSound', sound);
     addSystem(new CafeCustomers(scene, kit, listener, npcSound));
-    addSystem(new CafeParkedCars(scene, sedanModel, listener));
+    addSystem(new CafeParkedCars(scene, npcModels, listener));
     addSystem(new CafeCrew(scene, kit, listener, npcSound));
     addSystem(new NeighborhoodLife(scene, kit, listener, npcSound));
-    addSystem(new CafeParkedCars(scene, sedanModel, listener, NEIGHBORHOOD_CARS, 'neighborhood-parked'));
+    addSystem(new CafeParkedCars(scene, npcModels, listener, NEIGHBORHOOD_CARS, 'neighborhood-parked'));
+    addSystem(new CafeParkedCars(scene, npcModels, listener, CREW_CARS, 'crew-car'));
     addSystem(new RoadsidePeople(scene, kit, [
       { from: 100, to: 125, side: 1 }, { from: 390, to: 415, side: -1 },
       { from: OVERLOOK_S - 55, to: OVERLOOK_S - 30, side: -1 },

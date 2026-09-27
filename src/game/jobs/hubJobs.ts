@@ -1,4 +1,5 @@
 import { defineJob, type JobDefinition } from '../../game-core/jobs/jobs';
+import { OVERLOOK, ROUTE_LENGTH, roadAt } from '../world/mountain/route';
 
 /** Board zone on Kyo Coffee's terrace (see hubLayout `kyo_job_board`). */
 export const KYO_JOB_BOARD = 'kyo_job_board';
@@ -80,4 +81,110 @@ export const HATID_SUKI_HOME = defineJob({
   ],
 });
 
-export const HUB_JOBS: readonly JobDefinition[] = [KYO_ICE_RUN, TALYER_OIL_ERRAND, TALYER_BATTERY_DROP, HATID_SUKI_HOME];
+/** Mountain stops: road shoulder (+ right of uphill travel) or a verge you walk to. */
+const shoulder = (s: number, offset = 4.2) => { const p = roadAt(s, offset); return { x: p.x, z: p.z }; };
+const PAHUWAY = { x: OVERLOOK.x, z: OVERLOOK.z, radius: 12 };
+const MAASIN_MARKET = { ...shoulder(ROUTE_LENGTH - 90), radius: 8 };
+const TERRACE_STAND = { ...shoulder(ROUTE_LENGTH * .21), radius: 8 };
+const KYO_APRON = { x: 130.5, z: 98, radius: 9 };
+
+/**
+ * Catering drop for the Pahuway crowd: coffee urns and pastries from Kyo up to the overlook.
+ * Long enough to need fuel; urns slosh, so a clean run earns a tip.
+ */
+export const KYO_OVERLOOK_CATERING = defineJob({
+  id: 'kyo_overlook_catering', type: 'delivery', title: 'Coffee for the overlook',
+  description: 'A car club booked Kyo for their Pahuway meet. Get the urns and pastry boxes up the mountain while it is still hot.',
+  payoutPhp: 950, offeredAt: [KYO_JOB_BOARD], requirements: { mode: 'driving', minFuelLiters: 10 }, timeLimitSeconds: 600,
+  cargo: { label: 'Coffee urns', maxDamage: .55, impactDamage: .35 },
+  bonus: { label: 'tip for hot, unspilled coffee', php: 250, withinSeconds: 450, maxDamage: .2 },
+  objectives: [
+    { id: 'pickup', label: 'Load the urns at Kyo', prompt: 'Load coffee urns', locationName: 'Kyo Coffee', area: KYO_APRON, cargo: 'load' },
+    { id: 'dropoff', label: 'Set up at Pahuway overlook', prompt: 'Hand over the urns', locationName: 'Pahuway overlook', area: PAHUWAY, cargo: 'unload' },
+  ],
+});
+
+/** Pickup: Kyo's bean supplier is at the Maasin market. The whole mountain and back. */
+export const KYO_BEAN_PICKUP = defineJob({
+  id: 'kyo_bean_pickup', type: 'pickup', title: 'Beans from Maasin',
+  description: 'The roaster in Maasin has Kyo\'s sacks ready. Drive the whole mountain, load up, and bring them down before closing.',
+  payoutPhp: 1500, offeredAt: [KYO_JOB_BOARD], requirements: { mode: 'driving', minFuelLiters: 18 }, timeLimitSeconds: 1200,
+  cargo: { label: 'Coffee sacks', maxDamage: .9, impactDamage: .15 },
+  objectives: [
+    { id: 'pickup', label: 'Load the sacks at the Maasin market', prompt: 'Load coffee sacks', locationName: 'Maasin market', area: MAASIN_MARKET, cargo: 'load' },
+    { id: 'dropoff', label: 'Bring them back to Kyo', prompt: 'Unload coffee sacks', locationName: 'Kyo Coffee', area: KYO_APRON, cargo: 'unload' },
+  ],
+});
+
+/** Multi-drop: one load of pastry boxes, three stops around the block, last box goes home. */
+export const KYO_PASTRY_ROUND = defineJob({
+  id: 'kyo_pastry_round', type: 'delivery', title: 'Ensaymada round',
+  description: 'Three standing orders for ensaymada boxes: Suki 24, the Bahandi kiosk, and the neighbour by your place. Keep them flat.',
+  payoutPhp: 560, offeredAt: [KYO_JOB_BOARD], requirements: { mode: 'driving' }, timeLimitSeconds: 360,
+  cargo: { label: 'Pastry boxes', maxDamage: .6, impactDamage: .3 },
+  objectives: [
+    { id: 'pickup', label: 'Load pastry boxes at Kyo', prompt: 'Load pastry boxes', locationName: 'Kyo Coffee', area: KYO_APRON, cargo: 'load' },
+    { id: 'suki', label: 'Drop a box at Suki 24', prompt: 'Drop off a box', locationName: 'Suki 24', area: { x: -68, z: 11.5, radius: 10 } },
+    { id: 'bahandi', label: 'Drop a box at the Bahandi kiosk', prompt: 'Drop off a box', locationName: 'Bahandi Fuels', area: { x: 38, z: 22, radius: 8 } },
+    { id: 'dropoff', label: 'Walk the last box to the neighbour', prompt: 'Hand over the last box', locationName: 'Neighbour\'s porch',
+      area: { x: -50, z: 151.5, radius: 3 }, mode: 'walking', cargo: 'unload' },
+  ],
+});
+
+/** Pickup: a farmer at the terraces is selling a set of used rims Mang Boy wants. */
+export const TALYER_RIMS_PICKUP = defineJob({
+  id: 'talyer_rims_pickup', type: 'pickup', title: 'Rims from the terraces',
+  description: 'A farmer up at the vegetable terraces is selling a set of used rims. Mang Boy already paid. Go fetch them.',
+  payoutPhp: 800, offeredAt: [TALYER_JOB_BOARD], requirements: { mode: 'driving', minFuelLiters: 8 }, timeLimitSeconds: 720,
+  cargo: { label: 'Used rims', maxDamage: .95, impactDamage: .1 },
+  objectives: [
+    { id: 'pickup', label: 'Load the rims at the terrace stall', prompt: 'Load the rims', locationName: 'Terrace stall', area: TERRACE_STAND, cargo: 'load' },
+    { id: 'dropoff', label: 'Bring them to the talyer', prompt: 'Unload the rims', locationName: 'Talyer ni Mang Boy', area: { x: 22, z: 147.5, radius: 6 }, cargo: 'unload' },
+  ],
+});
+
+/** Delivery with an on-foot handoff: a rebuilt alternator for a suki in Alimodian. */
+export const TALYER_ALTERNATOR_DROP = defineJob({
+  id: 'talyer_alternator_drop', type: 'delivery', title: 'Alternator to Alimodian',
+  description: 'Mang Boy rebuilt an alternator for a suki just past the Alimodian sign. Park on the shoulder and walk it to the gate.',
+  payoutPhp: 600, offeredAt: [TALYER_JOB_BOARD], requirements: { mode: 'driving', minFuelLiters: 5 }, timeLimitSeconds: 420,
+  cargo: { label: 'Alternator', maxDamage: .8, impactDamage: .25 },
+  objectives: [
+    { id: 'pickup', label: 'Load the alternator at the talyer', prompt: 'Load the alternator', locationName: 'Talyer ni Mang Boy', area: { x: 22, z: 147.5, radius: 6 }, cargo: 'load' },
+    { id: 'park', label: 'Pull over in Alimodian', prompt: 'Park on the shoulder', locationName: 'Alimodian', area: { ...shoulder(320), radius: 8 } },
+    { id: 'dropoff', label: 'Walk it to the gate', prompt: 'Hand over the alternator', locationName: 'Alimodian',
+      area: { ...shoulder(320, -5.5), radius: 3 }, mode: 'walking', cargo: 'unload' },
+  ],
+});
+
+/** Delivery: an LPG tank from the Bahandi forecourt, carried the last metres to the neighbour. */
+export const FUEL_LPG_DELIVERY = defineJob({
+  id: 'fuel_lpg_delivery', type: 'delivery', title: 'LPG for the neighbour',
+  description: 'Your neighbour ran out of gas mid-sinigang. Load a full tank at the forecourt and carry it to their porch. Upright.',
+  payoutPhp: 340, offeredAt: [FUEL_JOB_BOARD], requirements: { mode: 'driving' }, timeLimitSeconds: 300,
+  cargo: { label: 'LPG tank', maxDamage: .5, impactDamage: .35 },
+  objectives: [
+    { id: 'pickup', label: 'Load the tank on the forecourt', prompt: 'Load the LPG tank', locationName: 'Bahandi Fuels', area: { x: 38, z: 22, radius: 8 }, cargo: 'load' },
+    { id: 'dropoff', label: 'Carry it to the neighbour\'s porch', prompt: 'Hand over the tank', locationName: 'Neighbour\'s porch',
+      area: { x: -50, z: 151.5, radius: 3 }, mode: 'walking', cargo: 'unload' },
+  ],
+});
+
+/** Hatid up the mountain: two riders from the meet spot want the overlook before sunset. */
+export const HATID_OVERLOOK = defineJob({
+  id: 'hatid_overlook', type: 'passenger', title: 'Hatid: Pahuway sunset',
+  description: 'Two college kids at the Bahandi meet spot missed the last jeep. Take them up to Pahuway overlook. They get carsick.',
+  payoutPhp: 720, offeredAt: [FUEL_JOB_BOARD], requirements: { mode: 'driving', minFuelLiters: 10 },
+  cargo: { label: 'Two riders', kind: 'passenger', maxDamage: .6, impactDamage: .2 },
+  bonus: { label: 'tip for a smooth climb', php: 200, maxDamage: .15 },
+  objectives: [
+    { id: 'pickup', label: 'Pick them up at the meet spot', prompt: 'Let the riders in', locationName: 'Bahandi Fuels', area: { x: 40, z: 14, radius: 8 }, cargo: 'load' },
+    { id: 'dropoff', label: 'Drop them at Pahuway overlook', prompt: 'Drop off the riders', locationName: 'Pahuway overlook', area: PAHUWAY, cargo: 'unload' },
+  ],
+});
+
+export const HUB_JOBS: readonly JobDefinition[] = [
+  KYO_ICE_RUN, KYO_PASTRY_ROUND, KYO_OVERLOOK_CATERING, KYO_BEAN_PICKUP,
+  TALYER_OIL_ERRAND, TALYER_BATTERY_DROP, TALYER_ALTERNATOR_DROP, TALYER_RIMS_PICKUP,
+  HATID_SUKI_HOME, FUEL_LPG_DELIVERY, HATID_OVERLOOK,
+];

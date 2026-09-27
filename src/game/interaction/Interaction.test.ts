@@ -6,10 +6,17 @@ import { interactablesFromZones, resolveInteraction, type Interactable } from ".
 import { InteractionSystem } from "./InteractionSystem";
 import { containsPoint } from "../world/layoutTools";
 import { HUB_JOBS } from "../jobs/hubJobs";
+import { nearestRoad, OVERLOOK } from "../world/mountain/route";
 
 const zone = (id: string, x = 0, priority = 0): Interactable => ({
   id, action: "order_coffee", label: id, priority, area: { kind: "circle", x, z: 0, radius: 3 },
 });
+
+/** Up the mountain there is no parking: the shoulder (a metre past the edge) or the overlook pad. */
+const onMountainShoulder = (p: { x: number; z: number }) => {
+  const { sample, distance } = nearestRoad(p);
+  return distance <= sample.width / 2 + 2 || Math.hypot(p.x - OVERLOOK.x, p.z - OVERLOOK.z) < 10;
+};
 
 describe("world interactions", () => {
   it("resolves priority, distance and ID independently of source order", () => {
@@ -69,14 +76,14 @@ describe("world interactions", () => {
     expect(resolveInteraction(zones, 54, 33, "walking")?.id).toBe("fuel_job_board");
   });
 
-  it("puts driving stops on parking the car can reach and every job on a board", () => {
+  it("puts driving stops on parking or the mountain shoulder the car can reach, and every job on a board", () => {
     const all = HUB_LAYOUT.chunks.flatMap((c) => c.zones);
     const parking = all.filter((z) => z.kind === "parking");
     const boards = new Set(interactablesFromZones(all).filter((z) => z.action === "browse_jobs").map((z) => z.id));
     for (const job of HUB_JOBS) {
       expect(job.offeredAt.every((id) => boards.has(id)), job.id).toBe(true);
       for (const { area, id, mode } of job.objectives)
-        if (mode === "driving") expect(parking.some((z) => containsPoint(z.rect, area.x, area.z)), `${job.id}:${id}`).toBe(true);
+        if (mode === "driving") expect(parking.some((z) => containsPoint(z.rect, area.x, area.z)) || onMountainShoulder(area), `${job.id}:${id}`).toBe(true);
     }
   });
 });

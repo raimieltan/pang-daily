@@ -71,13 +71,18 @@ export function laneWaypoints(direction:1|-1,offset=1.5): (Waypoint & {s:number}
   const points=ROAD.map(p=>({...roadAt(p.s,offset*direction),speed:p.speed}));
   return direction===1?points:points.reverse();
 }
+/** A run between two distances along the road; gates at `gates` (fractions of the whole road) name their sector. */
+export function mountainRace(o:{id:string;name:string;direction:1|-1;from:number;to:number;gates:readonly number[];finish:string;
+  rival?:RaceDefinition['rival'];driveAwayM?:number}):RaceDefinition {
+  const {direction}=o,start=roadAt(o.from,1.5*direction);
+  const gates=o.gates.map(t=>({id:sectorAt(t*ROUTE_LENGTH+1).name,center:roadAt(t*ROUTE_LENGTH),halfSize:{x:6,y:4,z:6}}));
+  const past=o.driveAwayM===undefined?direction*Infinity:o.to+direction*o.driveAwayM;
+  const points=laneWaypoints(direction).filter(p=>direction===1?p.s>=o.from-10&&p.s<=past:p.s<=o.from+10&&p.s>=past);
+  return {id:o.id,name:o.name,mode:'point-to-point',start,heading:start.heading+(direction===-1?Math.PI:0),
+    checkpoints:direction===1?gates:gates.reverse(),finish:{id:o.finish,center:roadAt(o.to),halfSize:{x:6,y:4,z:6}},waypoints:points,rival:o.rival};
+}
 function raceRoute(direction:1|-1):RaceDefinition {
-  const startS=direction===1?90:ROUTE_LENGTH-90,finishS=direction===1?ROUTE_LENGTH-65:65;
-  const start=roadAt(startS,1.5*direction);
-  const gates=[.17,.36,.51,.66,.79].map((t,i)=>({id:SECTORS[i+1].name,center:roadAt(t*ROUTE_LENGTH),halfSize:{x:6,y:4,z:6}}));
-  const points=laneWaypoints(direction).filter(p=>direction===1?p.s!>=startS-10:p.s!<=startS+10);
-  return {id:direction===1?'alimodian_maasin':'maasin_alimodian',name:direction===1?'Alimodian → Maasin · mountain run':'Maasin → Alimodian · downhill run',mode:'point-to-point',
-    start,heading:start.heading+(direction===-1?Math.PI:0),checkpoints:direction===1?gates:gates.reverse(),
-    finish:{id:direction===1?'Maasin arrival':'Alimodian arrival',center:roadAt(finishS),halfSize:{x:6,y:4,z:6}},waypoints:points};
+  return mountainRace({id:direction===1?'alimodian_maasin':'maasin_alimodian',name:direction===1?'Alimodian → Maasin · mountain run':'Maasin → Alimodian · downhill run',
+    direction,from:direction===1?90:ROUTE_LENGTH-90,to:direction===1?ROUTE_LENGTH-65:65,gates:[.17,.36,.51,.66,.79],finish:direction===1?'Maasin arrival':'Alimodian arrival'});
 }
 export const MOUNTAIN_RACES=[raceRoute(1),raceRoute(-1)] as const;

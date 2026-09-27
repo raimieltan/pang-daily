@@ -29,6 +29,13 @@ Hub jobs live in `game/jobs/hubJobs.ts`, one board each:
 | Board | Job | Type | Shape |
 | --- | --- | --- | --- |
 | Kyo Coffee terrace | `KYO_ICE_RUN` | delivery | Suki 24 → Kyo in the car, 4:00, fragile |
+| Kyo Coffee terrace | `KYO_PASTRY_ROUND` | delivery | multi-drop: Kyo → Suki 24 → Bahandi → the neighbour's porch on foot, 6:00 |
+| Kyo Coffee terrace | `KYO_OVERLOOK_CATERING` | delivery | Kyo → Pahuway overlook, 10:00, needs 10 L, ₱250 tip under 7:30 with ≤20% spill |
+| Kyo Coffee terrace | `KYO_BEAN_PICKUP` | pickup | drive to the Maasin market, load, back to Kyo, 20:00, needs 18 L |
 | Talyer waiting area | `TALYER_OIL_ERRAND` | errand | on foot at both ends (Bahandi kiosk → bay), no clock |
 | Talyer waiting area | `TALYER_BATTERY_DROP` | errand | load at the apron, 5:00, needs 6 L of fuel, hand over on foot on the main road shoulder |
+| Talyer waiting area | `TALYER_ALTERNATOR_DROP` | delivery | talyer → park on the Alimodian shoulder → walk it to the gate, 7:00 |
+| Talyer waiting area | `TALYER_RIMS_PICKUP` | pickup | terrace stall → talyer apron, 12:00, needs 8 L |
 | Bahandi kiosk | `HATID_SUKI_HOME` | passenger | Suki 24 → Home, ₱100 tip under 2:00 with ≤15% bumps |
+| Bahandi kiosk | `FUEL_LPG_DELIVERY` | delivery | forecourt → neighbour's porch on foot, 5:00, fragile |
+| Bahandi kiosk | `HATID_OVERLOOK` | passenger | meet spot → Pahuway overlook, ₱200 tip with ≤15% bumps |

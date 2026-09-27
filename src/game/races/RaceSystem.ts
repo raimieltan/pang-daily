@@ -12,6 +12,9 @@ import type { InteractionSystem } from "../interaction/InteractionSystem";
 import type { PlayerModes } from "../player/PlayerModes";
 import type { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { VehicleVisual } from "../vehicles/VehicleVisual";
+import { dressNpcCar, type NpcCar, type NpcCarModels } from "../vehicles/npcCar";
+import type { VehicleSession } from "@/game-core/maintenance/VehicleSession";
+import { NPC_CAR_BUILDS, npcCarId } from "@/game-core/exterior/npcBuilds";
 import { Race, type RaceProgress, type RaceDefinition } from "./Race";
 import { LOCAL_ROUTE } from "./localRoute";
 
@@ -24,16 +27,22 @@ export class RaceSystem implements GameSystem {
   private lastStanding = 0;
   private root: TransformNode;
   private visual?: VehicleVisual;
+  /** Named rivals' dressed cars, built the first time their race starts. */
+  private dressed = new Map<string, { car: NpcCar; visual: VehicleVisual }>();
+  private current?: VehicleVisual;
   private disposed = false;
   private gates;
   private materials: StandardMaterial[];
   private resultSent = false;
   introRemaining = 0;
+  private scene: Scene;
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
-    private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE]) {
+    private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE],
+    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn"> } = {}) {
     this.publisher = new SummaryPublisher((progress) => bridge.emit("raceProgress", progress));
     this.root = new TransformNode("local-rival", scene);
     this.root.setEnabled(false);
+    this.scene = scene;
     void VehicleVisual.load(scene, player.definition.spec, this.root).then((visual) => {
       if (this.disposed) visual.dispose(); else this.visual = visual;
     }).catch(() => {
@@ -78,7 +87,7 @@ export class RaceSystem implements GameSystem {
   get active() { return this.race.phase === "COUNTDOWN" || this.race.phase === "RUNNING"; }
   private atStart(route: RaceDefinition) { return Math.hypot(this.modes.position.x-route.start.x, this.modes.position.y-route.start.y, this.modes.position.z-route.start.z) <= 12; }
   readonly interactions = (): Interactable[] => this.active ? [] : this.routes.map(route => ({
-    id: `race:${route.id}`, target: route.id, action: "start_race", label: `Race · ${route.name}`, priority: 20,
+    id: `race:${route.id}`, target: route.id, action: "start_race", label: route.rival ? `Race ${route.rival.name} · ${route.name} ${"★".repeat(route.rival.tier)} · ₱${route.rival.prizePhp}` : `Race · ${route.name}`, priority: 20,
     modes: ["driving"], area: { kind: "circle", x: route.start.x, z: route.start.z, radius: 12 },
   }));
   connect(interactions: InteractionSystem) { this.releases.push(interactions.handle("start_race", i => {
@@ -93,9 +102,9 @@ export class RaceSystem implements GameSystem {
     this.gates.forEach(g=>g.setEnabled(g.metadata.routeId===route.id));
     this.race.reset(); this.bridge.emit("raceProgress", this.race.snapshot());
     this.race.start(); this.resultSent = false; this.lastStanding = 0;
-    this.controls.enabled = false; this.root.setEnabled(true);
+    this.controls.enabled = false; this.showRival(route); this.root.setEnabled(true);
     this.introRemaining = 3.2;
-    this.bridge.emit("raceIntro", { title: route.name });
+    this.bridge.emit("raceIntro", { title: route.rival ? `${route.name} · vs ${route.rival.name}` : route.name });
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
   private reset() {
@@ -124,7 +133,7 @@ export class RaceSystem implements GameSystem {
     const p = this.race.rival.position;
     this.root.position.set(p.x, p.y + 0.1, p.z); this.root.rotation.y = this.race.rival.heading;
     if (this.race.rival.departed) this.root.setEnabled(false);
-    this.visual?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
+    (this.current ?? this.visual)?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
     this.gates.filter(g=>g.metadata.routeId===this.selected.id).forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
       this.lastStanding = this.race.position; this.bridge.emit("raceStandingChanged", this.standing());
@@ -132,16 +141,35 @@ export class RaceSystem implements GameSystem {
     if (this.race.phase === "FINISHED" && !this.resultSent) {
       this.resultSent = true;
       this.gates.forEach(gate => gate.setEnabled(false));
-      this.bridge.emit("raceFinished", { ...this.standing(), timeMs: Math.round(this.race.playerTime! * 1000) });
+      const prize = this.race.position === 1 ? this.selected.rival?.prizePhp ?? 0 : 0;
+      const paid = prize > 0 && this.garage.wallet?.earn(prize, { kind: "race_prize", source: `race:${this.selected.id}`,
+        description: `Beat ${this.selected.rival!.name} · ${this.selected.name}`, relatedEntityId: this.selected.id });
+      this.bridge.emit("raceFinished", { ...this.standing(), timeMs: Math.round(this.race.playerTime! * 1000),
+        ...(paid && !("rejected" in paid) ? { prizePhp: prize } : {}) });
     }
     if (phase !== this.race.phase) this.publisher.flush(this.race.snapshot());
     else this.publisher.tick(dt, () => this.race.snapshot());
+  }
+  /** Swaps in the rival's own build; anonymous races and missing models keep the stock car. */
+  private showRival(route: RaceDefinition) {
+    let dressed = route.rival && this.dressed.get(route.id);
+    const build = route.rival && NPC_CAR_BUILDS[route.rival.build];
+    const source = build && this.garage.models?.()[npcCarId(build)];
+    if (route.rival && !dressed && source) {
+      const car = dressNpcCar(this.scene, source, `race-rival-${route.id}`, route.rival.paint, build);
+      car.model.root.parent = this.root;
+      dressed = { car, visual: VehicleVisual.wrap(car.model) };
+      this.dressed.set(route.id, dressed);
+    }
+    this.dressed.forEach(d => d.car.model.root.setEnabled(d === dressed));
+    this.visual?.model.root.setEnabled(!dressed);
+    this.current = dressed ? dressed.visual : this.visual;
   }
   private standing() { return { raceId: this.selected.id, position: this.race.position, racers: 2 }; }
   dispose() {
     this.disposed = true; this.releases.forEach((release) => release());
     this.player.canReposition = undefined; this.modes.canExit = undefined;
     this.controls.enabled = this.modes.mode === "driving";
-    this.visual?.dispose(); this.root.dispose(); this.gates.forEach((gate) => gate.dispose()); this.materials.forEach((m) => m.dispose());
+    this.visual?.dispose(); this.dressed.forEach(d => d.car.dispose()); this.root.dispose(); this.gates.forEach((gate) => gate.dispose()); this.materials.forEach((m) => m.dispose());
   }
 }

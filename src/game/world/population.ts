@@ -86,9 +86,9 @@ for (const [i, home] of MOUNTAIN_HOMES.entries()) {
 
 export const RESIDENTS: readonly Resident[] = people;
 
-const overlookCar = (ds: number, offset: number, paint: string): ParkedCarPlacement => {
+const overlookCar = (ds: number, offset: number, paint: string, build?: ParkedCarPlacement['build']): ParkedCarPlacement => {
   const p = roadAt(OVERLOOK_S + ds, offset);
-  return { x: p.x, y: OVERLOOK.y, z: p.z, heading: p.heading * 180 / Math.PI + 90, paint };
+  return { x: p.x, y: OVERLOOK.y, z: p.z, heading: p.heading * 180 / Math.PI + 90, paint, build };
 };
 export const NEIGHBORHOOD_CARS: readonly ParkedCarPlacement[] = [
   { x: 10.5, z: 19, heading: 0, paint: '#b9b7a7' },
@@ -97,8 +97,8 @@ export const NEIGHBORHOOD_CARS: readonly ParkedCarPlacement[] = [
   { x: 33, z: 147.5, heading: 90, paint: '#758474' },
   { x: -78.5, z: 12.5, heading: 0, paint: '#9f6659', build: 'donor_daily' },
   { x: -59.5, z: 12.5, heading: 0, paint: '#b4b7ae' },
-  { x: 83, z: -14, heading: 90, paint: '#76828b' },
+  { x: 83, z: -14, heading: 90, paint: '#76828b', build: 'kidlat_stock' },
   { x: 151, z: -14, heading: 90, paint: '#a3916c' },
   overlookCar(-18, 8, '#9aa18a'),
-  overlookCar(18, 12, '#7a8d96'),
+  overlookCar(18, 12, '#7a8d96', 'kidlat_street'),
 ];

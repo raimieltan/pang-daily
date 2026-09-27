@@ -27,6 +27,11 @@ export class VehicleVisual {
     return new VehicleVisual(model);
   }
 
+  /** Animates a model that is already placed, e.g. a dressed NPC clone. */
+  static wrap(model: VehicleModel): VehicleVisual {
+    return new VehicleVisual(model);
+  }
+
   /** `steerAngle` in rad (right +), `forwardSpeed` in m/s along the car. */
   update(dt: number, steerAngle: number, forwardSpeed: number): void {
     const { wheels } = this.model;

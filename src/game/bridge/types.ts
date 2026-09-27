@@ -73,6 +73,8 @@ export type RaceStanding = {
 
 export type RaceResult = RaceStanding & {
   timeMs: number;
+  /** Paid for beating a named rival. */
+  prizePhp?: number;
 };
 
 /** Where the player is in the hub. Sent on arrival/departure, not continuously. */

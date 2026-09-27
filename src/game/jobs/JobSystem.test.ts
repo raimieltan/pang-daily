@@ -42,7 +42,8 @@ const payouts = (wallet: VehicleSession) => wallet.snapshot().transactions.filte
 it('is discovered at the Kyo board, starts in the car, and pays once after pickup then drop-off', () => {
   const s = setup();
   s.commands.interact();
-  expect(useJobStore.getState().board?.listings).toEqual([expect.objectContaining({ id: 'kyo_ice_run', payoutPhp: 450, status: 'available', stops: ['Suki 24', 'Kyo Coffee'] })]);
+  expect(useJobStore.getState().board?.listings.map(l => l.id)).toEqual(['kyo_ice_run', 'kyo_pastry_round', 'kyo_overlook_catering', 'kyo_bean_pickup']);
+  expect(useJobStore.getState().board?.listings[0]).toEqual(expect.objectContaining({ id: 'kyo_ice_run', payoutPhp: 450, status: 'available', stops: ['Suki 24', 'Kyo Coffee'] }));
   s.commands.acceptJob('kyo_ice_run');
   expect(useJobStore.getState().board).toBeNull();
   expect(job()).toMatchObject({ status: 'accepted', hint: 'Get in your car to start.' });
@@ -136,7 +137,7 @@ it('persists the job in progress across a runtime restart', () => {
 it("lists Mang Boy's errands at the talyer board, with on-foot stops for the oil run", () => {
   const s = setup();
   s.at(TALYER_BOARD, 'walking'); s.commands.interact();
-  expect(useJobStore.getState().board?.listings.map(l => l.id)).toEqual(['talyer_oil_errand', 'talyer_battery_drop']);
+  expect(useJobStore.getState().board?.listings.map(l => l.id)).toEqual(['talyer_oil_errand', 'talyer_battery_drop', 'talyer_alternator_drop', 'talyer_rims_pickup']);
   s.commands.acceptJob('talyer_oil_errand');
   expect(job()).toMatchObject({ status: 'active', type: 'errand' }); // No start requirement: it starts on foot.
   const [pickup, dropoff] = stops(TALYER_OIL_ERRAND);
@@ -194,5 +195,5 @@ it('takes a hatid from the fuel board, tips a smooth quick ride, and replays cle
   expect(s.jobs.current).toBeNull();
   expect(payouts(s.wallet).map(tx => tx.amountPhp)).toEqual([480, 380]);
   s.at(FUEL_BOARD, 'walking'); s.commands.interact();
-  expect(useJobStore.getState().board?.listings).toEqual([expect.objectContaining({ id: 'hatid_suki_home', status: 'available', completedCount: 2 })]);
+  expect(useJobStore.getState().board?.listings[0]).toEqual(expect.objectContaining({ id: 'hatid_suki_home', status: 'available', completedCount: 2 }));
 });

@@ -23,7 +23,7 @@ export function DrivingHud() {
   return (
     <div className="flex flex-col items-end gap-1" data-testid="driving-hud">
       {progress && <div className="race-readout text-right" aria-live="polite">
-        {progress.phase === "READY" && <p>Barangay sprint · Meet the rival at the gold line east of Home.</p>}
+        {progress.phase === "READY" && <p>Races · Stop on a gold start line in town or on the mountain.</p>}
         {progress.phase === "COUNTDOWN" && <p className="text-3xl">{progress.countdown || "GO!"}</p>}
         {progress.phase === "RUNNING" && <>
           <p>{(progress.elapsedMs / 1000).toFixed(1)}s · Gates {progress.checkpoint}/{progress.total}</p>
@@ -43,7 +43,7 @@ export function DrivingHud() {
       )}
       {!race && lastResult && (
         <span data-testid="race-result">
-          Finished P{lastResult.position}/{lastResult.racers} · {(lastResult.timeMs / 1000).toFixed(2)}s
+          Finished P{lastResult.position}/{lastResult.racers} · {(lastResult.timeMs / 1000).toFixed(2)}s{lastResult.prizePhp ? ` · +₱${lastResult.prizePhp.toLocaleString()}` : ""}
         </span>
       )}
       {vehicle && (
