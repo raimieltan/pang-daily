@@ -254,7 +254,8 @@ export class CharacterVisual {
     this.legs.forEach(({ hip, knee }, i) => {
       const cycle = this.phase + i * Math.PI;
       hip.rotation.x = Math.sin(cycle) * 0.62 * this.weight;
-      knee.rotation.x = -Math.max(0, Math.cos(cycle)) * 0.85 * this.weight;
+      // The rig faces +z: positive knee flexion folds the shin backward.
+      knee.rotation.x = Math.max(0, Math.cos(cycle)) * 0.85 * this.weight;
     });
     this.arms.forEach(({ shoulder, elbow }, i) => {
       shoulder.rotation.x = -Math.sin(this.phase + i * Math.PI) * 0.42 * this.weight;
