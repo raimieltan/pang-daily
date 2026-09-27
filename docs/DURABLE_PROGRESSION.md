@@ -1,5 +1,7 @@
 # Durable social and content progression
 
+Detailed per-NPC event effects are retained for the newest 200 social events per player. The `20260927160000_social_detail_retention` migration prunes older effects, and each later social write enforces the same limit in its transaction. Event IDs, source keys, fingerprints, order, reputation deltas, and durable aggregate records remain indefinitely: they are needed for duplicate rejection, rival continuity, reward caps, and progression. The retained envelope has no historical trust/flag delta after its detail expires; current trust, flags, favors, crew state, and unlocks are read from their relational records.
+
 Authenticated gameplay uses `POST /api/player/commands`. Every command identifies an action and stable content IDs; the authenticated principal selects the player. There is no player ID selector, final social value setter, arbitrary unlock grant, or reward amount in this API.
 
 The player's wallet lock serializes commands. The transaction includes the gameplay fact, wallet transaction, social rule effects, consumed event sources, discovered opportunities, chapter markers, and command receipt. A failed write rolls everything back. The same request key returns the original receipt; a new key for an already completed source cannot apply progression or pay again. Conflicting race completion facts are rejected.

@@ -54,7 +54,6 @@ export class PlayerRepository {
           } });
           if (!player || player.archivedAt || !player.wallet || !player.saveVersion || !player.inventory || !player.activeVehicleId ||
             !player.vehicles.some(vehicle => vehicle.id === player.activeVehicleId) || player.vehicles.some(vehicle => !vehicle.condition) ||
-            !starter.npcIds.every(id => player.npcs.some(npc => npc.npcId === id)) ||
             !player.npcs.some(npc => npc.npcId === starter.rival.npcId && npc.rival) ||
             !starter.sceneIds.every(id => player.reputation.some(scene => scene.sceneId === id)) ||
             !starter.crewIds.every(id => player.crews.some(crew => crew.crewId === id && crew.membership)) ||

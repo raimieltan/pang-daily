@@ -46,6 +46,7 @@ describe('deterministic social events', () => {
  it('tracks favor failure and repairs trust through an authored follow-up job', () => {
   const session = new SocialSession(SOCIAL_CONTENT);
   session.applyEvent(dialogue());
+  session.chooseConversation('talyer_mang_boy', 'mang_first', 'promise_help');
   session.applyEvent(favor('accepted'));
   session.applyEvent(favor('failed'));
   expect(session.snapshot().npcs.mang_boy.trust).toBeLessThan(50);
@@ -54,6 +55,8 @@ describe('deterministic social events', () => {
   session.applyEvent({ type: 'favor', eventId: 'recovery:completed', sourceId: 'talyer_battery_drop#1', npcId: 'mang_boy', favorId: 'mang_boy_recovery', jobId: 'talyer_battery_drop', runId: 'talyer_battery_drop#1', phase: 'completed', jobStatus: 'completed' });
   expect(session.snapshot().npcs.mang_boy.trust).toBeGreaterThan(30);
   expect(session.snapshot().favors.mang_boy_recovery.status).toBe('completed');
+  expect(session.snapshot().npcs.mang_boy.trust).toBeGreaterThanOrEqual(58);
+  expect(session.discoverOpportunities().map(item => item.id)).toContain('mang_boy_service');
   expect(session.relationships('mang_boy').mentor).toBe(true);
  });
 

@@ -10,7 +10,7 @@ export const SOCIAL_CONTENT: SocialContent = {
  npcs: [
   { id: 'mang_boy', name: 'Mang Boy', roles: ['mechanic', 'mentor'], homeInteractionId: 'talyer_bay_1', homeLocationId: 'talyer', dialogueEntryId: 'talyer_mang_boy' },
   { id: 'casey', name: 'Casey', roles: ['rival'], homeInteractionId: 'casey_corner', homeLocationId: 'coffee_shop', dialogueEntryId: 'casey_intro', crewId: 'kyo_regulars', vehicleBuildId: 'casey_kidlat_rs' },
-  { id: 'kyo_barista', name: 'Kyo Barista', roles: ['seller'], homeInteractionId: 'kyo_counter', homeLocationId: 'coffee_shop', dialogueEntryId: 'kyo_order' },
+  { id: 'kyo_barista', name: 'Kyo Barista', roles: ['friend', 'seller'], homeInteractionId: 'kyo_counter', homeLocationId: 'coffee_shop', dialogueEntryId: 'kyo_order' },
   { id: 'jun_surplus', name: 'Jun Surplus Parts', roles: ['seller'], homeInteractionId: 'marketplace:seller:jun_surplus', homeLocationId: 'marketplace', dialogueEntryId: 'seller_jun_surplus' },
  ],
  crews: CREWS,
@@ -18,6 +18,7 @@ export const SOCIAL_CONTENT: SocialContent = {
  events: [
   ...['raced_casey', 'beat_casey', 'lost_to_casey', 'casey_shared_dnf'].map(id => ({ id, npcIds: ['casey'], sceneId: 'iloilo_scene' })),
   { id: 'met_at_talyer', npcIds: ['mang_boy'], sceneId: 'iloilo_scene' },
+  { id: 'met_kyo_barista', npcIds: ['kyo_barista'], sceneId: 'iloilo_scene' },
   { id: 'met_casey_at_kyo', npcIds: ['casey'], sceneId: 'iloilo_scene' },
   { id: 'helped_mang_boy', npcIds: ['mang_boy'], sceneId: 'iloilo_scene' },
   { id: 'broke_mang_boy_commitment', npcIds: ['mang_boy'], sceneId: 'iloilo_scene' },
@@ -34,6 +35,7 @@ export const SOCIAL_CONTENT: SocialContent = {
   { id: 'mentorship_offered', npcId: 'mang_boy', establishes: 'mentor' },
   { id: 'promised_help', npcId: 'mang_boy' },
   { id: 'apology_offered', npcId: 'mang_boy' },
+  { id: 'introduced_mang_boy', npcId: 'kyo_barista', establishes: 'friend' },
  ],
  unlocks: [{ id: 'talyer_favor', sourceEventId: 'met_at_talyer' }, ...SOCIAL_OPPORTUNITIES.map(rule => ({ id: rule.id, sourceEventId: rule.benefit.kind === 'race' || rule.benefit.kind === 'crew' ? 'met_casey_at_kyo' : 'met_at_talyer' }))],
  references: {

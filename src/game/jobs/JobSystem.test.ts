@@ -58,7 +58,7 @@ it('changes a favor only after the validated job run ends, then repairs an aband
   s.at(TALYER_BATTERY_DROP.objectives[0].area, 'driving'); s.commands.interact();
   s.at(TALYER_BATTERY_DROP.objectives[1].area, 'walking'); s.commands.interact();
   expect(loadSocialSession(storage).snapshot().favors.mang_boy_recovery.status).toBe('completed');
-  expect(loadSocialSession(storage).snapshot().npcs.mang_boy.trust).toBe(54);
+ expect(loadSocialSession(storage).snapshot().npcs.mang_boy.trust).toBe(64);
 });
 
 it('is discovered at the Kyo board, starts in the car, and pays once after pickup then drop-off', () => {

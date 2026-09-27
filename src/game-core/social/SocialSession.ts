@@ -88,7 +88,7 @@ export class SocialSession {
     addUnique(npc.favorIds, 'mang_boy_parts_help');
    } else if (effect.choiceId === 'apologize') {
     if (!['failed', 'abandoned'].includes(next.favors.mang_boy_parts_help?.status ?? '')) throw new Error('unavailable dialogue choice');
-   } else if (!next.appliedEvents.some((item) => item.type === 'race' && item.targetId === definition.npcId) || npc.relationshipFlags.includes('trusted_friend') || npc.relationshipFlags.includes('hostile')) throw new Error('unavailable dialogue choice');
+   } else if (effect.choiceId !== 'introduce_mang_boy' && (!next.appliedEvents.some((item) => item.type === 'race' && item.targetId === definition.npcId) || npc.relationshipFlags.includes('trusted_friend') || npc.relationshipFlags.includes('hostile'))) throw new Error('unavailable dialogue choice');
    if (reward.flag) { addUnique(npc.relationshipFlags, reward.flag); flagsAdded.push(reward.flag); }
   } else if (effect?.kind === 'favorOffer') {
    const favor = this.content.favors.find((item) => item.id === effect.favorId && item.npcId === definition.npcId);

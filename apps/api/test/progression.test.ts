@@ -45,6 +45,49 @@ test('durable social and content progression', async t => {
   return { attemptId, action, key, receipt };
  }
  try {
+  await t.test('older profile gains the Kyo friend with safe defaults and persists a one-time referral', async () => {
+   const a = await account();
+   const original = await load(a.cookie);
+   await db.npcRelationship.delete({ where: { playerId_npcId: { playerId: a.playerId, npcId: 'kyo_barista' } } });
+   const migrated = await load(a.cookie);
+   assert.deepEqual(migrated.economy, original.economy);
+   assert.deepEqual(migrated.vehicles, original.vehicles);
+   assert.deepEqual(migrated.inventory, original.inventory);
+   assert.deepEqual(migrated.progression, original.progression);
+   assert.deepEqual(migrated.social.state.npcs.kyo_barista, original.social.state.npcs.kyo_barista);
+   await introduce(a.cookie, 'kyo_order');
+   await choose(a.cookie, 'kyo_order', 'kyo_first', 'meet_kyo');
+   const key = randomUUID();
+   const referral = { type: 'social_choice', dialogueId: 'kyo_order', nodeId: 'kyo_familiar', choiceId: 'introduce_mang_boy' } as const;
+   await command(a.cookie, referral, 200, key);
+   const saved = await load(a.cookie);
+   assert.equal(saved.social.state.npcs.kyo_barista.trust, 52);
+   assert.ok(saved.social.state.npcs.kyo_barista.relationshipFlags.includes('introduced_mang_boy'));
+   assert.ok(await db.npcRelationship.findUnique({ where: { playerId_npcId: { playerId: a.playerId, npcId: 'kyo_barista' } } }));
+   await command(a.cookie, referral, 200, key);
+   assert.deepEqual((await load(a.cookie)).social.state, saved.social.state);
+   await introduce(a.cookie, 'talyer_mang_boy');
+   await choose(a.cookie, 'talyer_mang_boy', 'mang_referred', 'promise_help_referred');
+   assert.equal((await load(a.cookie)).social.state.favors.mang_boy_parts_help.status, 'offered');
+  });
+  await t.test('social history retains deduplication envelopes while limiting detailed effects', async () => {
+   const a = await account();
+   const events = Array.from({ length: 201 }, (_, index) => ({
+    id: randomUUID(), playerId: a.playerId, sequence: index + 1,
+    eventId: `historic:${index}`, sourceId: `historic:${index}`, sourceKey: `historic:${index}`,
+    fingerprint: '{}', type: 'conversation', targetContentId: 'kyo_barista',
+    contextContentId: 'kyo_familiar', reason: 'Historic conversation',
+   }));
+   await db.socialEvent.createMany({ data: events });
+   await db.socialEventEffect.createMany({ data: events.map(event => ({
+    socialEventId: event.id, playerId: a.playerId, npcId: 'kyo_barista',
+    trustDelta: 0, respectDelta: 0, flagsAdded: [], flagsRemoved: [],
+   })) });
+   await introduce(a.cookie, 'kyo_order');
+   assert.equal(await db.socialEvent.count({ where: { playerId: a.playerId } }), 202);
+   assert.equal(await db.socialEventEffect.count({ where: { playerId: a.playerId } }), 200);
+   assert.ok(await db.socialEvent.findUnique({ where: { playerId_sourceKey: { playerId: a.playerId, sourceKey: 'historic:0' } } }));
+  });
   await t.test('strict intents, invalid content and cross-player references cannot assign social truth', async () => {
    const a = await account(), b = await account();
    for (const action of [{ type: 'social_introduce', dialogueId: 'casey_intro', trust: 100 }, { type: 'set_reputation', points: 999 }, { type: 'unlock', unlockId: 'midnight_run' }, { type: 'social_choice', playerId: b.playerId, dialogueId: 'casey_intro', nodeId: 'kyo_crew', choiceId: 'crew_accept' }]) assert.equal((await call('/player/commands', a.cookie, { key: randomUUID(), action })).status, 400);

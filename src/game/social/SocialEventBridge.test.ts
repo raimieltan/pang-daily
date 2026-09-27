@@ -21,7 +21,7 @@ describe('social event bridge', () => {
   const state = loadSocialSession(storage).snapshot();
   expect(state.favors.mang_boy_parts_help.status).toBe('failed');
   expect(state.favors.mang_boy_recovery.status).toBe('completed');
-  expect(state.npcs.mang_boy.trust).toBe(46);
+ expect(state.npcs.mang_boy.trust).toBe(56);
   expect(errors).not.toHaveBeenCalled();
   social.dispose(); bridge.dispose();
  });

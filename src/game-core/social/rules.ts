@@ -15,6 +15,7 @@ type Reward = { readonly trust: number; readonly respect: number; readonly reaso
 export const SOCIAL_RULES = {
  dialogue: {
   introduction: { trust: 0, respect: 0, reason: 'First conversation' },
+  introduce_mang_boy: { trust: 2, respect: 0, reason: 'Shared trusted mechanic introduction', flag: 'introduced_mang_boy' },
   promise_help: { trust: 2, respect: 0, reason: 'Promised to help Mang Boy', flag: 'promised_help' },
   apologize: { trust: 0, respect: 0, reason: 'Apologized to Mang Boy', flag: 'apology_offered' },
   congratulate_casey: { trust: 3, respect: 0, reason: 'Gave Casey credit after a race', flag: 'trusted_friend' },
@@ -26,7 +27,7 @@ export const SOCIAL_RULES = {
   completed: { trust: 8, respect: 5, reason: 'Kept a commitment' },
   failed: { trust: -20, respect: -3, reason: 'Broke a commitment' },
   abandoned: { trust: -12, respect: -2, reason: 'Abandoned a commitment' },
-  recovery: { trust: 16, respect: 3, reason: 'Made amends through follow-up help', flag: 'mentorship_offered' },
+  recovery: { trust: 26, respect: 3, reason: 'Made amends through follow-up help', flag: 'mentorship_offered' },
  },
  race: {
   win: { trust: 0, respect: 8, reason: 'Won a valid race' },

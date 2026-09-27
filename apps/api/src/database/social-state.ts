@@ -4,6 +4,8 @@ import { getReputationProgress } from '@pang-daily/game-core/social/reputation';
 import type { SocialState } from '@pang-daily/game-core/social/contract';
 import type { Prisma } from '../generated/prisma/client';
 type Tx = Prisma.TransactionClient;
+/** Detailed trust/flag deltas are kept for the newest 200 events per player. */
+export const SOCIAL_DETAILED_HISTORY_LIMIT = 200;
 export async function loadSocialState(tx: Tx, playerId: string): Promise<SocialState> {
  const player = await tx.playerProfile.findUniqueOrThrow({ where: { id: playerId }, include: {
   npcs: { include: { flags: true, milestones: true, favors: { include: { job: true } } } },
@@ -41,7 +43,7 @@ export async function saveSocialState(tx: Tx, playerId: string, before: SocialSt
  const next = session.snapshot();
  for (const [npcId, npc] of Object.entries(next.npcs)) {
   if (JSON.stringify(before.npcs[npcId]) === JSON.stringify(npc)) continue;
-  await tx.npcRelationship.update({ where: { playerId_npcId: { playerId, npcId } }, data: { introduced: npc.introduced, trust: npc.trust, respect: npc.respect } });
+  await tx.npcRelationship.upsert({ where: { playerId_npcId: { playerId, npcId } }, create: { playerId, npcId, introduced: npc.introduced, trust: npc.trust, respect: npc.respect }, update: { introduced: npc.introduced, trust: npc.trust, respect: npc.respect } });
   await tx.npcRelationshipFlag.deleteMany({ where: { playerId, npcId, flagId: { notIn: npc.relationshipFlags } } });
   for (const flagId of npc.relationshipFlags) await tx.npcRelationshipFlag.upsert({ where: { playerId_npcId_flagId: { playerId, npcId, flagId } }, create: { playerId, npcId, flagId }, update: {} });
   for (const eventContentId of npc.eventIds) await tx.npcMilestone.upsert({ where: { playerId_npcId_eventContentId: { playerId, npcId, eventContentId } }, create: { playerId, npcId, eventContentId }, update: {} });
@@ -71,5 +73,9 @@ export async function saveSocialState(tx: Tx, playerId: string, before: SocialSt
   sceneId: event.reputation?.sceneId, reputationSourceKey: event.reputation?.sourceKey, reputationDelta: event.reputation?.pointsDelta,
   effects: { create: event.effects.map(effect => ({ ...effect })) },
  } });
+ const oldestDetailedSequence = next.appliedEvents.length - SOCIAL_DETAILED_HISTORY_LIMIT;
+ if (oldestDetailedSequence > 0) {
+  await tx.socialEventEffect.deleteMany({ where: { playerId, event: { sequence: { lte: oldestDetailedSequence } } } });
+ }
  return next;
 }
