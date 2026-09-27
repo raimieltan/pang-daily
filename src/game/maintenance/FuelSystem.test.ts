@@ -1,3 +1,4 @@
+import { EARLY_ECONOMY } from '../../game-core/economy/balance';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { GameBridge } from '../bridge';
@@ -25,7 +26,7 @@ function setup() {
   const interactions = new InteractionSystem(bridge.runtime, focus, [() => zones]);
   const unbind = bindMaintenanceStore(bridge.ui.events);
   const maintenance = new MaintenanceSystem(bridge.runtime, session, vehicle, () => focus.mode === 'driving');
-  const fuel = new FuelSystem(bridge.runtime, session, car, { interactions, rejection: () => fuelRejection({ mode: focus.mode, player: focus.position, car: position, speedKmh: sample.speedMps * 3.6, racing: sample.racing }, zones) });
+  const fuel = new FuelSystem(bridge.runtime, session, car, { interactions, rejection: () => fuelRejection({ mode: focus.mode, player: focus.position, car: position, speedKmh: sample.speedMps * 3.6, racing: sample.racing, fuelLiters: session.summary(car).fuelLiters }, zones) });
   const errors: string[] = []; bridge.ui.events.on('commandRejected', e => errors.push(e.reason));
   cleanup.push(() => { fuel.dispose(); maintenance.dispose(); interactions.dispose(); unbind(); bridge.dispose(); });
   return { bridge, commands: bridge.ui.commands, session, focus, position, sample, fuel, maintenance, vehicle, errors };
@@ -81,4 +82,19 @@ it('uses final performance fuel consumption while preserving the stock distance/
   s.vehicle.performanceStats.fuelConsumption = 1.5;
   s.maintenance.update(.5); s.maintenance.dispose();
   expect(s.session.summary(car).fuelLiters).toBeCloseTo(35 - drivingFuelLiters(20, 1, .5) * 1.5);
+});
+
+it('sells a capped paid reserve can for a stranded empty car, with no duplicate charge', () => {
+  const s = setup(); s.session.consumeFuel(car, 35); s.position.set(2200, 100, 3000);
+  s.commands.interact();
+  expect(useMaintenanceStore.getState().fuelOpen).toBe(true);
+  s.commands.quoteFuel({ liters: 45 });
+  const quote = useMaintenanceStore.getState().fuelQuote!;
+  expect(quote.liters).toBe(EARLY_ECONOMY.recovery.reserveCanMaxLiters);
+  const before = s.session.snapshot().walletPhp;
+  s.commands.purchaseFuel(quote.id); s.commands.purchaseFuel(quote.id);
+  expect(s.session.summary(car).fuelLiters).toBe(quote.liters);
+  expect(s.session.snapshot().walletPhp).toBe(before - quote.costPhp);
+  expect(s.session.snapshot().transactions.filter(tx => tx.kind === 'fuel_purchase')).toHaveLength(1);
+  s.fuel.update(); expect(useMaintenanceStore.getState().fuelOpen).toBe(false);
 });

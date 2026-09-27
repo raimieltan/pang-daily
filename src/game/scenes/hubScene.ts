@@ -195,7 +195,7 @@ export const hubScene: SceneDefinition = {
     market.useWorkshop({ rejection: talyer });
     addSystem(new FuelSystem(bridge, session, maintainedCar.definition.spec, {
       interactions, rejection: () => fuelRejection({ mode: modes.mode, player: modes.position,
-        car: maintainedCar.position, speedKmh: maintainedCar.speedKmh, racing: race.active }, zones),
+        car: maintainedCar.position, speedKmh: maintainedCar.speedKmh, racing: race.active, fuelLiters: session.summary(maintainedCar.definition.spec).fuelLiters }, zones),
     }));
     addSystem(jobSystem);
     addSystem(new CustomizationSystem(bridge, inventory, maintainedCar, talyer));

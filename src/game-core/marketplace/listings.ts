@@ -1,3 +1,4 @@
+import { EARLY_ECONOMY } from '../economy/balance';
 import { z } from 'zod';
 import { PART_TEMPLATES, partDefinition, type PartCategory } from '../parts/parts';
 import { MEETUPS, SELLERS, type Seller } from './sellers';
@@ -7,7 +8,7 @@ export type Grade = typeof GRADES[number];
 /** Lower bound of actual condition each grade honestly describes. */
 const GRADE_FLOOR: Record<Grade, number> = { like_new: .85, good: .65, fair: .4, as_is: 0 };
 /** Sellers price off what they advertise, not what the part actually is. */
-const GRADE_PRICE: Record<Grade, number> = { like_new: 1, good: .82, fair: .6, as_is: .38 };
+const GRADE_PRICE: Record<Grade, number> = EARLY_ECONOMY.usedParts.gradePrice;
 export const GRADE_LABEL: Record<Grade, string> = { like_new: 'Like new', good: 'Good condition', fair: 'Used, fair', as_is: 'As is' };
 const BLURBS: Record<Grade, readonly string[]> = {
   like_new: ['Parang bago, boss. Almost no use.', 'Pull-out lang, walang issue.', 'Barely used. Upgraded kaya binebenta.'],
@@ -61,8 +62,8 @@ export function generateListing(seed: number, id: string, now: number, lifetimeM
   const advertisedGrade = GRADES[Math.min(GRADES.length - 1, Math.max(0, GRADES.indexOf(honestGrade) - bump))];
   const [low, high] = template.priceRange;
   // Round like real posts: to ₱50 below ₱5k, ₱100 above. A little haggle room baked in.
-  const raw = (low + (high - low) * r()) * GRADE_PRICE[advertisedGrade] * (1 + (r() - .5) * .1);
-  const step = raw < 5000 ? 50 : 100;
+  const raw = (low + (high - low) * r()) * GRADE_PRICE[advertisedGrade] * (1 + (r() - .5) * EARLY_ECONOMY.usedParts.haggleSpread);
+  const step = raw < EARLY_ECONOMY.usedParts.largePriceThreshold ? EARLY_ECONOMY.usedParts.smallPriceStep : EARLY_ECONOMY.usedParts.largePriceStep;
   return {
     id, templateId: template.id, sellerId: seller.id, location: pick(r, seller.locations),
     askingPricePhp: Math.max(step, Math.round(raw / step) * step), advertisedGrade, blurb: pick(r, BLURBS[advertisedGrade]),

@@ -174,10 +174,10 @@ it("lists Mang Boy's errands at the talyer board, with on-foot stops for the oil
 
 it('needs fuel to start the battery drop and hands it over on foot at the roadside', () => {
   const s = setup();
-  s.world.fuelLiters = 2;
+  s.world.fuelLiters = TALYER_BATTERY_DROP.requirements.minFuelLiters! / 2;
   s.at(TALYER_BOARD, 'walking'); s.commands.interact(); s.commands.acceptJob('talyer_battery_drop');
   s.at(TALYER_BOARD, 'driving'); s.system.update(1); // The hint refreshes on the view throttle.
-  expect(job()).toMatchObject({ status: 'accepted', hint: 'Needs at least 6 L of fuel.' });
+  expect(job()).toMatchObject({ status: 'accepted', hint: `Needs at least ${TALYER_BATTERY_DROP.requirements.minFuelLiters} L of fuel.` });
   s.world.fuelLiters = 20; s.system.update(.1);
   expect(job()).toMatchObject({ status: 'active', timeLimitSeconds: 300 });
   const [pickup, dropoff] = stops(TALYER_BATTERY_DROP);

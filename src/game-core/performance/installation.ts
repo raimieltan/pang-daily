@@ -1,3 +1,4 @@
+import { PERFORMANCE_LABOR } from '../economy/balance';
 import type { InventoryItem, InventorySession } from '../inventory/InventorySession';
 import { InventorySession as Inventory } from '../inventory/InventorySession';
 import type { VehicleCondition, VehicleDefinition } from '../vehicles/VehicleDefinition';
@@ -12,10 +13,7 @@ import type { InstallContext, PerformanceCategory } from './schema';
 
 export const TALYER_PERFORMANCE = { mechanicLevel: 2, reputation: 0 } satisfies InstallContext;
 /** Labor only; parts must already be owned. Whole PHP, tunable independently of sale prices. */
-export const PERFORMANCE_LABOR_PHP: Record<PerformanceCategory, number> = {
-  engine: 3500, fuel_system: 1800, intake: 250, exhaust: 600, turbo: 2500,
-  cooling: 650, ecu: 800, clutch: 1500, transmission: 2500, differential: 1800, supporting_mod: 350,
-};
+export const PERFORMANCE_LABOR_PHP: Record<PerformanceCategory, number> = PERFORMANCE_LABOR;
 export type PerformanceOperation = 'install' | 'remove';
 export type PerformancePreview = {
   itemId: string; name: string; operation: PerformanceOperation; laborPhp: number;

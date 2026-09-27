@@ -1,3 +1,4 @@
+import { RACE_REWARDS } from '../../game-core/economy/balance';
 import { FIRST_RIVAL } from '@/game-core/social/rivalHistory';
 import { RIVAL_TUNING } from './Race';
 import { filletPolyline } from "../world/layoutTools";
@@ -7,7 +8,7 @@ const gate = (id: string, x: number, z: number, east = true): Gate => ({
 });
 /** Short north-street sprint with one readable right bend and a drive-away past the finish. */
 export const LOCAL_ROUTE: RaceDefinition = {
-  rival: { npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, name: FIRST_RIVAL.name, build: FIRST_RIVAL.vehicleBuildId, paint: '#f1f0eb', tier: 1, prizePhp: 400, tuning: RIVAL_TUNING },
+  rival: { npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, name: FIRST_RIVAL.name, build: FIRST_RIVAL.vehicleBuildId, paint: '#f1f0eb', tier: 1, prizePhp: RACE_REWARDS.barangay_sprint, tuning: RIVAL_TUNING },
   id: "barangay_sprint", name: "Barangay sprint", mode: "point-to-point",
   start: { x: -65, y: 0, z: 137.5 }, heading: Math.PI / 2,
   checkpoints: [gate("North street", -20, 140), gate("Brake for right", 78, 140), gate("Coffee bend", 120, 108, false)],

@@ -1,3 +1,4 @@
+import { EARLY_ECONOMY } from '../economy/balance';
 import type { PersistencePort, PersistentIntent } from '../persistence/PersistencePort';
 import { discountedPrice, type SocialAccess } from '../social/eligibility';
 import { opportunity } from '../social/opportunities';
@@ -6,7 +7,7 @@ import { z } from 'zod';
 import { vehicleConditionSchema, type VehicleCondition, type VehicleDefinition } from '../vehicles/VehicleDefinition';
 import { applyConditionLoss, repairLines, SERVICE_COMPONENTS, type ConditionLoss, type RepairLine, type ServiceComponent } from './condition';
 
-export const STARTING_WALLET_PHP = 5000;
+export const STARTING_WALLET_PHP = EARLY_ECONOMY.startingCashPhp;
 const ownedSchema = z.object({ condition: vehicleConditionSchema, revision: z.number().int().nonnegative(), fuelLiters: z.number().min(0).max(FUEL_CAPACITY_LITERS) });
 const sessionSchema = z.object({ version: z.literal(2), walletPhp: moneySchema,
   checkpoint: z.object({ balancePhp: moneySchema, sequence: z.number().int().nonnegative() }).optional(),

@@ -18,9 +18,10 @@ const click = (element: HTMLElement) => act(() => element.click());
 const checkbox = (label: string) => Array.from(container.querySelectorAll('label')).find(el => el.textContent?.includes(label))!.querySelector('input')!;
 const payButton = () => Array.from(container.querySelectorAll('button')).find(el => el.textContent?.startsWith('Pay '))!;
 const text = (id: string) => container.querySelector(`[data-testid="${id}"]`)?.textContent;
-function setup() {
+function setup(walletPhp = 5000) {
   const bridge = new GameBridge(), session = new VehicleSession();
   release.push(() => bridge.dispose(), bindGameUiStore(bridge.ui), bindMaintenanceStore(bridge.ui.events));
+  if (walletPhp < 5000) session.spend(5000 - walletPhp, { kind: 'expense', source: 'test', description: 'Prior spending' });
   let quote: RepairQuote = session.quote(car);
   bridge.runtime.handle('repairVehicle', ({ quoteId, components }) => {
     if (quoteId !== quote.id) return { rejected: 'Old quote' };
@@ -51,7 +52,7 @@ it('shows an itemized quote, updates totals, pays once and shows repaired condit
   expect(session.snapshot().transactions.filter(t => t.kind === 'repair')).toHaveLength(1);
 });
 it('blocks unaffordable selections, displays a rejection and closes cleanly', () => {
-  const { bridge } = setup();
+  const { bridge } = setup(100);
   for (const input of container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) click(input);
   expect(payButton().disabled).toBe(true);
   expect(container.textContent).toContain('Not enough cash. Choose fewer repairs.');

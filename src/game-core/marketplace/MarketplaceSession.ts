@@ -1,3 +1,4 @@
+import { EARLY_ECONOMY } from '../economy/balance';
 import type { PersistencePort } from '../persistence/PersistencePort';
 import { discountedPrice, type SocialAccess } from '../social/eligibility';
 import { opportunity } from '../social/opportunities';
@@ -11,7 +12,7 @@ import { generateListing, GRADE_LABEL, listingSchema, listingView, seller, verdi
 /** Visible listings at once; expired ones are replaced on the next sync. */
 export const BOARD_SIZE = 8;
 /** Mang Boy's fee to put a part on the bench and tell you what it really is. */
-export const MECHANIC_INSPECTION_PHP = 150;
+export const MECHANIC_INSPECTION_PHP = EARLY_ECONOMY.usedParts.inspectionPhp;
 
 const marketSaveSchema = z.object({ version: z.literal(1), seed: z.number().int().nonnegative(), serial: z.number().int().nonnegative(),
   listings: z.array(listingSchema) });

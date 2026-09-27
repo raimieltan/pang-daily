@@ -1,3 +1,4 @@
+import { RACE_REWARDS } from '../../game-core/economy/balance';
 import { FIRST_RIVAL } from '@/game-core/social/rivalHistory';
 import { HUB_LAYOUT } from '../world/hub/hubLayout';
 import { pointAlong, polylineLength } from '../world/layoutTools';
@@ -50,28 +51,28 @@ export const KYO_BLOCK_LAP: RaceDefinition = {
     box('Kyo bend', at(LOOP_START + 470)), box('Main road', at(LOOP_START + 640))],
   finish: box('Bahandi line', at(LOOP_LENGTH + LOOP_START - 20)),
   waypoints: paced(lane(LOOP, LOOP_START, LOOP_LENGTH + LOOP_START + 60, 3.5), 19),
-  rival: rival({ name: 'Jun-jun', paint: '#c3b18e', build: 'donor_daily', tier: 1, prizePhp: 400 }),
+  rival: rival({ name: 'Jun-jun', paint: '#c3b18e', build: 'donor_daily', tier: 1, prizePhp: RACE_REWARDS.kyo_block_lap }),
 };
 
 /** Tier 2. Alimodian into the vegetable terraces, finishing at the top of the climb. */
 export const TERRACE_SPRINT = mountainRace({
   id: 'terrace_sprint', name: 'Terrace sprint', direction: 1, from: 200, to: ROUTE_LENGTH * .36 - 30,
   gates: [.12, .17, .27], finish: 'Top of the climb', driveAwayM: 150,
-  rival: rival({ name: 'Totoy', paint: '#516353', build: 'tidy_kit', tier: 2, prizePhp: 700 }),
+  rival: rival({ name: 'Totoy', paint: '#516353', build: 'tidy_kit', tier: 2, prizePhp: RACE_REWARDS.terrace_sprint }),
 });
 
 /** Tier 3. From Pahuway overlook down the Maasin descent. Casey's hatch loves it. */
 export const PAHUWAY_DESCENT = mountainRace({
   id: 'pahuway_descent', name: 'Pahuway descent', direction: 1, from: OVERLOOK_S + 45, to: ROUTE_LENGTH - 65,
   gates: [.79, .86, .93], finish: 'Maasin arrival', driveAwayM: 40,
-  rival: rival({ npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, name: FIRST_RIVAL.name, paint: '#f1f0eb', build: 'casey_kidlat_rs', tier: 3, prizePhp: 1100 }),
+  rival: rival({ npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, name: FIRST_RIVAL.name, paint: '#f1f0eb', build: 'casey_kidlat_rs', tier: 3, prizePhp: RACE_REWARDS.pahuway_descent }),
 });
 
 /** Tier 4. Up the red-earth wall and along the ridge, against Kent's quiet EFI swap. */
 export const THE_WALL = mountainRace({
   id: 'the_wall', name: 'The wall', direction: 1, from: ROUTE_LENGTH * .17 + 40, to: ROUTE_LENGTH * .66,
   gates: [.3, .36, .44, .51, .58], finish: 'Ridge end', driveAwayM: 150,
-  rival: rival({ name: 'Kent', paint: '#eeede8', build: 'kent_sleeper', tier: 4, prizePhp: 1600 }),
+  rival: rival({ name: 'Kent', paint: '#eeede8', build: 'kent_sleeper', tier: 4, prizePhp: RACE_REWARDS.the_wall }),
 });
 
 /**
@@ -96,7 +97,7 @@ export const MIDNIGHT_RUN: RaceDefinition = {
     const n = Math.max(1, Math.ceil(Math.hypot(next.x - p.x, next.z - p.z) / 3));
     return Array.from({ length: n }, (_, k) => ({ x: p.x + (next.x - p.x) * k / n, z: p.z + (next.z - p.z) * k / n }));
   }), 19), ...mountainLane],
-  rival: rival({ name: 'Sean', paint: '#1f4f9e', build: 'sean_evo_tribute', tier: 5, prizePhp: 3000 }),
+  rival: rival({ name: 'Sean', paint: '#1f4f9e', build: 'sean_evo_tribute', tier: 5, prizePhp: RACE_REWARDS.midnight_run }),
 };
 
 /** Ordered easiest first; each tier's rival runs a faster build and drives it harder. */

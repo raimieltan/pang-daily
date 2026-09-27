@@ -28,3 +28,13 @@ saves migrate to version 2 with full tanks and enriched ledger entries. Legacy
 transaction timestamps use the Unix epoch because the original save did not record
 times. Saves with inconsistent ledger balances are rejected using the existing
 fresh-session fallback. Storage failure retains a valid in-memory session, as before.
+
+
+## M2 balance
+
+All M2 money tuning lives in [balance.ts](./balance.ts); runtime routes and server commands
+consume the same rewards and prices. [M2_ECONOMY_BALANCE.md](../../../docs/M2_ECONOMY_BALANCE.md)
+records assumptions, job counts, recovery requirements, and the 75-minute validation run.
+An empty stranded car qualifies for a paid reserve can at a pump, capped by the shared
+recovery configuration. Walk to the pump after earning through the oil-and-coolant errand;
+this does not give cash, reset condition, or create debt.

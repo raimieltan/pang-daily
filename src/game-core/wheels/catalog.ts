@@ -1,3 +1,4 @@
+import { PART_PRICE_RANGES } from '../economy/balance';
 import { parseWheelPart, type WheelPart } from "./WheelPart";
 
 /**
@@ -17,7 +18,7 @@ export const WHEEL_PARTS: readonly WheelPart[] = [
     tireSize: "165/65R14",
     fit: { diameterM: 0.57, widthM: 0.165, offsetMm: 49 },
     massKg: 12.5,
-    market: { priceRangePhp: [1500, 2400], conditionRange: [0.5, 1] },
+    market: { priceRangePhp: PART_PRICE_RANGES.wheels_steelies_14, conditionRange: [0.5, 1] },
     modifiers: { grip: -0.03, braking: 0, acceleration: 0.02 },
     visual: { style: "steelie", rimColor: "#9aa0a6" },
   }),
@@ -32,7 +33,7 @@ export const WHEEL_PARTS: readonly WheelPart[] = [
     tireSize: "195/55R15",
     fit: { diameterM: 0.6, widthM: 0.195, offsetMm: 35 },
     massKg: 14,
-    market: { priceRangePhp: [7000, 11000], conditionRange: [0.4, 0.95] },
+    market: { priceRangePhp: PART_PRICE_RANGES.wheels_mags_15_4x100, conditionRange: [0.4, 0.95] },
     modifiers: { grip: 0.06, braking: 0.03, acceleration: 0 },
     visual: { style: "multi_spoke", rimColor: "#c9ccd1" },
   }),
@@ -47,7 +48,7 @@ export const WHEEL_PARTS: readonly WheelPart[] = [
     tireSize: "215/45R17",
     fit: { diameterM: 0.64, widthM: 0.215, offsetMm: 15 },
     massKg: 19,
-    market: { priceRangePhp: [5500, 9500], conditionRange: [0.25, 0.8] },
+    market: { priceRangePhp: PART_PRICE_RANGES.wheels_oversized_17_deep_dish, conditionRange: [0.25, 0.8] },
     modifiers: { grip: 0.04, braking: -0.04, acceleration: -0.06 },
     visual: { style: "deep_dish", rimColor: "#e3e5e8" },
   }),

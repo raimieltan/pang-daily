@@ -1,3 +1,4 @@
+import { EARLY_ECONOMY } from '../../game-core/economy/balance';
 import type { VehicleDefinition } from '../../game-core/vehicles/VehicleDefinition';
 import { VehicleSession } from '../../game-core/maintenance/VehicleSession';
 import type { FuelRequest } from '../../game-core/economy/economy';
@@ -53,8 +54,12 @@ export class FuelSystem implements GameSystem {
     const rejection = this.access.rejection();
     if (rejection) { this.close(); return { rejected: rejection }; }
     if (!this.open) return { rejected: 'Visit a fuel pump first.' };
-    const result = this.session.fuelQuote(this.definition, request);
+    let result = this.session.fuelQuote(this.definition, request);
     if ('rejected' in result) return { rejected: result.rejected };
+    if ((this.session.summary(this.definition).fuelLiters ?? 0) <= EARLY_ECONOMY.recovery.emptyTankThresholdLiters && result.liters > EARLY_ECONOMY.recovery.reserveCanMaxLiters) {
+      result = this.session.fuelQuote(this.definition, { liters: EARLY_ECONOMY.recovery.reserveCanMaxLiters });
+      if ('rejected' in result) return { rejected: result.rejected };
+    }
     this.quote = { ...result, id: `fuel-${++this.serial}` };
     this.bridge.emit('fuelQuote', this.quote);
   }

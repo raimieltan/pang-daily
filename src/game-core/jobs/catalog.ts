@@ -1,3 +1,4 @@
+import { JOB_BALANCE } from '../economy/balance';
 import { defineJob, type JobDefinition } from './jobs';
 /** Canonical authored jobs; coordinates are content, not live runtime transforms. */
 export const HUB_JOBS: readonly JobDefinition[] = [
@@ -6,7 +7,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "delivery",
     "title": "Ice & milk run",
     "description": "Kyo ran out of ice before the late crowd. Grab the order at Suki 24 and bring it back without sloshing it everywhere.",
-    "payoutPhp": 450,
     "offeredAt": [
       "kyo_job_board"
     ],
@@ -56,7 +56,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "delivery",
     "title": "Ensaymada round",
     "description": "Three standing orders for ensaymada boxes: Suki 24, the Bahandi kiosk, and the neighbour by your place. Keep them flat.",
-    "payoutPhp": 560,
     "offeredAt": [
       "kyo_job_board"
     ],
@@ -132,13 +131,11 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "delivery",
     "title": "Coffee for the overlook",
     "description": "A car club booked Kyo for their Pahuway meet. Get the urns and pastry boxes up the mountain while it is still hot.",
-    "payoutPhp": 950,
     "offeredAt": [
       "kyo_job_board"
     ],
     "requirements": {
-      "mode": "driving",
-      "minFuelLiters": 10
+      "mode": "driving"
     },
     "objectives": [
       {
@@ -179,7 +176,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     },
     "bonus": {
       "label": "tip for hot, unspilled coffee",
-      "php": 250,
       "withinSeconds": 450,
       "maxDamage": 0.2
     }
@@ -189,13 +185,11 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "pickup",
     "title": "Beans from Maasin",
     "description": "The roaster in Maasin has Kyo's sacks ready. Drive the whole mountain, load up, and bring them down before closing.",
-    "payoutPhp": 1500,
     "offeredAt": [
       "kyo_job_board"
     ],
     "requirements": {
-      "mode": "driving",
-      "minFuelLiters": 18
+      "mode": "driving"
     },
     "objectives": [
       {
@@ -240,7 +234,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "errand",
     "title": "Oil & coolant for Mang Boy",
     "description": "Mang Boy is out of 20W-50 and coolant. Pick up the order he called in at the Bahandi Fuels kiosk and bring it to the bay.",
-    "payoutPhp": 300,
     "offeredAt": [
       "talyer_job_board"
     ],
@@ -287,13 +280,11 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "errand",
     "title": "Battery for a stalled suki",
     "description": "One of Mang Boy's regulars died on the shoulder out by the mountain road. Take a charged battery to them before they give up and call a tow.",
-    "payoutPhp": 650,
     "offeredAt": [
       "talyer_job_board"
     ],
     "requirements": {
-      "mode": "driving",
-      "minFuelLiters": 6
+      "mode": "driving"
     },
     "objectives": [
       {
@@ -338,13 +329,11 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "delivery",
     "title": "Alternator to Alimodian",
     "description": "Mang Boy rebuilt an alternator for a suki just past the Alimodian sign. Park on the shoulder and walk it to the gate.",
-    "payoutPhp": 600,
     "offeredAt": [
       "talyer_job_board"
     ],
     "requirements": {
-      "mode": "driving",
-      "minFuelLiters": 5
+      "mode": "driving"
     },
     "objectives": [
       {
@@ -402,13 +391,11 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "pickup",
     "title": "Rims from the terraces",
     "description": "A farmer up at the vegetable terraces is selling a set of used rims. Mang Boy already paid. Go fetch them.",
-    "payoutPhp": 800,
     "offeredAt": [
       "talyer_job_board"
     ],
     "requirements": {
-      "mode": "driving",
-      "minFuelLiters": 8
+      "mode": "driving"
     },
     "objectives": [
       {
@@ -453,7 +440,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "passenger",
     "title": "Hatid: Manang Lorna",
     "description": "Manang Lorna has too many grocery bags for a jeepney. Pick her up at Suki 24 and bring her home, gently.",
-    "payoutPhp": 380,
     "offeredAt": [
       "fuel_job_board"
     ],
@@ -498,7 +484,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     },
     "bonus": {
       "label": "tip for a quick, smooth ride",
-      "php": 100,
       "withinSeconds": 120,
       "maxDamage": 0.15
     }
@@ -508,7 +493,6 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "delivery",
     "title": "LPG for the neighbour",
     "description": "Your neighbour ran out of gas mid-sinigang. Load a full tank at the forecourt and carry it to their porch. Upright.",
-    "payoutPhp": 340,
     "offeredAt": [
       "fuel_job_board"
     ],
@@ -558,13 +542,11 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "type": "passenger",
     "title": "Hatid: Pahuway sunset",
     "description": "Two college kids at the Bahandi meet spot missed the last jeep. Take them up to Pahuway overlook. They get carsick.",
-    "payoutPhp": 720,
     "offeredAt": [
       "fuel_job_board"
     ],
     "requirements": {
-      "mode": "driving",
-      "minFuelLiters": 10
+      "mode": "driving"
     },
     "objectives": [
       {
@@ -604,11 +586,19 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     },
     "bonus": {
       "label": "tip for a smooth climb",
-      "php": 200,
       "maxDamage": 0.15
     }
   }
-].map(job => defineJob(job as Parameters<typeof defineJob>[0]));
+].map(job => {
+  const balance = JOB_BALANCE[job.id as keyof typeof JOB_BALANCE];
+  return defineJob({
+    ...job,
+    payoutPhp: balance.payoutPhp,
+    requirements: { ...job.requirements, ...('minFuelLiters' in balance ? { minFuelLiters: balance.minFuelLiters } : {}) },
+    ...(job.bonus ? { bonus: { ...job.bonus, php: balance.bonusPhp } } : {}),
+  } as Parameters<typeof defineJob>[0]);
+});
+
 export const KYO_ICE_RUN = HUB_JOBS.find(job => job.id === 'kyo_ice_run')!;
 export const TALYER_OIL_ERRAND = HUB_JOBS.find(job => job.id === 'talyer_oil_errand')!;
 export const TALYER_BATTERY_DROP = HUB_JOBS.find(job => job.id === 'talyer_battery_drop')!;

@@ -1,3 +1,4 @@
+import { PART_PRICE_RANGES } from '../economy/balance';
 import { parseBodyPart, type BodyPart } from "./BodyPart";
 
 /**
@@ -20,7 +21,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "common",
     fitment: 0.55,
     paint: { paintable: true, finish: "bare_plastic", mismatchColor: null },
-    market: { priceRangePhp: [800, 1500], conditionRange: [0.5, 1] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_universal_rubber_lip, conditionRange: [0.5, 1] },
     effects: { weightKg: 1.5, drag: 0, downforce: 0.005, cooling: 0, reputation: 1 },
   }),
   // Sign-shop special: aluminium composite panel with carbon vinyl, on threaded-rod struts.
@@ -37,7 +38,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "common",
     fitment: 0.6,
     paint: { paintable: false, finish: "fake_carbon", mismatchColor: null },
-    market: { priceRangePhp: [1200, 2200], conditionRange: [0.35, 0.9] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_acp_chin_splitter, conditionRange: [0.35, 0.9] },
     effects: { weightKg: 3, drag: 0.005, downforce: 0.01, cooling: -0.04, reputation: 2 },
   }),
   parseBodyPart({
@@ -53,7 +54,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "uncommon",
     fitment: 0.7,
     paint: { paintable: true, finish: "primer", mismatchColor: null },
-    market: { priceRangePhp: [3500, 5500], conditionRange: [0.35, 0.9] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_dalagan_fiberglass_skirts, conditionRange: [0.35, 0.9] },
     effects: { weightKg: 6, drag: -0.005, downforce: 0, cooling: 0, reputation: 2 },
   }),
   parseBodyPart({
@@ -69,7 +70,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "common",
     fitment: 0.85,
     paint: { paintable: true, finish: "body_color", mismatchColor: null },
-    market: { priceRangePhp: [1800, 3000], conditionRange: [0.5, 1] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_dalagan_ducktail, conditionRange: [0.5, 1] },
     effects: { weightKg: 2, drag: 0.005, downforce: 0.005, cooling: 0, reputation: 2 },
   }),
   // Wider than the trunk, bolted through it. Mostly drag; the crowd at the gas station loves it.
@@ -86,7 +87,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "uncommon",
     fitment: 0.4,
     paint: { paintable: true, finish: "fake_carbon", mismatchColor: null },
-    market: { priceRangePhp: [4500, 8000], conditionRange: [0.4, 0.95] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_marketplace_gt_wing, conditionRange: [0.4, 0.95] },
     effects: { weightKg: 7, drag: 0.08, downforce: 0.02, cooling: 0, reputation: 5 },
   }),
   parseBodyPart({
@@ -102,7 +103,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "common",
     fitment: 0.8,
     paint: { paintable: true, finish: "primer", mismatchColor: null },
-    market: { priceRangePhp: [2500, 4000], conditionRange: [0.4, 0.9] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_dalagan_primer_bumper, conditionRange: [0.4, 0.9] },
     effects: { weightKg: 0, drag: 0, downforce: 0, cooling: 0.02, reputation: 0 },
   }),
   // Replica of the Evo V front end, pulled off a white donor. Mostly looks; the mouth does feed the radiator.
@@ -119,7 +120,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "rare",
     fitment: 0.6,
     paint: { paintable: true, finish: "mismatched", mismatchColor: "#e6e4dc" },
-    market: { priceRangePhp: [7000, 12000], conditionRange: [0.35, 0.9] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_evo_type_front_bumper, conditionRange: [0.35, 0.9] },
     effects: { weightKg: 3, drag: 0.01, downforce: 0.01, cooling: 0.06, reputation: 4 },
   }),
   parseBodyPart({
@@ -135,7 +136,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "common",
     fitment: 0.75,
     paint: { paintable: true, finish: "mismatched", mismatchColor: "#8e2a2a" },
-    market: { priceRangePhp: [1200, 2200], conditionRange: [0.45, 0.85] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_dalagan_red_fender_fl, conditionRange: [0.45, 0.85] },
     effects: { weightKg: 0, drag: 0, downforce: 0, cooling: 0, reputation: -1 },
   }),
   parseBodyPart({
@@ -151,7 +152,7 @@ export const BODY_PARTS: readonly BodyPart[] = [
     rarity: "rare",
     fitment: 0.65,
     paint: { paintable: true, finish: "fake_carbon", mismatchColor: null },
-    market: { priceRangePhp: [6500, 10000], conditionRange: [0.3, 0.9] },
+    market: { priceRangePhp: PART_PRICE_RANGES.exterior_vented_carbon_look_hood, conditionRange: [0.3, 0.9] },
     effects: { weightKg: -6, drag: 0, downforce: 0, cooling: 0.08, reputation: 3 },
   }),
 ];

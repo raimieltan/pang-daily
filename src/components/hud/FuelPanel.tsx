@@ -1,5 +1,6 @@
 'use client';
 
+import { EARLY_ECONOMY } from '@/game-core/economy/balance';
 import { useState } from 'react';
 import { FUEL_CAPACITY_LITERS, FUEL_PRICE_PHP_PER_LITER } from '@/game-core/economy/economy';
 import { useMaintenanceStore } from '@/state/maintenanceStore';
@@ -11,7 +12,7 @@ export function FuelPanel() {
   return open ? <FuelForm /> : null;
 }
 function FuelForm() {
-  const [amount, setAmount] = useState('5');
+  const [amount, setAmount] = useState(String(EARLY_ECONOMY.fuel.defaultPurchaseLiters));
   const [unit, setUnit] = useState<'liters' | 'budgetPhp'>('liters');
   const summary = useMaintenanceStore(s => s.summary);
   const quote = useMaintenanceStore(s => s.fuelQuote);
@@ -40,6 +41,6 @@ function FuelForm() {
       <button className="mt-4 w-full border border-emerald-100/40 p-3 disabled:opacity-35" disabled={!commands || quote.costPhp > wallet} onClick={() => commands?.purchaseFuel(quote.id)}>Pay {pesos(quote.costPhp)} & refuel</button>
     </div>}
     {error && <p role="alert" className="mt-3 text-red-300">{error}</p>}
-    <p className="mt-4 text-xs text-white/50">Stay beside the pump until payment is complete.</p>
+    <p className="mt-4 text-xs text-white/50">Empty car stranded elsewhere? Buy a paid reserve can here (up to {EARLY_ECONOMY.recovery.reserveCanMaxLiters} L), then walk back. Stay beside the pump until payment is complete.</p>
   </section>;
 }

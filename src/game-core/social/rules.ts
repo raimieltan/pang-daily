@@ -1,3 +1,4 @@
+import { EARLY_ECONOMY } from '../economy/balance';
 import type { RaceValidation } from './raceOutcomes';
 export type SocialEventInput =
  | { type: 'dialogue'; eventId: string; sourceId: string; npcId: string; dialogueId: string; choiceId?: 'promise_help' | 'apologize' | 'congratulate_casey' | 'insult_casey' }
@@ -39,6 +40,6 @@ export const SOCIAL_RULES = {
 } as const satisfies Record<string, Record<string, Reward>>;
 
 /** Per NPC and authored source. Further valid attempts are recorded with zero reward. */
-export const SOCIAL_REPEAT_LIMITS = { racePerRoute: 3, repairPerNpc: 3, inspectionPerNpc: 3, marketplacePerSeller: 3 } as const;
+export const SOCIAL_REPEAT_LIMITS = { racePerRoute: EARLY_ECONOMY.raceValidation.paidWinsPerRoute, repairPerNpc: 3, inspectionPerNpc: 3, marketplacePerSeller: 3 } as const;
 export const SOCIAL_RACE_RIVALS: Readonly<Record<string, string>> = { barangay_sprint: 'casey', pahuway_descent: 'casey' };
 export const SOCIAL_MARKETPLACE_SELLERS: Readonly<Record<string, string>> = { jun_surplus: 'jun_surplus' };
