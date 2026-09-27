@@ -2,6 +2,7 @@ import { NPC_CAR_BUILDS } from '../exterior/npcBuilds';
 import type { SocialContent } from './contract';
 import { DIALOGUE_ENTRIES } from './dialogue';
 import { SOCIAL_OPPORTUNITIES } from './opportunities';
+import { CREWS } from './crews';
 import { SELLERS } from '../marketplace/sellers';
 
 /** Authored identities and stable references from the hub, dialogue, and race content. */
@@ -12,7 +13,7 @@ export const SOCIAL_CONTENT: SocialContent = {
   { id: 'kyo_barista', name: 'Kyo Barista', roles: ['seller'], homeInteractionId: 'kyo_counter', homeLocationId: 'coffee_shop', dialogueEntryId: 'kyo_order' },
   { id: 'jun_surplus', name: 'Jun Surplus Parts', roles: ['seller'], homeInteractionId: 'marketplace:seller:jun_surplus', homeLocationId: 'marketplace', dialogueEntryId: 'seller_jun_surplus' },
  ],
- crews: [{ id: 'kyo_regulars', name: 'Kyo Regulars', homeLocationId: 'coffee_shop' }],
+ crews: CREWS,
  scenes: [{ id: 'iloilo_scene', name: 'Iloilo car scene' }],
  events: [
   ...['raced_casey', 'beat_casey', 'lost_to_casey', 'casey_shared_dnf'].map(id => ({ id, npcIds: ['casey'], sceneId: 'iloilo_scene' })),
@@ -76,7 +77,15 @@ export function validateSocialContent(content: SocialContent): string[] {
   const validRoles = ['friend', 'rival', 'mechanic', 'seller', 'mentor', 'hostile_contact'];
   if (!npc.roles.length || new Set(npc.roles).size !== npc.roles.length || npc.roles.some((role) => !validRoles.includes(role))) errors.push(`invalid roles for NPC: ${npc.id}`);
  }
- for (const crew of content.crews) check('location', crew.homeLocationId, refs.locationIds);
+ for (const crew of content.crews) {
+  check('location', crew.homeLocationId, refs.locationIds);
+  check('NPC', crew.introductionContactId, npcs);
+  for (const member of crew.memberNpcIds) check('NPC', member, npcs);
+  if (!crew.name.trim() || !crew.description.trim() || !crew.subculture.trim() || !crew.memberNpcIds.includes(crew.introductionContactId) || crew.rejoinPolicy !== 'once') errors.push(`invalid crew definition: ${crew.id}`);
+  for (const id of crew.membershipOpportunityIds) if (!SOCIAL_OPPORTUNITIES.some(item => item.id === id && item.lossBehavior === 'suspend')) errors.push(`invalid crew member opportunity: ${id}`);
+  const rule = SOCIAL_OPPORTUNITIES.find(item => item.id === crew.invitationOpportunityId);
+  if (!rule || rule.benefit.kind !== 'crew' || rule.benefit.crewId !== crew.id || JSON.stringify(rule.requirements) !== JSON.stringify(crew.invitationCriteria)) errors.push(`invalid crew invitation: ${crew.id}`);
+ }
  for (const event of content.events) {
   check('scene', event.sceneId, scenes);
   for (const npcId of event.npcIds) check('NPC', npcId, npcs);

@@ -26,8 +26,8 @@ try {
  for (let repeat = 0; repeat < 3; repeat++) {
   await call('interact');
   await expect(dialogue).toContainText('Ara ka naman.');
-  await expect(dialogue.getByRole('button')).toHaveCount(1);
-  await key('Enter');
+  await expect(dialogue.locator('[data-choice-id="crew_info_familiar"]')).toHaveCount(1);
+  await key('Escape');
   await expect(dialogue).toHaveCount(0);
  }
  console.log('PASS world-zone interaction, first meeting, fallback, empty choices, cancel, repeated open/close');

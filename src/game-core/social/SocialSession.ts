@@ -1,3 +1,4 @@
+import { initialCrew, joinCrew } from './crews';
 import { FIRST_RIVAL, rivalHistory } from './rivalHistory';
 import { SOCIAL_RACE_CHECKPOINTS, validateRaceOutcome } from './raceOutcomes';
 import { evaluateEligibility } from './eligibility';
@@ -19,7 +20,7 @@ const clamp = (value: number) => Math.max(STANDING_MIN, Math.min(STANDING_MAX, v
 const addUnique = (items: string[], id: string) => { if (!items.includes(id)) items.push(id); };
 
 export function createSocialState(content?: SocialContent): SocialState {
- return { version: 3, npcs: Object.fromEntries((content?.npcs ?? []).map((npc) => [npc.id, initialNpc()])), favors: {}, appliedEvents: [], reputation: {}, reputationRewards: {}, crews: {}, unlocks: {} };
+ return { version: 4, npcs: Object.fromEntries((content?.npcs ?? []).map((npc) => [npc.id, initialNpc()])), favors: {}, appliedEvents: [], reputation: {}, reputationRewards: {}, crews: {}, unlocks: {} };
 }
 
 /** The sole gameplay mutation path: authored rules select all effects, then one snapshot is persisted and committed. */
@@ -70,6 +71,7 @@ export class SocialSession {
   if (choice.when && !evaluateDialogueCondition(choice.when, this.state)) throw new Error('unavailable dialogue choice');
   if (choice.once && this.state.appliedEvents.some((item) => item.eventId === eventId)) throw new Error('unavailable dialogue choice');
   const next = copy(this.state);
+  const definitionNpcId = definition.npcId;
   const npc = next.npcs[definition.npcId];
   if (!npc?.introduced) throw new Error('unavailable dialogue choice');
   if (!choice.effect && !choice.once) {
@@ -94,17 +96,32 @@ export class SocialSession {
    next.favors[favor.id] = { favorId: favor.id, npcId: favor.npcId, status: 'offered', runId: null };
    addUnique(npc.favorIds, favor.id);
    reward = { trust: 0, respect: 0, reason: 'Follow-up favor offered' };
-  } else if (effect?.kind === 'crewInvitation') {
-   const eligibility = evaluateEligibility(opportunity('kyo_crew_invitation'), next);
-   if (!eligibility.eligible) throw new Error(`Crew invitation unavailable: ${eligibility.unmetRequirements.join('; ')}`);
-   if (!this.content.crews.some((item) => item.id === effect.crewId) || next.crews[effect.crewId]?.membership === 'member') throw new Error('unavailable dialogue choice');
-   next.crews[effect.crewId] = { crewId: effect.crewId, points: next.crews[effect.crewId]?.points ?? 0, membership: 'invited' };
-   reward = { trust: 0, respect: 0, reason: 'Crew invitation received' };
-  } else if (effect?.kind === 'crewAcceptance') {
-   const access = evaluateEligibility(opportunity('kyo_crew_invitation'), next);
-   if (!access.discovered || !access.eligible || next.crews[effect.crewId]?.membership !== 'invited') throw new Error(`Crew invitation unavailable: ${access.unmetRequirements.join('; ')}`);
-   next.crews[effect.crewId].membership = 'member';
-   reward = { trust: 0, respect: 0, reason: 'Joined Kyo Regulars' };
+  } else if (effect && ['crewInvitation', 'crewAcceptance', 'crewDecline', 'crewLeave'].includes(effect.kind) && 'crewId' in effect) {
+   const definition = this.content.crews.find(item => item.id === effect.crewId);
+   if (!definition || definition.introductionContactId !== definitionNpcId) throw new Error('unavailable crew contact');
+   const crew = next.crews[effect.crewId] ??= initialCrew(effect.crewId);
+   if (effect.kind === 'crewInvitation' || effect.kind === 'crewAcceptance') {
+    const access = evaluateEligibility(opportunity(definition.invitationOpportunityId), next);
+    if (!crew.introduced || !access.eligible) throw new Error(`Crew invitation unavailable: ${access.unmetRequirements.join('; ')}`);
+    next.unlocks[definition.invitationOpportunityId] = { unlockId: definition.invitationOpportunityId, unlocked: true };
+   }
+   if (effect.kind === 'crewInvitation') {
+    if (crew.membership === 'member' || crew.invitation === 'invited' || crew.joins >= 2) throw new Error('Crew invitation unavailable');
+    crew.invitation = 'invited'; reward = { trust: 0, respect: 0, reason: `Invitation from ${definition.name}` };
+   } else if (effect.kind === 'crewAcceptance') {
+    joinCrew(next, crew);
+    reward = { trust: 0, respect: 0, reason: `Joined ${definition.name}` };
+    for (const id of definition.membershipOpportunityIds) {
+     const rule = opportunity(id);
+     if (evaluateEligibility(rule, next).eligible) next.unlocks[id] = { unlockId: id, unlocked: true };
+    }
+   } else if (effect.kind === 'crewDecline') {
+    if (crew.invitation !== 'invited') throw new Error('Crew invitation unavailable');
+    crew.invitation = 'declined'; reward = { trust: 0, respect: 0, reason: `Declined ${definition.name}` };
+   } else {
+    if (crew.membership !== 'member') throw new Error('Crew leave unavailable');
+    crew.membership = 'left'; reward = { trust: 0, respect: 0, reason: `Left ${definition.name}` };
+   }
   } else if (effect?.kind === 'unlock') {
    if (!this.content.unlocks.some((item) => item.id === effect.unlockId)) throw new Error('unavailable dialogue choice');
    next.unlocks[effect.unlockId] = { unlockId: effect.unlockId, unlocked: true };
@@ -151,6 +168,9 @@ export class SocialSession {
     if (!event.choiceId) {
      if (npc.introduced) return { status: 'ignored' };
      npc.introduced = true;
+     for (const crew of this.content.crews.filter(item => item.introductionContactId === event.npcId)) {
+      const standing = next.crews[crew.id] ??= initialCrew(crew.id); standing.introduced = true;
+     }
      const meeting = this.content.events.find((item) => item.npcIds.includes(event.npcId) && item.id.startsWith('met_'));
      if (meeting) addUnique(npc.eventIds, meeting.id);
      reward = SOCIAL_RULES.dialogue.introduction;
@@ -334,9 +354,9 @@ export class SocialSession {
 export function restoreSocialState(input: unknown, content: SocialContent): SocialState {
  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('invalid social save');
  const raw = input as Partial<SocialState> & { version: number };
- if (raw.version !== 3 && raw.version !== 2 && raw.version !== 1) throw new Error('invalid social save version');
+ if (raw.version !== 4 && raw.version !== 3 && raw.version !== 2 && raw.version !== 1) throw new Error('invalid social save version');
  if (!raw.npcs || !raw.reputation || !raw.crews || !raw.unlocks || typeof raw.npcs !== 'object') throw new Error('invalid social save records');
- const state: SocialState = { ...createSocialState(content), ...copy(raw), version: 3, favors: copy(raw.favors ?? {}), appliedEvents: copy(raw.appliedEvents ?? []), reputationRewards: copy(raw.reputationRewards ?? {}) };
+ const state: SocialState = { ...createSocialState(content), ...copy(raw), version: 4, favors: copy(raw.favors ?? {}), appliedEvents: copy(raw.appliedEvents ?? []), reputationRewards: copy(raw.reputationRewards ?? {}) };
  const known = (items: readonly { id: string }[], id: string, kind: string) => { if (!items.some((item) => item.id === id)) throw new Error(`unknown ${kind}: ${id}`); };
  for (const [id, npc] of Object.entries(state.npcs)) {
   known(content.npcs, id, 'NPC');
@@ -371,7 +391,21 @@ export function restoreSocialState(input: unknown, content: SocialContent): Soci
   requireInteger(source.count, 'reputation reward count');
   if (source.count < 0 || source.count > limit) throw new Error(`invalid reputation reward count: ${key}`);
  }
- for (const [id, record] of Object.entries(state.crews)) { known(content.crews, id, 'crew'); if (record.crewId !== id || !['none', 'invited', 'member'].includes(record.membership)) throw new Error(`invalid crew state: ${id}`); requireInteger(record.points, 'crew standing'); }
+ for (const [id, record] of Object.entries(state.crews)) {
+  known(content.crews, id, 'crew');
+  if (raw.version < 4) {
+   const legacy = record as unknown as { membership: string };
+   record.invitation = legacy.membership === 'invited' ? 'invited' : legacy.membership === 'member' ? 'accepted' : 'none';
+   record.joins = legacy.membership === 'member' ? 1 : 0;
+   record.introduced = legacy.membership !== 'none' || !!state.npcs[content.crews.find(item => item.id === id)!.introductionContactId]?.introduced;
+   if (legacy.membership === 'invited') record.membership = 'none';
+  }
+  if (record.crewId !== id || !['none', 'member', 'left'].includes(record.membership) || !['none', 'invited', 'accepted', 'declined'].includes(record.invitation) || typeof record.introduced !== 'boolean') throw new Error(`invalid crew state: ${id}`);
+  requireInteger(record.points, 'crew standing'); requireInteger(record.joins, 'crew joins');
+  if ((!record.introduced && (record.invitation !== 'none' || record.membership !== 'none')) || (record.membership === 'none' && record.joins !== 0) || record.joins < 0 || record.joins > 2 || ((record.membership === 'member' || record.membership === 'left') && record.joins === 0) || (record.membership === 'member' && record.invitation !== 'accepted')) throw new Error(`invalid crew state: ${id}`);
+ }
+ if (Object.values(state.crews).filter(item => item.membership === 'member').length > 1) throw new Error('Only one active crew membership is supported');
+ for (const crew of content.crews) if (state.npcs[crew.introductionContactId]?.introduced && !state.crews[crew.id]) state.crews[crew.id] = { ...initialCrew(crew.id), introduced: true };
  for (const [id, record] of Object.entries(state.unlocks)) { known(content.unlocks, id, 'unlock'); if (record.unlockId !== id || typeof record.unlocked !== 'boolean') throw new Error(`invalid unlock state: ${id}`); }
  return copy(state);
 }

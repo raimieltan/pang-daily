@@ -18,7 +18,15 @@ export type NpcDefinition = {
  readonly crewId?: CrewId;
  readonly vehicleBuildId?: string;
 };
-export type CrewDefinition = { readonly id: CrewId; readonly name: string; readonly homeLocationId: string };
+export type CrewDefinition = {
+ readonly id: CrewId; readonly name: string; readonly homeLocationId: string;
+ readonly subculture: string; readonly description: string;
+ readonly memberNpcIds: readonly NpcId[]; readonly introductionContactId: NpcId;
+ readonly invitationOpportunityId: string;
+ readonly membershipOpportunityIds: readonly string[];
+ readonly invitationCriteria: readonly import('./eligibility').Requirement[];
+ readonly rejoinPolicy: 'once';
+};
 export type SocialEventDefinition = { readonly id: SocialEventId; readonly npcIds: readonly NpcId[]; readonly crewId?: CrewId; readonly sceneId: SceneId };
 export type FavorDefinition = { readonly id: FavorId; readonly npcId: NpcId; readonly jobId: string; readonly recoveryFor?: FavorId };
 export type SocialUnlockDefinition = { readonly id: SocialUnlockId; readonly sourceEventId: SocialEventId };
@@ -57,13 +65,17 @@ export type NpcSocialState = {
 export type SceneReputation = { sceneId: SceneId; points: number };
 export type ReputationSourceState = { sourceKey: string; count: number };
 export type ReputationEventEffect = { sceneId: SceneId; sourceKey: string; pointsDelta: number; fromTier: string; toTier: string };
-export type CrewStanding = { crewId: CrewId; points: number; membership: 'none' | 'invited' | 'member' };
+export type CrewStanding = {
+ crewId: CrewId; points: number; introduced: boolean;
+ invitation: 'none' | 'invited' | 'accepted' | 'declined';
+ membership: 'none' | 'member' | 'left'; joins: number;
+};
 export type SocialUnlockState = { unlockId: SocialUnlockId; unlocked: boolean };
 export type FavorProgress = { favorId: FavorId; npcId: NpcId; status: 'offered' | 'accepted' | 'completed' | 'failed' | 'abandoned'; runId: string | null };
 export type SocialEventEffect = { npcId: NpcId; trustDelta: number; respectDelta: number; flagsAdded: RelationshipFlagId[]; flagsRemoved: RelationshipFlagId[] };
 export type AppliedSocialEvent = { eventId: string; sourceId: string; sourceKey: string; fingerprint: string; type: string; targetId: string; contextId: string; reason: string; effects: SocialEventEffect[]; reputation?: ReputationEventEffect };
 export type SocialState = {
- version: 3;
+ version: 4;
  npcs: Record<NpcId, NpcSocialState>;
  favors: Record<FavorId, FavorProgress>;
  appliedEvents: AppliedSocialEvent[];

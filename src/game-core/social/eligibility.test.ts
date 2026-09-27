@@ -29,7 +29,7 @@ describe('social opportunities', () => {
   expect(evaluateEligibility(opportunity('kyo_crew_invitation'), state).eligible).toBe(true);
   state.npcs.casey.respect = 54;
   state.reputation.iloilo_scene.points = 11;
-  state.crews.kyo_regulars = { crewId: 'kyo_regulars', points: -1, membership: 'none' };
+  state.crews.kyo_regulars = { crewId: 'kyo_regulars', points: -1, membership: 'none', invitation: 'none', introduced: true, joins: 0 };
   expect(evaluateEligibility(opportunity('kyo_crew_invitation'), state).unmetRequirements).toHaveLength(3);
   state.npcs.casey.eventIds = [];
   expect(evaluateEligibility(opportunity('casey_wall_invitation'), state).unmetRequirements).toContain('Meet Casey at Kyo');
@@ -59,12 +59,12 @@ describe('social opportunities', () => {
  });
  it('rechecks crew acceptance and commits membership through the conversation path', () => {
   const social = new SocialSession(SOCIAL_CONTENT, standing()); social.discoverOpportunities();
-  social.chooseConversation('casey_intro', 'casey_post_race', 'crew_invite');
+  social.chooseConversation('casey_intro', 'kyo_crew', 'crew_invite');
   const poor = social.snapshot(); poor.npcs.casey.trust = 49;
   const lost = new SocialSession(SOCIAL_CONTENT, poor);
-  expect(() => lost.chooseConversation('casey_intro', 'casey_post_race', 'crew_accept')).toThrow('unavailable');
-  expect(lost.snapshot().crews.kyo_regulars.membership).toBe('invited');
-  social.chooseConversation('casey_intro', 'casey_post_race', 'crew_accept');
+  expect(() => lost.chooseConversation('casey_intro', 'kyo_crew', 'crew_accept')).toThrow('unavailable');
+  expect(lost.snapshot().crews.kyo_regulars.invitation).toBe('invited');
+  social.chooseConversation('casey_intro', 'kyo_crew', 'crew_accept');
   expect(social.snapshot().crews.kyo_regulars.membership).toBe('member');
  });
  it('clamps discounts and never compounds or creates negative prices', () => {

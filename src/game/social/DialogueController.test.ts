@@ -41,7 +41,7 @@ describe('world dialogue controller', () => {
   expect(s.controller.choose('congratulate_casey')).toBeUndefined();
   expect(s.controller.choose('congratulate_casey')).toMatchObject({ rejected: expect.any(String) });
   expect(loadSocialSession(s.storage).snapshot().npcs.casey.trust).toBe(53);
-  expect((s.views.at(-1) as { choices: { id: string }[] }).choices.map(choice => choice.id)).toEqual(['casey_rematch_info']);
+  expect((s.views.at(-1) as { choices: { id: string }[] }).choices.map(choice => choice.id)).toEqual(['crew_info', 'casey_rematch_info']);
   s.controller.dispose(); s.input.dispose(); s.bridge.dispose();
  });
 });

@@ -43,7 +43,7 @@ describe('authored conversations', () => {
   state.npcs.casey.respect = 80;
   state.npcs.casey.relationshipFlags.push('rival');
   state.reputation.iloilo_scene = { sceneId: 'iloilo_scene', points: 55 };
-  state.crews.kyo_regulars = { crewId: 'kyo_regulars', points: 12, membership: 'invited' };
+  state.crews.kyo_regulars = { crewId: 'kyo_regulars', points: 12, membership: 'none', invitation: 'invited', introduced: true, joins: 0 };
   state.favors.mang_boy_parts_help = { favorId: 'mang_boy_parts_help', npcId: 'mang_boy', status: 'failed', runId: 'talyer_oil_errand#1' };
   state.unlocks.talyer_favor = { unlockId: 'talyer_favor', unlocked: true };
   expect(evaluateDialogueCondition({ all: [

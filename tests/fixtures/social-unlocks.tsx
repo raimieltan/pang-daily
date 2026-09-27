@@ -60,6 +60,8 @@ Object.assign(window, { socialUnlockTest: {
  sukiTitle: () => market.view().listings.find(listing => listing.id === 'browser-suki')?.title,
  tick: () => opportunities.update(1), notices: () => notices,
  raceAccess: () => opportunities.raceRejection('the_wall'),
+ crewRaceAccess: () => opportunities.raceRejection('midnight_run'),
+ chooseCrew: (id: string) => dialogue.choose(id),
  lose: () => {
   const state = loadSocialSession(sessionStorage).snapshot();
   state.npcs.jun_surplus.trust = 0; state.npcs.mang_boy.trust = 0; state.npcs.casey.trust = 0; state.reputation.iloilo_scene.points = 0;

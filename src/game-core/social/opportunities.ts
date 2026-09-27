@@ -1,3 +1,4 @@
+import { CREWS } from './crews';
 import type { OpportunityRule } from './eligibility';
 
 export const SOCIAL_OPPORTUNITIES: readonly OpportunityRule[] = [
@@ -13,10 +14,9 @@ export const SOCIAL_OPPORTUNITIES: readonly OpportunityRule[] = [
   { text: 'Earn Mang Boy’s trust: 58', condition: { npcId: 'mang_boy', trustAtLeast: 58 } },
   { text: 'Help Mang Boy or make amends', condition: { any: [{ favorId: 'mang_boy_parts_help', favorStatus: 'completed' }, { favorId: 'mang_boy_recovery', favorStatus: 'completed' }] } },
  ] },
- { id: 'kyo_crew_invitation', name: 'Kyo Regulars crew invitation', lossBehavior: 'suspend', benefit: { kind: 'crew', crewId: 'kyo_regulars' }, requirements: [
-  { text: 'Become Casey’s trusted friend with 55 respect', condition: { npcId: 'casey', flag: 'trusted_friend', trustAtLeast: 50, respectAtLeast: 55 } },
-  { text: 'Reach Regular reputation', condition: { reputationTier: 'Regular' } },
-  { text: 'Keep Kyo crew standing at least zero', condition: { crewId: 'kyo_regulars', standingAtLeast: 0 } },
+ ...CREWS.map(crew => ({ id: crew.invitationOpportunityId, name: `${crew.name} crew invitation`, lossBehavior: 'suspend' as const, benefit: { kind: 'crew' as const, crewId: crew.id }, requirements: crew.invitationCriteria })),
+ { id: 'kyo_midnight_run', name: 'Kyo Regulars Midnight Run', lossBehavior: 'suspend', benefit: { kind: 'race', raceId: 'midnight_run' }, requirements: [
+  { text: 'Join Kyo Regulars', condition: { crewId: 'kyo_regulars', membership: 'member' } },
  ] },
 ];
 export const opportunity = (id: string): OpportunityRule => {

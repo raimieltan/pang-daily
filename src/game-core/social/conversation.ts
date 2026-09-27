@@ -1,3 +1,4 @@
+import { crewStatus } from './crews';
 import { FIRST_RIVAL, rivalHistory, type RivalOutcome } from './rivalHistory';
 import type { SocialContent, SocialState } from './contract';
 import { getReputationProgress, REPUTATION_CONFIG, type ReputationTier } from './reputation';
@@ -7,7 +8,7 @@ export type DialogueCondition =
  | { any: readonly DialogueCondition[] }
  | { npcId: string; introduced?: boolean; trustAtLeast?: number; trustAtMost?: number; respectAtLeast?: number; respectAtMost?: number; flag?: string; notFlag?: string }
  | { reputationTier: ReputationTier }
- | { crewId: string; standingAtLeast?: number; membership?: 'none' | 'invited' | 'member' }
+ | { crewId: string; standingAtLeast?: number; membership?: 'none' | 'invited' | 'member' | 'left'; status?: ReturnType<typeof crewStatus>; joins?: number }
  | { favorId: string; favorStatus: 'none' | 'offered' | 'accepted' | 'completed' | 'failed' | 'abandoned' }
  | { rivalId: string; hasOutcome: 'any' | RivalOutcome }
  | { raceId: string; raceResult: 'finished' | 'won' }
@@ -18,6 +19,7 @@ export type DialogueEffect =
  | { kind: 'favorOffer'; favorId: string }
  | { kind: 'crewInvitation'; crewId: string }
  | { kind: 'crewAcceptance'; crewId: string }
+ | { kind: 'crewDecline' | 'crewLeave'; crewId: string }
  | { kind: 'unlock'; unlockId: string };
 export type DialogueChoice = { id: string; text: string; when?: DialogueCondition; effect?: DialogueEffect; nextNodeId?: string; once?: boolean };
 export type DialogueNode = { id: string; speakerId: string; text: string; reactions?: Record<RivalOutcome | 'firstLoss', string>; choices: readonly DialogueChoice[] };
@@ -50,8 +52,8 @@ export const CONVERSATIONS: readonly ConversationDefinition[] = [
   { nodeId: 'casey_post_race', when: { raceId: 'pahuway_descent', raceResult: 'finished' } },
  ], nodes: [
   { id: 'casey_first', speakerId: 'casey', text: 'Ikaw ang may daily? Kitaay ta sa Pahuway. Dahan-dahan sa liko, ha.', choices: [] },
-  { id: 'casey_familiar', speakerId: 'casey', text: 'Ara ka naman. Kumusta ang andar sang daily?', choices: [] },
-  { id: 'casey_low_trust', speakerId: 'casey', text: 'Kung mag-istorya ta, tarong lang. Wala ko gana sa hambog.', choices: [] },
+  { id: 'casey_familiar', speakerId: 'casey', text: 'Ara ka naman. Kumusta ang andar sang daily?', choices: [{ id: 'crew_info_familiar', text: 'Tell me about Kyo Regulars.', nextNodeId: 'kyo_crew' }] },
+  { id: 'casey_low_trust', speakerId: 'casey', text: 'Kung mag-istorya ta, tarong lang. Wala ko gana sa hambog.', choices: [{ id: 'crew_info_low', text: 'Talk about my crew status.', nextNodeId: 'kyo_crew' }] },
   { id: 'casey_post_race', speakerId: 'casey', text: 'Maayo nga run. May masunod pa gid na sa dalan.', reactions: {
    win: 'Maayo nga run. Ginlampuwasan mo ko! Kitaay ta gihapon sa Kyo; indi pa tapos ang aton istorya.',
    loss: 'Ako anay subong. Indi kabalaka, may next run pa. Kitaay ta sa north street.',
@@ -60,9 +62,19 @@ export const CONVERSATIONS: readonly ConversationDefinition[] = [
   }, choices: [
    { id: 'congratulate_casey', text: 'Maayo ka magdala, Casey.', when: { all: [{ rivalId: 'casey', hasOutcome: 'any' }, { npcId: 'casey', notFlag: 'trusted_friend' }, { npcId: 'casey', notFlag: 'hostile' }] }, effect: { kind: 'socialChoice', choiceId: 'congratulate_casey' }, once: true },
    { id: 'insult_casey', text: 'Tsamba lang to. Sunod, wala ka na.', when: { all: [{ rivalId: 'casey', hasOutcome: 'any' }, { npcId: 'casey', notFlag: 'trusted_friend' }, { npcId: 'casey', notFlag: 'hostile' }] }, effect: { kind: 'socialChoice', choiceId: 'insult_casey' }, once: true },
-   { id: 'crew_accept', text: 'Sige, join ako sa Kyo Regulars.', when: { all: [{ crewId: 'kyo_regulars', membership: 'invited' }, { unlockId: 'kyo_crew_invitation', unlocked: true }, { npcId: 'casey', trustAtLeast: 50, respectAtLeast: 55, flag: 'trusted_friend' }, { reputationTier: 'Regular' }] }, effect: { kind: 'crewAcceptance', crewId: 'kyo_regulars' }, once: true },
-   { id: 'crew_invite', text: 'Tambay ako sa Kyo kasama ninyo?', when: { all: [{ npcId: 'casey', flag: 'trusted_friend', respectAtLeast: 55 }, { reputationTier: 'Regular' }] }, effect: { kind: 'crewInvitation', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_info', text: 'Tell me about Kyo Regulars.', nextNodeId: 'kyo_crew' },
    { id: 'casey_rematch_info', text: 'Diin kita mag-rematch?', nextNodeId: 'casey_rematch' },
+  ] },
+  { id: 'kyo_crew', speakerId: 'casey', text: 'Kyo Regulars: old daily drivers, grip runs kag kape. Friends from any crew are welcome. Members can run the Midnight Run from the Kyo exit. Declining changes no friendships. After leaving, you can ask to rejoin once; a second leave is final for now.', choices: [
+   { id: 'crew_invite', text: 'Can I join Kyo Regulars?', when: { crewId: 'kyo_regulars', status: 'introduced' }, effect: { kind: 'crewInvitation', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_accept', text: 'Sige, join ako sa Kyo Regulars.', when: { all: [{ crewId: 'kyo_regulars', status: 'invited', joins: 0 }, { npcId: 'casey', trustAtLeast: 50, respectAtLeast: 55, flag: 'trusted_friend' }, { reputationTier: 'Regular' }] }, effect: { kind: 'crewAcceptance', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_decline', text: 'Pass anay. Friends gihapon.', when: { crewId: 'kyo_regulars', status: 'invited', joins: 0 }, effect: { kind: 'crewDecline', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_reconsider', text: 'I changed my mind. Can I join?', when: { crewId: 'kyo_regulars', status: 'declined', joins: 0 }, effect: { kind: 'crewInvitation', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_leave', text: 'I want to leave Kyo Regulars.', when: { crewId: 'kyo_regulars', status: 'member', joins: 1 }, effect: { kind: 'crewLeave', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_rejoin_invite', text: 'Can I rejoin? I understand this is my one return.', when: { crewId: 'kyo_regulars', status: 'left', joins: 1 }, effect: { kind: 'crewInvitation', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_rejoin', text: 'Yes, rejoin Kyo Regulars.', when: { crewId: 'kyo_regulars', status: 'invited', joins: 1 }, effect: { kind: 'crewAcceptance', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_rejoin_decline', text: 'I will stay independent.', when: { crewId: 'kyo_regulars', status: 'invited', joins: 1 }, effect: { kind: 'crewDecline', crewId: 'kyo_regulars' }, once: true },
+   { id: 'crew_leave_again', text: 'Leave again. I understand I cannot rejoin again for now.', when: { crewId: 'kyo_regulars', status: 'member', joins: 2 }, effect: { kind: 'crewLeave', crewId: 'kyo_regulars' }, once: true },
   ] },
   { id: 'casey_rematch', speakerId: 'casey', text: 'Sa north street ang Barangay sprint. Balik sa daily mo, drive sa start line kag pili-a Race Casey. Wala entry fee; same Casey, same puti nga Kidlat.', choices: [{ id: 'casey_back_to_tambay', text: 'Sige. Istorya anay kita.', nextNodeId: 'casey_post_race' }] },
  ] },
@@ -90,7 +102,7 @@ export function evaluateDialogueCondition(condition: DialogueCondition, state: S
    && (!condition.notFlag || !npc.relationshipFlags.includes(condition.notFlag));
  }
  if ('reputationTier' in condition) return getReputationProgress(state).points >= REPUTATION_CONFIG.tiers.find((item) => item.name === condition.reputationTier)!.minimum;
- if ('crewId' in condition) { const crew = state.crews[condition.crewId]; return (condition.standingAtLeast === undefined || (crew?.points ?? 0) >= condition.standingAtLeast) && (condition.membership === undefined || (crew?.membership ?? 'none') === condition.membership); }
+ if ('crewId' in condition) { const crew = state.crews[condition.crewId]; return (condition.standingAtLeast === undefined || (crew?.points ?? 0) >= condition.standingAtLeast) && (condition.membership === undefined || (condition.membership === 'invited' ? crew?.invitation === 'invited' : (crew?.membership ?? 'none') === condition.membership)) && (condition.status === undefined || crewStatus(state, condition.crewId) === condition.status) && (condition.joins === undefined || (crew?.joins ?? 0) === condition.joins); }
  if ('favorId' in condition) return (state.favors[condition.favorId]?.status ?? 'none') === condition.favorStatus;
  if ('rivalId' in condition) { const history = rivalHistory(state); return condition.rivalId === FIRST_RIVAL.npcId && (condition.hasOutcome === 'any' ? history.latestOutcome !== null : history.latestOutcome === condition.hasOutcome); }
  if ('raceId' in condition) return state.appliedEvents.some((event) => event.type === 'race' && event.contextId === condition.raceId && (!raceDnf(event.fingerprint)) && (condition.raceResult === 'finished' || racePosition(event.fingerprint) === 1));
@@ -150,7 +162,7 @@ export function validateConversations(definitions: readonly ConversationDefiniti
     if (effect && !choice.once) errors.push(`effect must be one-shot: ${choice.id}`);
     if (effect?.kind === 'socialChoice' && ((effect.choiceId === 'promise_help' || effect.choiceId === 'apologize') ? definition.npcId !== 'mang_boy' : definition.npcId !== 'casey')) errors.push(`invalid social choice target: ${effect.choiceId}`);
     if (effect?.kind === 'favorOffer' && !content.favors.some((item) => item.id === effect.favorId && item.npcId === definition.npcId)) errors.push(`unknown effect favor: ${effect.favorId}`);
-    if ((effect?.kind === 'crewInvitation' || effect?.kind === 'crewAcceptance') && !content.crews.some((item) => item.id === effect.crewId)) errors.push(`unknown effect crew: ${effect.crewId}`);
+    if ((effect?.kind === 'crewInvitation' || effect?.kind === 'crewAcceptance' || effect?.kind === 'crewDecline' || effect?.kind === 'crewLeave') && !content.crews.some((item) => item.id === effect.crewId)) errors.push(`unknown effect crew: ${effect.crewId}`);
     if (effect?.kind === 'unlock' && !content.unlocks.some((item) => item.id === effect.unlockId)) errors.push(`unknown effect unlock: ${effect.unlockId}`);
    }
   }
