@@ -30,8 +30,8 @@ export function DrivingHud() {
           <p>Next: {progress.next} · Follow the gold gate</p>
           {progress.invalidFinish && <p className="text-red-300">Finish blocked — return to {progress.next}.</p>}
         </>}
-        {(progress.phase === "RUNNING" || progress.phase === "COUNTDOWN") && <button className="pointer-events-auto mt-2 underline" onClick={() => commands?.resetRace()}>Abandon race</button>}
-        {progress.phase === "FINISHED" && <div className="pointer-events-auto flex justify-end gap-4">
+        {(progress.phase === "RUNNING" || progress.phase === "COUNTDOWN") && <button className="pointer-events-auto mt-2 underline" onClick={() => commands?.abandonRace()}>Withdraw (DNF)</button>}
+        {(progress.phase === "FINISHED" || progress.phase === "DNF") && <div className="pointer-events-auto flex justify-end gap-4">
           <button onClick={() => commands?.startRace(progress.raceId)}>Race again</button>
           <button onClick={() => commands?.resetRace()}>Back to hub</button>
         </div>}
@@ -43,7 +43,7 @@ export function DrivingHud() {
       )}
       {!race && lastResult && (
         <span data-testid="race-result">
-          Finished P{lastResult.position}/{lastResult.racers} · {(lastResult.timeMs / 1000).toFixed(2)}s{lastResult.prizePhp ? ` · +₱${lastResult.prizePhp.toLocaleString()}` : ""}
+          {lastResult.outcome === 'dnf' ? 'DNF' : `Finished P${lastResult.position}/${lastResult.racers}`} · {(lastResult.timeMs / 1000).toFixed(2)}s{lastResult.prizePhp ? ` · +₱${lastResult.prizePhp.toLocaleString()}` : ""}
         </span>
       )}
       {vehicle && (

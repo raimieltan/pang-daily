@@ -29,6 +29,10 @@ export function DialogueBox() {
 
  if (view) return <div className="pointer-events-auto max-w-lg self-center rounded border border-amber-200/40 bg-black/85 px-4 py-3 text-sm text-white" data-testid="dialogue" role="dialog" aria-label={`Conversation with ${view.speaker}`}>
   <p><strong className="text-amber-100">{view.speaker}:</strong> {view.text}</p>
+  {view.rival && <div className="mt-2 text-xs text-white/65" data-testid="rival-history">
+    <p>{view.rival.wins} wins · {view.rival.losses} losses · {view.rival.dnfs} DNFs</p>
+    <p>{view.rival.rematch.eligible ? view.rival.rematch.label : view.rival.rematch.unmetRequirements.join('; ')}</p>
+  </div>}
   <div className="mt-3 flex flex-col gap-2">
    {view.choices.map((choice) => <button key={choice.id} type="button" data-choice-id={choice.id} className={`rounded border px-3 py-2 text-left ${choice.id === view.selectedChoiceId ? 'border-amber-200 text-amber-100' : 'border-white/30 text-white/80'}`} onClick={() => commands?.chooseDialogue(choice.id)}>{choice.text}</button>)}
    <button type="button" aria-label="Leave conversation" className="self-end rounded border border-white/30 px-3 py-1 text-white/70" onClick={() => commands?.closeDialogue()}>Leave</button>

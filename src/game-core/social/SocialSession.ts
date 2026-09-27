@@ -1,3 +1,7 @@
+import { FIRST_RIVAL, rivalHistory } from './rivalHistory';
+import { SOCIAL_RACE_CHECKPOINTS, validateRaceOutcome } from './raceOutcomes';
+import { evaluateEligibility } from './eligibility';
+import { SOCIAL_OPPORTUNITIES, opportunity } from './opportunities';
 import { validateSocialContent } from './catalog';
 import { STANDING_DEFAULT, STANDING_MAX, STANDING_MIN, type AppliedSocialEvent, type NpcSocialState, type SocialContent, type SocialEventEffect, type SocialState } from './contract';
 import { SOCIAL_MARKETPLACE_SELLERS, SOCIAL_RACE_RIVALS, SOCIAL_REPEAT_LIMITS, SOCIAL_RULES, type SocialEventInput } from './rules';
@@ -27,6 +31,22 @@ export class SocialSession {
   errors.push(...validateConversations(CONVERSATIONS, content));
   if (errors.length) throw new Error(`invalid social content: ${errors.join('; ')}`);
   this.state = saved == null ? createSocialState(content) : restoreSocialState(saved, content);
+ }
+
+ discoverOpportunities(): { id: string; name: string }[] {
+  const next = copy(this.state);
+  const discovered = SOCIAL_OPPORTUNITIES.filter(rule => !next.unlocks[rule.id]?.unlocked && evaluateEligibility(rule, next).eligible);
+  if (!discovered.length) return [];
+  for (const rule of discovered) next.unlocks[rule.id] = { unlockId: rule.id, unlocked: true };
+  this.persist?.(copy(next)); this.state = next;
+  return discovered.map(({ id, name }) => ({ id, name }));
+ }
+
+ recoverInterruptedRaces(): void {
+  for (const attempt of rivalHistory(this.state).attempts.filter(item => item.outcome === 'started')) {
+   this.applyEvent({ type: 'race', eventId: `race:${attempt.attemptId}:interrupted`, sourceId: attempt.attemptId, attemptId: attempt.attemptId, npcId: attempt.npcId, raceId: attempt.raceId, vehicleId: attempt.vehicleId, outcome: 'dnf', position: 2, racers: 2, timeMs: 0,
+    validation: { completedCheckpoints: 0, totalCheckpoints: SOCIAL_RACE_CHECKPOINTS[attempt.raceId], finishValidated: false, invalidFinish: false } });
+  }
  }
 
  snapshot(): SocialState { return copy(this.state); }
@@ -75,9 +95,16 @@ export class SocialSession {
    addUnique(npc.favorIds, favor.id);
    reward = { trust: 0, respect: 0, reason: 'Follow-up favor offered' };
   } else if (effect?.kind === 'crewInvitation') {
+   const eligibility = evaluateEligibility(opportunity('kyo_crew_invitation'), next);
+   if (!eligibility.eligible) throw new Error(`Crew invitation unavailable: ${eligibility.unmetRequirements.join('; ')}`);
    if (!this.content.crews.some((item) => item.id === effect.crewId) || next.crews[effect.crewId]?.membership === 'member') throw new Error('unavailable dialogue choice');
    next.crews[effect.crewId] = { crewId: effect.crewId, points: next.crews[effect.crewId]?.points ?? 0, membership: 'invited' };
    reward = { trust: 0, respect: 0, reason: 'Crew invitation received' };
+  } else if (effect?.kind === 'crewAcceptance') {
+   const access = evaluateEligibility(opportunity('kyo_crew_invitation'), next);
+   if (!access.discovered || !access.eligible || next.crews[effect.crewId]?.membership !== 'invited') throw new Error(`Crew invitation unavailable: ${access.unmetRequirements.join('; ')}`);
+   next.crews[effect.crewId].membership = 'member';
+   reward = { trust: 0, respect: 0, reason: 'Joined Kyo Regulars' };
   } else if (effect?.kind === 'unlock') {
    if (!this.content.unlocks.some((item) => item.id === effect.unlockId)) throw new Error('unavailable dialogue choice');
    next.unlocks[effect.unlockId] = { unlockId: effect.unlockId, unlocked: true };
@@ -188,14 +215,31 @@ export class SocialSession {
     }
     break;
    }
+   case 'race_attempt': {
+    if (event.npcId !== FIRST_RIVAL.npcId || event.vehicleId !== FIRST_RIVAL.vehicleId || !FIRST_RIVAL.raceIds.includes(event.raceId as 'barangay_sprint' | 'pahuway_descent') || event.totalCheckpoints !== SOCIAL_RACE_CHECKPOINTS[event.raceId] || event.sourceId !== event.attemptId) throw new Error('invalid rival race attempt');
+    requireId(event.attemptId, 'race attempt ID');
+    if (next.appliedEvents.some(item => item.type === 'race' && item.sourceId === event.attemptId)) throw new Error('race attempt already ended');
+    contextId = event.raceId;
+    if (!npc.relationshipFlags.includes('rival')) { addUnique(npc.relationshipFlags, 'rival'); added.push('rival'); }
+    addUnique(npc.eventIds, 'raced_casey');
+    reward = { trust: 0, respect: 0, reason: 'Met Casey at the race grid' };
+    break;
+   }
    case 'race': {
     if (!(event.raceId in REPUTATION_CONFIG.races) || (SOCIAL_RACE_RIVALS[event.raceId] ?? undefined) !== event.npcId || event.sourceId !== event.attemptId) throw new Error('invalid race rival or attempt source');
-    requireId(event.attemptId, 'race attempt ID');
-    requireInteger(event.position, 'race position'); requireInteger(event.racers, 'racers'); requireInteger(event.timeMs, 'race time');
-    if (event.racers < 2 || event.position < 1 || event.position > event.racers || event.timeMs <= 0) throw new Error('invalid race result');
+    const rejection = validateRaceOutcome(event);
+    if (rejection) throw new Error(rejection);
+    if (event.npcId && event.vehicleId && event.vehicleId !== FIRST_RIVAL.vehicleId) throw new Error('invalid rival vehicle identity');
+    const started = next.appliedEvents.find(item => item.type === 'race_attempt' && item.sourceId === event.attemptId);
+    if (started && (started.targetId !== event.npcId || started.contextId !== event.raceId)) throw new Error('race result differs from accepted attempt');
     contextId = event.raceId;
-    const previous = next.appliedEvents.filter((item) => item.type === 'race' && item.targetId === event.npcId && item.contextId === event.raceId && item.reason !== 'Race reputation limit reached').length;
-    reward = !event.npcId ? { trust: 0, respect: 0, reason: 'Finished a valid race' } : previous >= SOCIAL_REPEAT_LIMITS.racePerRoute ? { trust: 0, respect: 0, reason: 'Race reputation limit reached' } : event.position === 1 ? SOCIAL_RULES.race.win : SOCIAL_RULES.race.loss;
+    const previous = next.appliedEvents.filter(item => item.type === 'race' && item.targetId === event.npcId && item.contextId === event.raceId && !isRecordedDnf(item.fingerprint)).length;
+    reward = event.outcome === 'dnf' ? SOCIAL_RULES.race.dnf : !event.npcId ? { trust: 0, respect: 0, reason: 'Finished valid race' } : previous >= SOCIAL_REPEAT_LIMITS.racePerRoute ? { trust: 0, respect: 0, reason: 'Race reputation limit reached' } : event.position === 1 ? SOCIAL_RULES.race.win : SOCIAL_RULES.race.loss;
+    if (npc) {
+     if (!npc.relationshipFlags.includes('rival')) { addUnique(npc.relationshipFlags, 'rival'); added.push('rival'); }
+     addUnique(npc.eventIds, 'raced_casey');
+     addUnique(npc.eventIds, event.outcome === 'dnf' ? 'casey_shared_dnf' : event.position === 1 ? 'beat_casey' : 'lost_to_casey');
+    }
     break;
    }
    case 'job': {
@@ -277,6 +321,7 @@ export class SocialSession {
   switch (event.type) {
    case 'dialogue': return event.choiceId ? `dialogue-choice:${event.npcId}:${event.choiceId}` : `dialogue:${event.npcId}:${event.dialogueId}`;
    case 'favor': return `favor:${event.sourceId}:${event.phase}`;
+   case 'race_attempt': return `race-start:${event.sourceId}`;
    case 'race': return `race:${event.sourceId}`;
    case 'job': return `job:${event.sourceId}`;
    case 'service': return `wallet:${event.transactionId}`;
@@ -329,4 +374,8 @@ export function restoreSocialState(input: unknown, content: SocialContent): Soci
  for (const [id, record] of Object.entries(state.crews)) { known(content.crews, id, 'crew'); if (record.crewId !== id || !['none', 'invited', 'member'].includes(record.membership)) throw new Error(`invalid crew state: ${id}`); requireInteger(record.points, 'crew standing'); }
  for (const [id, record] of Object.entries(state.unlocks)) { known(content.unlocks, id, 'unlock'); if (record.unlockId !== id || typeof record.unlocked !== 'boolean') throw new Error(`invalid unlock state: ${id}`); }
  return copy(state);
+}
+
+function isRecordedDnf(fingerprint: string): boolean {
+ try { return JSON.parse(fingerprint).outcome === 'dnf'; } catch { return false; }
 }

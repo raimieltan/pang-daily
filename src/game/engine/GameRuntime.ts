@@ -1,3 +1,4 @@
+import { SocialOpportunityService } from '../social/SocialOpportunityService';
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { GameBridge, type GameCommands, type GameEventSource } from "../bridge";
 import { INITIAL_SCENE, scenes, type SceneId } from "../scenes";
@@ -42,6 +43,7 @@ export class GameRuntime {
   private readonly initialScene: SceneId;
   private paused = false;
   private lastStatsAt = 0;
+  private readonly opportunities: SocialOpportunityService;
   private started = false;
   private disposed = false;
 
@@ -62,13 +64,18 @@ export class GameRuntime {
     // The phone outlives scenes, so the marketplace is runtime-wide like pause.
     const inventory = loadInventorySession(storage);
     if (process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
-    this.market = new MarketplaceService(this.bridge.runtime, loadMarketplaceSession(session, inventory, storage));
     const socialFallback = new Map<string, string>();
- const socialStorage = storage ?? {
- getItem: key => socialFallback.get(key) ?? null,
- setItem: (key, value) => { socialFallback.set(key, value); },
- };
- this.social = new SocialEventBridge(this.events, socialStorage, error => emit('error', { message: `Social event rejected: ${error.message}` }), (progress, tierChange) => {
+    const socialStorage = storage ?? {
+      getItem: (key: string) => socialFallback.get(key) ?? null,
+      setItem: (key: string, value: string) => { socialFallback.set(key, value); },
+    };
+    this.opportunities = new SocialOpportunityService(this.bridge.runtime, socialStorage);
+    const access = this.opportunities.access;
+    session.useSocialAccess(access);
+    const marketplace = loadMarketplaceSession(session, inventory, storage);
+    marketplace.useSocialAccess(access);
+    this.market = new MarketplaceService(this.bridge.runtime, marketplace);
+    this.social = new SocialEventBridge(this.events, socialStorage, error => emit('error', { message: `Social event rejected: ${error.message}` }), (progress, tierChange) => {
       emit('socialReputationUpdated', progress);
       if (tierChange) emit('socialTierChanged', tierChange);
     });
@@ -104,9 +111,9 @@ export class GameRuntime {
     this.resizeObserver.disconnect();
     this.audio.dispose();
     this.market.dispose();
-    this.social.dispose();
     this.engine.stopRenderLoop();
     this.scenes.dispose();
+    this.social.dispose();
     this.engine.dispose();
     this.bridge.dispose();
   }
@@ -121,6 +128,7 @@ export class GameRuntime {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, MAX_FRAME_DT_SECONDS);
       this.scenes.update(dt);
       this.market.update(dt);
+      this.opportunities.update(dt);
     }
     // Keep rendering while paused so resizes and camera orbit still draw; systems stay frozen.
     this.scenes.render();

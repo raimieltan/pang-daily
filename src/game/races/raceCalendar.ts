@@ -1,3 +1,4 @@
+import { FIRST_RIVAL } from '@/game-core/social/rivalHistory';
 import { HUB_LAYOUT } from '../world/hub/hubLayout';
 import { pointAlong, polylineLength } from '../world/layoutTools';
 import { laneWaypoints, mountainRace, OVERLOOK_S, ROUTE_LENGTH } from '../world/mountain/route';
@@ -63,7 +64,7 @@ export const TERRACE_SPRINT = mountainRace({
 export const PAHUWAY_DESCENT = mountainRace({
   id: 'pahuway_descent', name: 'Pahuway descent', direction: 1, from: OVERLOOK_S + 45, to: ROUTE_LENGTH - 65,
   gates: [.79, .86, .93], finish: 'Maasin arrival', driveAwayM: 40,
-  rival: rival({ name: 'Casey', paint: '#f1f0eb', build: 'casey_kidlat_rs', tier: 3, prizePhp: 1100 }),
+  rival: rival({ npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, name: FIRST_RIVAL.name, paint: '#f1f0eb', build: 'casey_kidlat_rs', tier: 3, prizePhp: 1100 }),
 });
 
 /** Tier 4. Up the red-earth wall and along the ridge, against Kent's quiet EFI swap. */

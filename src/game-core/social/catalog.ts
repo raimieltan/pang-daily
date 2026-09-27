@@ -1,6 +1,7 @@
 import { NPC_CAR_BUILDS } from '../exterior/npcBuilds';
 import type { SocialContent } from './contract';
 import { DIALOGUE_ENTRIES } from './dialogue';
+import { SOCIAL_OPPORTUNITIES } from './opportunities';
 import { SELLERS } from '../marketplace/sellers';
 
 /** Authored identities and stable references from the hub, dialogue, and race content. */
@@ -14,6 +15,7 @@ export const SOCIAL_CONTENT: SocialContent = {
  crews: [{ id: 'kyo_regulars', name: 'Kyo Regulars', homeLocationId: 'coffee_shop' }],
  scenes: [{ id: 'iloilo_scene', name: 'Iloilo car scene' }],
  events: [
+  ...['raced_casey', 'beat_casey', 'lost_to_casey', 'casey_shared_dnf'].map(id => ({ id, npcIds: ['casey'], sceneId: 'iloilo_scene' })),
   { id: 'met_at_talyer', npcIds: ['mang_boy'], sceneId: 'iloilo_scene' },
   { id: 'met_casey_at_kyo', npcIds: ['casey'], sceneId: 'iloilo_scene' },
   { id: 'helped_mang_boy', npcIds: ['mang_boy'], sceneId: 'iloilo_scene' },
@@ -32,7 +34,7 @@ export const SOCIAL_CONTENT: SocialContent = {
   { id: 'promised_help', npcId: 'mang_boy' },
   { id: 'apology_offered', npcId: 'mang_boy' },
  ],
- unlocks: [{ id: 'talyer_favor', sourceEventId: 'met_at_talyer' }],
+ unlocks: [{ id: 'talyer_favor', sourceEventId: 'met_at_talyer' }, ...SOCIAL_OPPORTUNITIES.map(rule => ({ id: rule.id, sourceEventId: rule.benefit.kind === 'race' || rule.benefit.kind === 'crew' ? 'met_casey_at_kyo' : 'met_at_talyer' }))],
  references: {
   interactionIds: ['talyer_bay_1', 'casey_corner', 'kyo_counter', 'marketplace:seller:jun_surplus'],
   locationIds: ['talyer', 'coffee_shop', 'marketplace'],

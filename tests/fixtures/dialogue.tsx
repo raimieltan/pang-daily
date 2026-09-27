@@ -1,3 +1,4 @@
+import { raceValidation } from './raceValidation';
 import { createRoot } from 'react-dom/client';
 import { useEffect } from 'react';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
@@ -46,7 +47,7 @@ Object.assign(window, { dialogueTest: {
   if (kind === 'fresh') return;
   const session = loadSocialSession(sessionStorage);
   session.applyEvent({ type: 'dialogue', eventId: 'fixture:intro', sourceId: 'casey_intro', npcId: 'casey', dialogueId: 'casey_intro' });
-  session.applyEvent({ type: 'race', eventId: 'fixture:race', sourceId: 'fixture:race', attemptId: 'fixture:race', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 120000 });
+  session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'fixture:race', sourceId: 'fixture:race', attemptId: 'fixture:race', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 120000 });
   if (kind === 'low') {
    const next = session.snapshot();
    next.npcs.casey.trust = 20;

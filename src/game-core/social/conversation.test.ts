@@ -1,3 +1,4 @@
+import { raceValidation } from '../../../tests/fixtures/raceValidation';
 import { describe, expect, it } from 'vitest';
 import { SOCIAL_CONTENT } from './catalog';
 import { SocialSession } from './SocialSession';
@@ -75,7 +76,7 @@ describe('authored conversations', () => {
   session.applyEvent({ type: 'dialogue', eventId: 'intro:casey', sourceId: 'casey_intro', npcId: 'casey', dialogueId: 'casey_intro' });
   expect(() => session.chooseConversation('casey_intro', 'casey_post_race', 'congratulate_casey')).toThrow('unavailable dialogue choice');
   expect(session.snapshot().appliedEvents).toHaveLength(1);
-  session.applyEvent({ type: 'race', eventId: 'race:casey-1', sourceId: 'casey-1', attemptId: 'casey-1', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 120000 });
+  session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'race:casey-1', sourceId: 'casey-1', attemptId: 'casey-1', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 120000 });
   const result = session.chooseConversation('casey_intro', 'casey_post_race', 'congratulate_casey');
   expect(result.status).toBe('applied');
   expect(session.snapshot().npcs.casey.relationshipFlags).toContain('trusted_friend');

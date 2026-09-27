@@ -1,3 +1,5 @@
+import { LOCAL_ROUTE } from '@/game/races/localRoute';
+import { raceValidation } from '../../../tests/fixtures/raceValidation';
 import { describe, expect, it } from 'vitest';
 import { SOCIAL_CONTENT } from './catalog';
 import { SocialSession } from './SocialSession';
@@ -5,7 +7,7 @@ import { REPUTATION_CONFIG, getReputationProgress, meetsReputationTier } from '.
 import { RACE_CALENDAR } from '@/game/races/raceCalendar';
 import { HUB_JOBS } from '@/game/jobs/hubJobs';
 
-const race = (attemptId: string, position = 2) => ({ type: 'race' as const, eventId: `race:${attemptId}`, sourceId: attemptId, attemptId, raceId: 'kyo_block_lap', position, racers: 2, timeMs: 120000 });
+const race = (attemptId: string, position = 2) => ({ validation: raceValidation('kyo_block_lap'), type: 'race' as const, eventId: `race:${attemptId}`, sourceId: attemptId, attemptId, raceId: 'kyo_block_lap', position, racers: 2, timeMs: 120000 });
 const favor = (phase: 'accepted' | 'completed' | 'failed', runId = 'talyer_oil_errand#1') => ({ type: 'favor' as const, eventId: `favor:${runId}:${phase}`, sourceId: runId, npcId: 'mang_boy', favorId: 'mang_boy_parts_help', jobId: 'talyer_oil_errand', runId, phase, jobStatus: phase });
 
 describe('scene recognition ladder', () => {
@@ -23,7 +25,7 @@ describe('scene recognition ladder', () => {
   expect(getReputationProgress(REPUTATION_CONFIG.cap + 999).points).toBe(REPUTATION_CONFIG.cap);
   expect(getReputationProgress(-99).points).toBe(0);
   expect(getReputationProgress(Number.NaN).points).toBe(0);
-  expect(Object.keys(REPUTATION_CONFIG.races).sort()).toEqual(RACE_CALENDAR.map((route) => route.id).sort());
+  expect(Object.keys(REPUTATION_CONFIG.races).sort()).toEqual([LOCAL_ROUTE, ...RACE_CALENDAR].map((route) => route.id).sort());
   for (const jobId of Object.keys(REPUTATION_CONFIG.jobs)) expect(HUB_JOBS.some((job) => job.id === jobId)).toBe(true);
  });
 

@@ -1,3 +1,4 @@
+import { raceValidation } from '../../../tests/fixtures/raceValidation';
 import { describe, expect, it, vi } from 'vitest';
 import { GameBridge } from '@/game/bridge/GameBridge';
 import type { GameEventMap } from '@/game/bridge/GameEvents';
@@ -28,7 +29,7 @@ describe('social event bridge', () => {
  it('uses race attempts and transaction IDs for duplicate delivery', () => {
   const bridge = new GameBridge(), storage = memoryStorage(), errors = vi.fn();
   const social = new SocialEventBridge(bridge.ui.events, storage, errors);
-  const result = { raceId: 'pahuway_descent', attemptId: 'race-attempt-1', position: 1, racers: 2, timeMs: 120000 };
+  const result = { validation: raceValidation('pahuway_descent'), raceId: 'pahuway_descent', attemptId: 'race-attempt-1', position: 1, racers: 2, timeMs: 120000 };
   bridge.runtime.emit('raceFinished', result);
   bridge.runtime.emit('raceFinished', result);
   bridge.runtime.emit('repairCompleted', { transactionId: 2, vehicleId: 'daily', components: ['engine'], costPhp: 200, walletPhp: 800 } as GameEventMap['repairCompleted']);
@@ -58,8 +59,8 @@ describe('social event bridge', () => {
  it('reports one tier transition when separate race losses cross Regular', () => {
   const bridge = new GameBridge(), storage = memoryStorage(), updates = vi.fn(), errors = vi.fn();
   const social = new SocialEventBridge(bridge.ui.events, storage, errors, updates);
-  for (let n = 1; n <= 3; n++) bridge.runtime.emit('raceFinished', { raceId: 'kyo_block_lap', attemptId: `kyo-loss-${n}`, position: 2, racers: 2, timeMs: 120000 });
-  bridge.runtime.emit('raceFinished', { raceId: 'kyo_block_lap', attemptId: 'kyo-loss-3', position: 2, racers: 2, timeMs: 120000 });
+  for (let n = 1; n <= 3; n++) bridge.runtime.emit('raceFinished', { validation: raceValidation('kyo_block_lap'), raceId: 'kyo_block_lap', attemptId: `kyo-loss-${n}`, position: 2, racers: 2, timeMs: 120000 });
+  bridge.runtime.emit('raceFinished', { validation: raceValidation('kyo_block_lap'), raceId: 'kyo_block_lap', attemptId: 'kyo-loss-3', position: 2, racers: 2, timeMs: 120000 });
   expect(updates).toHaveBeenCalledTimes(3);
   expect(updates.mock.calls.filter(([, transition]) => transition)).toHaveLength(1);
   expect(updates.mock.calls[2][1]).toMatchObject({ from: 'Unknown', to: 'Regular', points: 15 });

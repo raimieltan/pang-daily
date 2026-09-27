@@ -1,3 +1,5 @@
+import { discountedPrice, type SocialAccess } from '../social/eligibility';
+import { opportunity } from '../social/opportunities';
 import { centavos, moneySchema, transactionSchema, quoteFuel, FUEL_CAPACITY_LITERS, MAINTENANCE_SERVICES, type MoneySource, type FuelRequest, type MaintenanceService } from '../economy/economy';
 import { z } from 'zod';
 import { vehicleConditionSchema, type VehicleCondition, type VehicleDefinition } from '../vehicles/VehicleDefinition';
@@ -30,7 +32,7 @@ function migrateSession(saved: unknown): unknown {
 }
 
 export type SessionSnapshot = z.infer<typeof sessionSchema>;
-export type RepairQuote = { id: string; vehicleId: string; vehicleName: string; revision: number; lines: RepairLine[]; totalPhp: number };
+export type RepairQuote = { id: string; vehicleId: string; vehicleName: string; revision: number; benefitId?: string; benefitLabel?: string; lines: RepairLine[]; totalPhp: number };
 export type MaintenanceSummary = { vehicleId: string; vehicleName: string; condition: VehicleCondition; walletPhp: number; fuelLiters?: number; fuelCapacityLiters?: number };
 export type RepairReceipt = { vehicleId: string; components: ServiceComponent[]; costPhp: number; walletPhp: number; transactionId: number };
 
@@ -38,6 +40,8 @@ export type RepairReceipt = { vehicleId: string; components: ServiceComponent[];
 export class VehicleSession {
   private state: SessionSnapshot;
   private quoteSerial = 0;
+  private socialAccess?: SocialAccess;
+  useSocialAccess(access: SocialAccess) { this.socialAccess = access; }
   private readonly listeners = new Set<() => void>();
   constructor(saved?: unknown, private readonly persist?: (snapshot: SessionSnapshot) => void) {
     const parsed = sessionSchema.safeParse(migrateSession(saved));
@@ -64,17 +68,22 @@ export class VehicleSession {
   }
   quote(definition: VehicleDefinition): RepairQuote {
     const summary = this.summary(definition), car = this.state.vehicles[definition.id];
-    const lines = repairLines(definition, car.condition);
+    const benefitId = this.socialAccess?.('mang_boy_service').eligible ? 'mang_boy_service' : undefined;
+    const lines = this.pricedRepairLines(definition, car.condition, benefitId);
     return { id: `repair-${++this.quoteSerial}`, vehicleId: definition.id, vehicleName: summary.vehicleName,
-      revision: car.revision, lines, totalPhp: lines.reduce((sum, line) => sum + line.costPhp, 0) };
+      revision: car.revision, benefitId, benefitLabel: benefitId ? opportunity(benefitId).name : undefined, lines, totalPhp: lines.reduce((sum, line) => sum + line.costPhp, 0) };
   }
   repair(definition: VehicleDefinition, quote: RepairQuote, selected: readonly ServiceComponent[]): RepairReceipt | { rejected: string } {
     const car = this.state.vehicles[definition.id];
     if (!car || quote.vehicleId !== definition.id || quote.revision !== car.revision) return { rejected: 'Condition changed. Ask Mang Boy for a new inspection.' };
     if (!Array.isArray(selected) || selected.length === 0 || selected.some(key => !SERVICE_COMPONENTS.includes(key))) return { rejected: 'Choose at least one repair.' };
     const components = [...new Set<ServiceComponent>(selected)];
+    if (quote.benefitId) {
+      const access = this.socialAccess?.('mang_boy_service');
+      if (quote.benefitId !== 'mang_boy_service' || !access?.eligible) return { rejected: `Repair benefit unavailable. ${access?.unmetRequirements.join('; ') ?? 'Ask for a new quote.'}` };
+    }
     // Reprice from authoritative state, never from the UI or a saved quote's line totals.
-    const lines = repairLines(definition, car.condition).filter(line => components.includes(line.component));
+    const lines = this.pricedRepairLines(definition, car.condition, quote.benefitId).filter(line => components.includes(line.component));
     if (lines.some(line => line.costPhp === 0)) return { rejected: 'That component is already fully repaired.' };
     const costPhp = lines.reduce((sum, line) => sum + line.costPhp, 0);
     const payment = this.payment(-costPhp, { kind: 'repair', description: `Repair: ${components.join(', ')}`, source: 'talyer', relatedEntityId: definition.id }, definition.id, components);
@@ -83,6 +92,10 @@ export class VehicleSession {
     car.revision++;
     const receipt = { vehicleId: definition.id, components, costPhp, walletPhp: this.state.walletPhp, transactionId: payment.id };
     this.changed(); return receipt;
+  }
+  private pricedRepairLines(definition: VehicleDefinition, condition: VehicleCondition, benefitId?: string): RepairLine[] {
+    const benefit = benefitId ? opportunity(benefitId).benefit : null;
+    return repairLines(definition, condition).map(line => ({ ...line, costPhp: benefit?.kind === 'repair' ? discountedPrice(line.costPhp, benefit.discountPercent) : line.costPhp }));
   }
   earn(amountPhp: number, source: MoneySource) { return this.transfer(amountPhp, source, false); }
   spend(amountPhp: number, source: MoneySource) { return this.transfer(amountPhp, source, true); }

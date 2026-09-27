@@ -13,7 +13,7 @@ export type RaceDefinition = {
   /** Named opponent in a built car; without one it's an anonymous stock Dalagan at the base pace. */
   rival?: RaceRival;
 };
-export type RacePhase = "READY" | "COUNTDOWN" | "RUNNING" | "FINISHED" | "RESET";
+export type RacePhase = "READY" | "COUNTDOWN" | "RUNNING" | "FINISHED" | "DNF" | "RESET";
 export type RaceProgress = { raceId: string; phase: RacePhase; countdown: number; elapsedMs: number; checkpoint: number; total: number; next: string; invalidFinish: boolean };
 
 /** Swept box entry catches thin gates even at high speed; y bounds support stacked roads. */
@@ -138,6 +138,15 @@ export class Race {
     const hit = this.player.advance(this.previous, position);
     this.previous = copyPoint(position);
     if (hit !== null) { this.playerTime = before + hit * dt; this.phase = "FINISHED"; }
+  }
+  abort(): boolean {
+    if (this.phase !== 'COUNTDOWN' && this.phase !== 'RUNNING') return false;
+    this.phase = 'DNF';
+    return true;
+  }
+  validation() {
+    return { completedCheckpoints: this.player.next, totalCheckpoints: this.route.checkpoints.length,
+      finishValidated: this.phase === 'FINISHED' && this.player.finished, invalidFinish: this.player.invalidFinish };
   }
   get position(): number {
     if (this.playerTime !== null) return this.opponentTime !== null && this.opponentTime < this.playerTime ? 2 : 1;

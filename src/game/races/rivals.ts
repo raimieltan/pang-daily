@@ -9,6 +9,7 @@ import { RIVAL_TUNING } from './Race';
 export type RaceTier = 1 | 2 | 3 | 4 | 5;
 export type RivalTuning = typeof RIVAL_TUNING;
 export type RaceRival = {
+  npcId?: string; vehicleId?: string;
   name: string; paint: string; build: NpcCarBuildId; tier: RaceTier;
   /** Paid once per win. */
   prizePhp: number;

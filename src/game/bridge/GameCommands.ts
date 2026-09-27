@@ -32,6 +32,7 @@ export type GameCommandMap = {
   /** Put the player car back on its current spawn point, at rest. */
   resetVehicle: void;
   resetRace: void;
+  abandonRace: void;
   setHandlingPreset: { presetId: string };
   /** Applies `quality`'s preset (if given), then any individual overrides. */
   setGraphics: Partial<GraphicsSettings>;
@@ -61,7 +62,7 @@ export type GameCommandMap = {
   /** The phone's buy & sell app; open anywhere. */
   openMarketplace: void;
   closeMarketplace: void;
-  buyListing: { listingId: string };
+  buyListing: { listingId: string; offerId?: string };
   /** Pay the mechanic to reveal an owned part's true condition (talyer only). */
   inspectPart: { partId: string };
   /** Bolt an owned wheel set (inventory item) onto the player car; null puts the stock wheels back. */
@@ -139,6 +140,7 @@ export interface GameCommands {
   startRace(raceId: RaceId): void;
   resetVehicle(): void;
   resetRace(): void;
+  abandonRace(): void;
   setHandlingPreset(presetId: string): void;
   setGraphics(settings: Partial<GraphicsSettings>): void;
   runGraphicsBenchmark(seconds?: number): void;
@@ -160,7 +162,7 @@ export interface GameCommands {
   dismissJobBoard(): void;
   openMarketplace(): void;
   closeMarketplace(): void;
-  buyListing(listingId: string): void;
+  buyListing(listingId: string, offerId?: string): void;
   inspectPart(partId: string): void;
   equipWheels(itemId: string | null): void;
   equipBodyPart(itemId: string, finish?: import('../../game-core/exterior').PaintFinish | null): void;
@@ -188,6 +190,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     spawnAt: (spawnPointId) => dispatch("spawnAt", { spawnPointId }),
     startRace: (raceId) => dispatch("startRace", { raceId }),
     resetRace: () => dispatch("resetRace"),
+    abandonRace: () => dispatch("abandonRace"),
     resetVehicle: () => dispatch("resetVehicle"),
     setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
     setGraphics: (settings) => dispatch("setGraphics", settings),
@@ -210,7 +213,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     dismissJobBoard: () => dispatch("dismissJobBoard"),
     openMarketplace: () => dispatch("openMarketplace"),
     closeMarketplace: () => dispatch("closeMarketplace"),
-    buyListing: listingId => dispatch("buyListing", { listingId }),
+    buyListing: (listingId, offerId) => dispatch("buyListing", offerId ? { listingId, offerId } : { listingId }),
     inspectPart: partId => dispatch("inspectPart", { partId }),
     equipWheels: itemId => dispatch("equipWheels", { itemId }),
     equipBodyPart: (itemId, finish) => dispatch("equipBodyPart", finish === undefined ? { itemId } : { itemId, finish }),

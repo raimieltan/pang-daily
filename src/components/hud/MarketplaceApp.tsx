@@ -91,12 +91,14 @@ function ListingDetail({ listing, onBack }: { listing: ListingView; onBack(): vo
   const commands = useGameUiStore(s => s.commands);
   const wallet = useMaintenanceStore(s => s.summary?.walletPhp);
   const [confirming, setConfirming] = useState(false);
-  const short = wallet !== undefined && wallet < listing.askingPricePhp;
+  const pricePhp = listing.offerPricePhp ?? listing.askingPricePhp;
+  const short = wallet !== undefined && wallet < pricePhp;
   return <article aria-label={listing.title} className="pb-4">
     <button type="button" className="px-3 py-2 text-xs text-white/60" onClick={onBack}>‹ Back</button>
     <Photo listing={listing} large />
     <div className="px-4">
-      <p className="mt-3 text-2xl font-semibold text-white">{pesos(listing.askingPricePhp)}</p>
+      <p className="mt-3 text-2xl font-semibold text-white">{pesos(pricePhp)}</p>
+      {listing.offerLabel && <p className="text-xs text-amber-200">{listing.offerLabel}</p>}
       <h2 className="text-base text-white/90">{listing.title}</h2>
       <p className="mt-1 text-[11px] text-white/45">Posted {ago(listing.postedSecondsAgo)} ago in {listing.location} · <span data-testid="listing-expiry">{listing.expiresInSeconds > 0 ? `listing ends in ${clock(listing.expiresInSeconds)}` : 'expired'}</span></p>
       <dl className="mt-3 grid grid-cols-[6rem_1fr] gap-y-1 text-xs">
@@ -114,11 +116,11 @@ function ListingDetail({ listing, onBack }: { listing: ListingView; onBack(): vo
       <p className="mt-3 text-[11px] text-white/40">Condition is the seller’s word, not a guarantee. No returns. A mechanic can tell you what it really is after you buy.</p>
       {!confirming
         ? <button type="button" className="mt-4 w-full rounded-lg bg-amber-200 py-2.5 font-semibold text-neutral-950 disabled:opacity-40" disabled={!commands || short || listing.expiresInSeconds === 0}
-          onClick={() => setConfirming(true)}>{short ? 'Not enough cash' : `Buy now · ${pesos(listing.askingPricePhp)}`}</button>
+          onClick={() => setConfirming(true)}>{short ? 'Not enough cash' : `Buy now · ${pesos(pricePhp)}`}</button>
         : <div className="mt-4 rounded-lg border border-amber-200/40 p-3">
-          <p className="text-xs text-white/80">Send {pesos(listing.askingPricePhp)} to {listing.seller.name} via e-wallet?</p>
+          <p className="text-xs text-white/80">Send {pesos(pricePhp)} to {listing.seller.name} via e-wallet?</p>
           <div className="mt-3 flex gap-2">
-            <button type="button" className="flex-1 rounded-lg bg-amber-200 py-2 font-semibold text-neutral-950" onClick={() => { commands?.buyListing(listing.id); onBack(); }}>Pay {pesos(listing.askingPricePhp)}</button>
+            <button type="button" className="flex-1 rounded-lg bg-amber-200 py-2 font-semibold text-neutral-950" onClick={() => { commands?.buyListing(listing.id, listing.offerId); onBack(); }}>Pay {pesos(pricePhp)}</button>
             <button type="button" className="flex-1 rounded-lg border border-white/20 py-2 text-white/70" onClick={() => setConfirming(false)}>Not yet</button>
           </div>
         </div>}

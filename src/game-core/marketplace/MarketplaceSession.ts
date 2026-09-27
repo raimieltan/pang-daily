@@ -1,3 +1,5 @@
+import { discountedPrice, type SocialAccess } from '../social/eligibility';
+import { opportunity } from '../social/opportunities';
 import { z } from 'zod';
 import type { PaintFinish } from '../exterior/BodyPart';
 import type { VehicleSession } from '../maintenance/VehicleSession';
@@ -37,6 +39,8 @@ const purchaseKey = (listingId: string) => `marketplace:${listingId}`;
  */
 export class MarketplaceSession {
   private state: MarketSave;
+  private socialAccess?: SocialAccess;
+  useSocialAccess(access: SocialAccess) { this.socialAccess = access; }
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly wallet: Wallet, private readonly inventory: Inventory, saved?: unknown,
@@ -74,22 +78,31 @@ export class MarketplaceSession {
     const now = this.now();
     const listings = [...this.state.listings].sort((a, b) => b.postedAt - a.postedAt);
     return {
-      listings: listings.map(l => listingView(l, now)), parts: this.inventory.items().map(item => this.partView(item)),
+      listings: listings.map(l => ({ ...listingView(l, now), ...this.offer(l) })), parts: this.inventory.items().map(item => this.partView(item)),
       inspectionFeePhp: MECHANIC_INSPECTION_PHP,
       nextExpirySeconds: listings.length ? Math.max(0, Math.ceil((Math.min(...listings.map(l => l.expiresAt)) - now) / 1000)) : null,
     };
   }
 
-  buy(listingId: string): PartPurchase | { rejected: string } {
+  buy(listingId: string, offerId?: string): PartPurchase | { rejected: string } {
     this.sync();
     const listing = this.state.listings.find(l => l.id === listingId);
     if (!listing) return { rejected: 'Sorry boss, sold na / listing expired.' };
-    const payment = this.wallet.spend(listing.askingPricePhp, { kind: 'parts_purchase', description: `Marketplace: ${partDefinition(listing.templateId)!.name}`,
+    let pricePhp = listing.askingPricePhp;
+    if (offerId) {
+      if (offerId !== 'jun_suki_offer') return { rejected: 'Unknown seller offer.' };
+      const rule = opportunity(offerId);
+      if (rule.benefit.kind !== 'seller' || listing.sellerId !== rule.benefit.sellerId) return { rejected: 'This seller offer does not apply to that listing.' };
+      const access = this.socialAccess?.(offerId);
+      if (!access?.eligible) return { rejected: `Seller offer unavailable. ${access?.unmetRequirements.join('; ') ?? 'Ask for a current offer.'}` };
+      pricePhp = discountedPrice(listing.askingPricePhp, rule.benefit.discountPercent);
+    }
+    const payment = this.wallet.spend(pricePhp, { kind: 'parts_purchase', description: `Marketplace: ${partDefinition(listing.templateId)!.name}`,
       source: `marketplace:${listing.sellerId}`, relatedEntityId: listing.id });
     if ('rejected' in payment) return { rejected: payment.rejected };
-    const item = this.deliver(listing);
+    const item = this.deliver(listing, pricePhp);
     if ('rejected' in item) return item; // Unreachable for catalog parts; the ledger replay retries on load.
-    return { listingId, sellerId: listing.sellerId, part: this.partView(item), pricePhp: listing.askingPricePhp, transactionId: payment.id };
+    return { listingId, sellerId: listing.sellerId, part: this.partView(item), pricePhp, transactionId: payment.id };
   }
 
   /** Paid reveal of an owned item's true condition. Any inventory item can go on the bench. */
@@ -105,9 +118,9 @@ export class MarketplaceSession {
   }
 
   /** Inventory first (keyed, so repeatable), then take the listing down. */
-  private deliver(listing: Listing) {
+  private deliver(listing: Listing, paidPhp = listing.askingPricePhp) {
     const item = this.inventory.add({ partId: listing.templateId, condition: listing.actualCondition, key: purchaseKey(listing.id),
-      origin: { kind: 'marketplace', listingId: listing.id, sellerId: listing.sellerId, paidPhp: listing.askingPricePhp, advertisedGrade: listing.advertisedGrade } });
+      origin: { kind: 'marketplace', listingId: listing.id, sellerId: listing.sellerId, paidPhp, advertisedGrade: listing.advertisedGrade } });
     this.state.listings = this.state.listings.filter(l => l.id !== listing.id);
     this.changed();
     return item;
@@ -119,12 +132,18 @@ export class MarketplaceSession {
       if (!tx.relatedEntityId) continue;
       if (tx.kind === 'parts_purchase') {
         const listing = this.state.listings.find(l => l.id === tx.relatedEntityId);
-        if (listing) this.deliver(listing);
+        if (listing) this.deliver(listing, -tx.amountPhp);
       } else if (tx.kind === 'part_inspection') {
         const item = this.inventory.item(tx.relatedEntityId);
         if (item && !item.revealedBy) this.inventory.reveal(item.id, 'mechanic');
       }
     }
+  }
+
+  private offer(listing: Listing): { offerId?: string; offerPricePhp?: number; offerLabel?: string } {
+    const rule = opportunity('jun_suki_offer');
+    if (rule.benefit.kind !== 'seller' || listing.sellerId !== rule.benefit.sellerId || !this.socialAccess?.(rule.id).eligible) return {};
+    return { offerId: rule.id, offerPricePhp: discountedPrice(listing.askingPricePhp, rule.benefit.discountPercent), offerLabel: rule.name };
   }
 
   private partView(item: InventoryItem): OwnedPartView {

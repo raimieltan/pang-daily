@@ -1,3 +1,4 @@
+import { raceValidation } from '../../../tests/fixtures/raceValidation';
 import { describe, expect, it } from 'vitest';
 import { SOCIAL_CONTENT } from './catalog';
 import { SocialSession } from './SocialSession';
@@ -27,7 +28,7 @@ describe('deterministic social events', () => {
 
  it('rejects conflicting redelivery of a consumed source', () => {
   const session = new SocialSession(SOCIAL_CONTENT);
-  const won = { type: 'race' as const, eventId: 'race:one', sourceId: 'attempt:one', attemptId: 'attempt:one', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 };
+  const won = { validation: raceValidation('pahuway_descent'), type: 'race' as const, eventId: 'race:one', sourceId: 'attempt:one', attemptId: 'attempt:one', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 };
   session.applyEvent(won);
   const before = session.snapshot();
   expect(() => session.applyEvent({ ...won, eventId: 'race:altered', position: 2 })).toThrow('different outcome');
@@ -67,13 +68,13 @@ describe('deterministic social events', () => {
 
  it('distinguishes race attempts, caps rewards, and changes only the rival', () => {
   const session = new SocialSession(SOCIAL_CONTENT);
-  for (let n = 1; n <= 5; n++) session.applyEvent({ type: 'race', eventId: `race:${n}`, sourceId: `attempt:${n}`, attemptId: `attempt:${n}`, npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 });
+  for (let n = 1; n <= 5; n++) session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: `race:${n}`, sourceId: `attempt:${n}`, attemptId: `attempt:${n}`, npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 });
   expect(session.snapshot().npcs.casey.respect).toBe(74);
   expect(session.snapshot().npcs.mang_boy.respect).toBe(50);
-  expect(session.applyEvent({ type: 'race', eventId: 'race:1', sourceId: 'attempt:1', attemptId: 'attempt:1', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 }).status).toBe('duplicate');
+  expect(session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'race:1', sourceId: 'attempt:1', attemptId: 'attempt:1', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 }).status).toBe('duplicate');
   const restored = new SocialSession(SOCIAL_CONTENT, session.snapshot());
-  expect(restored.applyEvent({ type: 'race', eventId: 'race:1', sourceId: 'attempt:1', attemptId: 'attempt:1', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 }).status).toBe('duplicate');
-  expect(restored.applyEvent({ type: 'race', eventId: 'race:6', sourceId: 'attempt:6', attemptId: 'attempt:6', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 }).status).toBe('applied');
+  expect(restored.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'race:1', sourceId: 'attempt:1', attemptId: 'attempt:1', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 }).status).toBe('duplicate');
+  expect(restored.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'race:6', sourceId: 'attempt:6', attemptId: 'attempt:6', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 }).status).toBe('applied');
   expect(restored.snapshot().npcs.casey.respect).toBe(74);
  });
 
@@ -81,7 +82,7 @@ describe('deterministic social events', () => {
   const friend = new SocialSession(SOCIAL_CONTENT);
   friend.applyEvent({ type: 'dialogue', eventId: 'casey-intro', sourceId: 'casey_intro', npcId: 'casey', dialogueId: 'casey_intro' });
   expect(() => friend.applyEvent({ type: 'dialogue', eventId: 'early-choice', sourceId: 'casey_intro:congratulate_casey', npcId: 'casey', dialogueId: 'casey_intro', choiceId: 'congratulate_casey' })).toThrow('valid race');
-  friend.applyEvent({ type: 'race', eventId: 'casey-race-1', sourceId: 'casey-attempt-1', attemptId: 'casey-attempt-1', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 130000 });
+  friend.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'casey-race-1', sourceId: 'casey-attempt-1', attemptId: 'casey-attempt-1', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 130000 });
   expect(friend.relationships('casey')).toEqual({ friend: false, hostile: false, mentor: false });
   friend.applyEvent({ type: 'dialogue', eventId: 'good-run', sourceId: 'casey_intro:congratulate_casey', npcId: 'casey', dialogueId: 'casey_intro', choiceId: 'congratulate_casey' });
   expect(friend.relationships('casey')).toEqual({ friend: true, hostile: false, mentor: false });
@@ -89,7 +90,7 @@ describe('deterministic social events', () => {
 
   const hostile = new SocialSession(SOCIAL_CONTENT);
   hostile.applyEvent({ type: 'dialogue', eventId: 'hostile-intro', sourceId: 'casey_intro', npcId: 'casey', dialogueId: 'casey_intro' });
-  hostile.applyEvent({ type: 'race', eventId: 'hostile-race', sourceId: 'hostile-attempt', attemptId: 'hostile-attempt', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 130000 });
+  hostile.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'hostile-race', sourceId: 'hostile-attempt', attemptId: 'hostile-attempt', npcId: 'casey', raceId: 'pahuway_descent', position: 2, racers: 2, timeMs: 130000 });
   hostile.applyEvent({ type: 'dialogue', eventId: 'insult', sourceId: 'casey_intro:insult_casey', npcId: 'casey', dialogueId: 'casey_intro', choiceId: 'insult_casey' });
   expect(hostile.relationships('casey')).toEqual({ friend: false, hostile: true, mentor: false });
  });
@@ -99,7 +100,7 @@ describe('deterministic social events', () => {
   seed.npcs.casey.respect = 99;
   seed.npcs.mang_boy.trust = 99;
   const session = new SocialSession(SOCIAL_CONTENT, seed);
-  const race = session.applyEvent({ type: 'race', eventId: 'upper-bound-race', sourceId: 'upper-bound-attempt', attemptId: 'upper-bound-attempt', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 });
+  const race = session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'upper-bound-race', sourceId: 'upper-bound-attempt', attemptId: 'upper-bound-attempt', npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 });
   expect(session.snapshot().npcs.casey.respect).toBe(100);
   expect(race.record?.effects[0].respectDelta).toBe(1);
   for (let n = 1; n <= 20; n++) session.applyEvent({ type: 'service', eventId: `repair:${n}`, sourceId: `repair:${n}`, npcId: 'mang_boy', serviceId: 'repair', outcome: 'completed', transactionId: n, vehicleId: 'daily', components: ['engine'], costPhp: 100 });
@@ -114,7 +115,7 @@ describe('deterministic social events', () => {
   const seed = new SocialSession(SOCIAL_CONTENT).snapshot();
   seed.npcs.mang_boy.trust = 1;
   const session = new SocialSession(SOCIAL_CONTENT, seed);
-  expect(() => session.applyEvent({ type: 'race', eventId: 'invalid-race', sourceId: 'invalid-attempt', attemptId: 'invalid-attempt', npcId: 'casey', raceId: 'pahuway_descent', position: 3, racers: 2, timeMs: 1000 })).toThrow('invalid race result');
+  expect(() => session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: 'invalid-race', sourceId: 'invalid-attempt', attemptId: 'invalid-attempt', npcId: 'casey', raceId: 'pahuway_descent', position: 3, racers: 2, timeMs: 1000 })).toThrow('Invalid race result');
   expect(session.snapshot().appliedEvents).toHaveLength(0);
   session.applyEvent(favor('accepted'));
   const outcome = session.applyEvent(favor('failed'));

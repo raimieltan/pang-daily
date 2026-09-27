@@ -23,7 +23,7 @@ export class MarketplaceService {
       market.subscribe(() => this.publish()),
       bridge.handle('openMarketplace', () => { this.open = true; market.sync(); this.publish(); }),
       bridge.handle('closeMarketplace', () => { this.open = false; bridge.emit('marketplace', null); }),
-      bridge.handle('buyListing', ({ listingId }) => this.buy(listingId)),
+      bridge.handle('buyListing', ({ listingId, offerId }) => this.buy(listingId, offerId)),
       bridge.handle('inspectPart', ({ partId }) => this.inspect(partId)),
     ];
   }
@@ -43,8 +43,8 @@ export class MarketplaceService {
     if (!this.market.sync() && this.open) this.publish();
   }
 
-  private buy(listingId: string): CommandOutcome {
-    const result = this.market.buy(listingId);
+  private buy(listingId: string, offerId?: string): CommandOutcome {
+    const result = this.market.buy(listingId, offerId);
     if ('rejected' in result) return result;
     this.bridge.emit('partPurchased', result);
   }

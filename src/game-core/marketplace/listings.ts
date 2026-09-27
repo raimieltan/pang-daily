@@ -74,6 +74,7 @@ export const seller = (id: string): Seller | undefined => SELLERS.find(s => s.id
 
 /** What the phone may show. Built field-by-field so hidden data cannot leak by spreading. */
 export type ListingView = {
+  offerId?: string; offerPricePhp?: number; offerLabel?: string;
   id: string; title: string; category: PartCategory; fits: string; askingPricePhp: number;
   advertised: { grade: Grade; label: string; blurb: string };
   seller: { id: string; name: string; rating: number; sales: number; since: number; replies: string };

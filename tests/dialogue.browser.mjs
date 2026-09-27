@@ -38,12 +38,12 @@ try {
  await call('close');
  await call('seed', 'race');
  await call('interact');
- await expect(dialogue).toContainText('Maayo nga run.');
+ await expect(dialogue).toContainText('First loss lang na');
  const before = await call('snapshot');
  await call('invalidate');
  expect(await call('choose', 'congratulate_casey')).toHaveProperty('rejected');
  expect((await call('snapshot')).appliedEvents).toEqual(before.appliedEvents);
- await expect(dialogue.locator('[data-choice-id]')).toHaveCount(0);
+ await expect(dialogue.locator('[data-choice-id="congratulate_casey"]')).toHaveCount(0);
  console.log('PASS low-trust/post-race conditions and stale choice rejection');
 
  await call('seed', 'race');

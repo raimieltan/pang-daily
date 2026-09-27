@@ -1,3 +1,4 @@
+import { payRacePrize } from '@/game-core/social/raceOutcomes';
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -39,7 +40,7 @@ export class RaceSystem implements GameSystem {
   private scene: Scene;
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
     private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE],
-    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn"> } = {}) {
+    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn" | "snapshot">; access?: (raceId: string) => string | null } = {}) {
     this.publisher = new SummaryPublisher((progress) => bridge.emit("raceProgress", progress));
     this.root = new TransformNode("local-rival", scene);
     this.root.setEnabled(false);
@@ -73,6 +74,7 @@ export class RaceSystem implements GameSystem {
       if (!this.atStart(route)) return { rejected: "Drive to this race's start line" };
       return this.start(route);
     }));
+    this.releases.push(bridge.handle("abandonRace", () => { this.abortAttempt(); }));
     this.releases.push(bridge.handle("resetRace", () => { this.reset(); }));
     const onPlaced = player.onPlaced;
     player.onPlaced = () => {
@@ -96,11 +98,14 @@ export class RaceSystem implements GameSystem {
     return route ? this.start(route) : { rejected: "Unknown race" };
   })); }
   private start(route: RaceDefinition) {
+    const rejection = this.garage.access?.(route.id);
+    if (rejection) return { rejected: rejection };
     if (this.active) return { rejected: "Race already in progress" };
     if (this.modes.mode !== "driving") return { rejected: "Get into your car to race" };
     if (!this.player.placeAt({ position: new Vector3(route.start.x, route.start.y, route.start.z), headingRad: route.heading })) return { rejected: "Start grid is unavailable" };
     this.attemptId = crypto.randomUUID();
     this.selected=route; this.race=new Race(route);
+    if (route.rival?.npcId && route.rival.vehicleId) this.bridge.emit('raceAttemptStarted', { raceId: route.id, attemptId: this.attemptId, npcId: route.rival.npcId, vehicleId: route.rival.vehicleId, totalCheckpoints: route.checkpoints.length });
     this.gates.forEach(g=>g.setEnabled(g.metadata.routeId===route.id));
     this.race.reset(); this.bridge.emit("raceProgress", this.race.snapshot());
     this.race.start(); this.resultSent = false; this.lastStanding = 0;
@@ -110,6 +115,7 @@ export class RaceSystem implements GameSystem {
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
   private reset() {
+    this.abortAttempt();
     this.introRemaining = 0;
     this.bridge.emit("raceIntro", null);
     this.race.reset(); this.controls.enabled = this.modes.mode === "driving";
@@ -140,17 +146,28 @@ export class RaceSystem implements GameSystem {
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
       this.lastStanding = this.race.position; this.bridge.emit("raceStandingChanged", this.standing());
     }
-    if (this.race.phase === "FINISHED" && !this.resultSent) {
-      this.resultSent = true;
-      this.gates.forEach(gate => gate.setEnabled(false));
-      const prize = this.race.position === 1 ? this.selected.rival?.prizePhp ?? 0 : 0;
-      const paid = prize > 0 && this.garage.wallet?.earn(prize, { kind: "race_prize", source: `race:${this.selected.id}`,
-        description: `Beat ${this.selected.rival!.name} · ${this.selected.name}`, relatedEntityId: this.selected.id });
-      this.bridge.emit("raceFinished", { ...this.standing(), attemptId: this.attemptId ?? undefined, timeMs: Math.round(this.race.playerTime! * 1000),
-        ...(paid && !("rejected" in paid) ? { prizePhp: prize } : {}) });
-    }
+    if (this.race.phase === "FINISHED" && !this.resultSent) this.publishResult();
     if (phase !== this.race.phase) this.publisher.flush(this.race.snapshot());
     else this.publisher.tick(dt, () => this.race.snapshot());
+  }
+  private abortAttempt() {
+    if (!this.race.abort()) return;
+    this.introRemaining = 0;
+    this.bridge.emit('raceIntro', null);
+    this.controls.enabled = this.modes.mode === 'driving';
+    this.root.setEnabled(false);
+    this.publishResult();
+    this.bridge.emit('raceProgress', this.race.snapshot());
+  }
+  private publishResult() {
+    if (this.resultSent || !this.attemptId) return;
+    this.resultSent = true;
+    this.gates.forEach(gate => gate.setEnabled(false));
+    const outcome = this.race.phase === 'DNF' ? 'dnf' as const : this.race.position === 1 ? 'win' as const : 'loss' as const;
+    const result = { ...this.standing(), attemptId: this.attemptId, npcId: this.selected.rival?.npcId, vehicleId: this.selected.rival?.vehicleId,
+      outcome, timeMs: Math.round((this.race.playerTime ?? this.race.elapsed) * 1000), validation: this.race.validation() };
+    const prizePhp = this.garage.wallet ? payRacePrize(this.garage.wallet, result, this.selected.rival?.prizePhp ?? 0) : 0;
+    this.bridge.emit('raceFinished', { ...result, prizePhp });
   }
   /** Swaps in the rival's own build; anonymous races and missing models keep the stock car. */
   private showRival(route: RaceDefinition) {
@@ -169,6 +186,7 @@ export class RaceSystem implements GameSystem {
   }
   private standing() { return { raceId: this.selected.id, position: this.race.position, racers: 2 }; }
   dispose() {
+    this.abortAttempt();
     this.disposed = true; this.releases.forEach((release) => release());
     this.player.canReposition = undefined; this.modes.canExit = undefined;
     this.controls.enabled = this.modes.mode === "driving";

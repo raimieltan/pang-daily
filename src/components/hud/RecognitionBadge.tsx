@@ -5,6 +5,13 @@ import { useSocialStore } from '@/state/socialStore';
 
 /** Scene recognition only; personal NPC trust and respect stay in their own state. */
 export function RecognitionBadge() {
+ const opportunityNotice = useSocialStore(state => state.opportunityNotices[0]);
+ const clearOpportunity = useSocialStore(state => state.clearOpportunityNotice);
+ useEffect(() => {
+  if (!opportunityNotice) return;
+  const timer = setTimeout(clearOpportunity, 6000);
+  return () => clearTimeout(timer);
+ }, [opportunityNotice, clearOpportunity]);
  const progress = useSocialStore((state) => state.progress);
  const notice = useSocialStore((state) => state.tierNotice);
  const clearNotice = useSocialStore((state) => state.clearTierNotice);
@@ -21,6 +28,7 @@ export function RecognitionBadge() {
   <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Recognition to next tier" aria-valuenow={Math.round(progress.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
    <div className="h-full bg-amber-200" style={{ width: `${Math.round(progress.progress * 100)}%` }} />
   </div>
+  {opportunityNotice && <p role="status" className="mt-2 text-amber-100">Discovered: {opportunityNotice.name}</p>}
   {notice && <p role="status" className="mt-2 text-amber-100">Recognition: {notice.to}</p>}
  </div>;
 }

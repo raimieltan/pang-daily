@@ -10,6 +10,11 @@ export class SocialEventBridge {
  private readonly release: (() => void)[] = [];
 
  constructor(events: GameEventSource, private readonly storage: SocialStoragePort, private readonly onError: (error: Error) => void = () => {}, private readonly onReputation?: (progress: ReputationProgress, tierChange?: { sceneId: string; from: ReputationTier; to: ReputationTier; points: number }) => void) {
+  this.receive(() => this.session.recoverInterruptedRaces());
+  this.release.push(events.on('raceAttemptStarted', attempt => this.receive(() => {
+   if (SOCIAL_RACE_RIVALS[attempt.raceId] !== attempt.npcId) return;
+   this.apply({ type: 'race_attempt', eventId: `race-start:${attempt.attemptId}`, sourceId: attempt.attemptId, ...attempt });
+  })));
   this.release.push(events.on('jobState', run => this.receive(() => {
    if (!run || (run.status !== 'accepted' && run.status !== 'active')) return;
    const favor = SOCIAL_CONTENT.favors.find((item) => item.jobId === run.jobId);
@@ -27,7 +32,7 @@ export class SocialEventBridge {
   this.release.push(events.on('raceFinished', result => this.receive(() => {
    if (!(result.raceId in REPUTATION_CONFIG.races) || !result.attemptId) return;
    const npcId = SOCIAL_RACE_RIVALS[result.raceId];
-   this.apply({ type: 'race', eventId: `race:${result.attemptId}`, sourceId: result.attemptId, attemptId: result.attemptId, ...(npcId ? { npcId } : {}), raceId: result.raceId, position: result.position, racers: result.racers, timeMs: result.timeMs });
+   this.apply({ type: 'race', eventId: `race:${result.attemptId}`, sourceId: result.attemptId, attemptId: result.attemptId, ...(npcId ? { npcId } : {}), raceId: result.raceId, position: result.position, racers: result.racers, timeMs: result.timeMs, validation: result.validation, outcome: result.outcome, vehicleId: result.vehicleId });
   })));
   this.release.push(events.on('repairCompleted', receipt => this.receive(() => {
    this.apply({ type: 'service', eventId: `repair:${receipt.transactionId}`, sourceId: `repair:${receipt.transactionId}`, npcId: 'mang_boy', serviceId: 'repair', outcome: 'completed', transactionId: receipt.transactionId, vehicleId: receipt.vehicleId, components: receipt.components, costPhp: receipt.costPhp });

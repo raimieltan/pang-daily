@@ -75,6 +75,9 @@ export type RaceResult = RaceStanding & {
  /** Unique per start, so a replayed result cannot count as a new race. */
  attemptId?: string;
   timeMs: number;
+  npcId?: string; vehicleId?: string;
+  outcome?: 'win' | 'loss' | 'dnf';
+  validation?: import('../../game-core/social/raceOutcomes').RaceValidation;
   /** Paid for beating a named rival. */
   prizePhp?: number;
 };

@@ -62,6 +62,7 @@ function QuoteForm({ quote }: { quote: RepairQuote }) {
     </nav>
     {section === 'performance' ? <TalyerPerformancePanel /> : section === 'exterior' ? <TalyerExteriorPanel /> : section === 'paint' || section === 'suspension' ? <TalyerSetupPanel section={section} /> : <>
     <p className="my-4 text-xs text-white/65">Inspection is free. Parts and labor are included. Pick what your budget can cover.</p>
+    {quote.benefitLabel && <p className="mb-3 text-xs text-amber-200">{quote.benefitLabel}</p>}
     <p className="mb-3 flex justify-between"><span className="text-white/60">Cash on hand</span><strong>{pesos(wallet)}</strong></p>
     {receipt && <p role="status" className="mb-3 border-l-2 border-emerald-300 pl-3 text-xs text-emerald-200">Paid {pesos(receipt.costPhp)}. {receipt.components.map(key => SERVICE_RULES[key].label).join(', ')} restored to 100%.</p>}
     {healthy && <p role="status" className="mb-3 text-emerald-200">All five systems are in good shape. No repairs needed, boss.</p>}

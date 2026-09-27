@@ -1,5 +1,6 @@
+import { rivalHistory } from '@/game-core/social/rivalHistory';
 import { SOCIAL_CONTENT } from '@/game-core/social/catalog';
-import { CONVERSATIONS, evaluateDialogueCondition, resolveConversation } from '@/game-core/social/conversation';
+import { CONVERSATIONS, dialogueNodeText, evaluateDialogueCondition, resolveConversation } from '@/game-core/social/conversation';
 import type { RuntimePort } from '@/game/bridge';
 import type { GameSystem } from '@/game/engine/types';
 import type { InputManager } from '@/game/input/InputManager';
@@ -104,6 +105,7 @@ export class DialogueController implements GameSystem {
   if (!node) { this.close(); return; }
   const choices = this.currentChoices();
   if (!choices.some((choice) => choice.id === this.selectedChoiceId)) this.selectedChoiceId = choices[0]?.id ?? null;
-  this.bridge.emit('dialogueViewChanged', { dialogueId: definition!.id, nodeId: node.id, speaker: SOCIAL_CONTENT.npcs.find((item) => item.id === node.speakerId)!.name, text: node.text, choices: choices.map(({ id, text }) => ({ id, text })), selectedChoiceId: this.selectedChoiceId });
+  const state = loadSocialSession(this.storage).snapshot();
+  this.bridge.emit('dialogueViewChanged', { dialogueId: definition!.id, nodeId: node.id, speaker: SOCIAL_CONTENT.npcs.find((item) => item.id === node.speakerId)!.name, text: dialogueNodeText(node, state), rival: definition!.npcId === 'casey' ? rivalHistory(state) : undefined, choices: choices.map(({ id, text }) => ({ id, text })), selectedChoiceId: this.selectedChoiceId });
  }
 }

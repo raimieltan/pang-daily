@@ -1,3 +1,4 @@
+import { raceValidation } from '../../tests/fixtures/raceValidation';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GameBridge } from '@/game/bridge/GameBridge';
 import { SocialEventBridge } from '@/game/social/SocialEventBridge';
@@ -16,10 +17,10 @@ describe('recognition UI projection', () => {
    if (transition) bridge.runtime.emit('socialTierChanged', transition);
   });
   expect(useSocialStore.getState().progress.tier).toBe('Unknown');
-  for (let n = 1; n <= 3; n++) bridge.runtime.emit('raceFinished', { raceId: 'kyo_block_lap', attemptId: `loss-${n}`, position: 2, racers: 2, timeMs: 120000 });
+  for (let n = 1; n <= 3; n++) bridge.runtime.emit('raceFinished', { validation: raceValidation('kyo_block_lap'), raceId: 'kyo_block_lap', attemptId: `loss-${n}`, position: 2, racers: 2, timeMs: 120000 });
   expect(useSocialStore.getState().progress).toMatchObject({ tier: 'Regular', points: 15, nextTier: 'Known' });
   expect(useSocialStore.getState().tierNotice).toMatchObject({ from: 'Unknown', to: 'Regular' });
-  bridge.runtime.emit('raceFinished', { raceId: 'kyo_block_lap', attemptId: 'loss-3', position: 2, racers: 2, timeMs: 120000 });
+  bridge.runtime.emit('raceFinished', { validation: raceValidation('kyo_block_lap'), raceId: 'kyo_block_lap', attemptId: 'loss-3', position: 2, racers: 2, timeMs: 120000 });
   expect(useSocialStore.getState().progress.points).toBe(15);
   social.dispose(); unbind(); bridge.dispose();
  });

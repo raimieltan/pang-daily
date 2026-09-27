@@ -1,3 +1,4 @@
+import { SocialOpportunityService } from '../social/SocialOpportunityService';
 import { FuelSystem } from "../maintenance/FuelSystem";
 import { JobMarker } from "../jobs/JobMarker";
 import { JobSystem } from "../jobs/JobSystem";
@@ -156,7 +157,7 @@ export const hubScene: SceneDefinition = {
     // NPC cars clone whichever owned car their build names; both are loaded by now.
     const npcModels = () => ({ [driven.spec.id]: player.visual.model, [parked.spec.id]: garage.model });
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES, ...RACE_CALENDAR],
-      { models: npcModels, wallet: session }));
+      { models: npcModels, wallet: session, access: new SocialOpportunityService(bridge, socialStorage).raceRejection }));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
     const maintainedCar = player;
     const jobSystem = new JobSystem(bridge, jobs, {
