@@ -1,3 +1,5 @@
+/** Compatibility-only browser persistence for standalone development/test fixtures.
+ * Account sessions use the server service and never restore these browser values. */
 import { VehicleSession } from '../../game-core/maintenance/VehicleSession';
 export const VEHICLE_SESSION_KEY = 'pang-daily.vehicle-session.v1';
 type StoragePort = Pick<Storage, 'getItem' | 'setItem'>;

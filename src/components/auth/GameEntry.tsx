@@ -3,8 +3,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { GameCanvas } from '@/components/game/GameCanvas';
 import { HudOverlay } from '@/components/hud/HudOverlay';
-import { PlayerApiError, playerApi } from '@/lib/player/playerApi';
-import { runtimeBootstrap, type RuntimeBootstrap } from '@/lib/player/runtimeBootstrap';
+import type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
+import { LegacyTransitionNotice } from './LegacyTransitionNotice';
+import { PlayerApiError, playerService } from '@/lib/player/playerService';
 
 type Entry = { status: 'loading' | 'anonymous' | 'error'; message?: string; requestId?: string } |
   { status: 'ready'; bootstrap: RuntimeBootstrap; name: string };
@@ -23,14 +24,14 @@ export function GameEntry() {
   async function load() {
     setEntry({ status: 'loading' });
     try {
-      const dto = await playerApi.bootstrap();
-      setEntry({ status: 'ready', bootstrap: runtimeBootstrap(dto), name: dto.profile.displayName });
+      const loaded = await playerService.bootstrap();
+      setEntry({ status: 'ready', ...loaded });
     } catch (error) { failed(error); }
   }
   useEffect(() => {
     const abort = new AbortController();
-    playerApi.bootstrap(abort.signal).then(dto => {
-      if (!abort.signal.aborted) setEntry({ status: 'ready', bootstrap: runtimeBootstrap(dto), name: dto.profile.displayName });
+    playerService.bootstrap(abort.signal).then(loaded => {
+      if (!abort.signal.aborted) setEntry({ status: 'ready', ...loaded });
     }).catch(error => { if (!abort.signal.aborted) failed(error); });
     return () => abort.abort();
   }, []);
@@ -38,7 +39,7 @@ export function GameEntry() {
     event.preventDefault();
     setBusy(true); setAuthError('');
     try {
-      await playerApi[mode]({ username, password });
+      await playerService[mode]({ username, password });
       setPassword('');
       await load();
     } catch (error) { setAuthError(error instanceof Error ? error.message : 'Unable to sign in. Please retry.'); }
@@ -46,13 +47,14 @@ export function GameEntry() {
   }
   async function logout() {
     setBusy(true);
-    try { await playerApi.logout(); setEntry({ status: 'anonymous' }); }
+    try { await playerService.logout(); setEntry({ status: 'anonymous' }); }
     catch (error) { failed(error); }
     finally { setBusy(false); }
   }
   if (entry.status === 'ready') return <>
     <GameCanvas bootstrap={entry.bootstrap} />
     <HudOverlay />
+    <LegacyTransitionNotice />
     <button type="button" disabled={busy} onClick={() => void logout()} className="absolute right-3 bottom-3 z-50 rounded bg-black/80 px-3 py-2 text-xs text-white" aria-label={`Sign out ${entry.name}`}>Sign out</button>
   </>;
   return <div className="flex h-full items-center justify-center bg-[#171b18] p-6 text-[#f3eee0]">
@@ -75,7 +77,7 @@ export function GameEntry() {
           <button disabled={busy} className="w-full rounded bg-[#e7bb6e] px-4 py-2 font-medium text-black disabled:opacity-50">{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
         </form>
         <button type="button" disabled={busy} onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setAuthError(''); }} className="text-sm underline">{mode === 'login' ? 'Create an account' : 'Already have an account? Sign in'}</button>
-        {mode === 'register' && <p className="text-xs text-white/60">Accounts start with a fresh save. Existing progress in this browser is not imported.</p>}
+        <p className="text-xs text-white/60">Browser development progress is retired when your server save loads. It is not imported. Sign in to keep your account save, or create an account with fresh starter progress. Audio settings are kept.</p>
       </>}
     </section>
   </div>;

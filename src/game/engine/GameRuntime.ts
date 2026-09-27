@@ -1,5 +1,5 @@
 import type { SocialStoragePort } from '../social/socialStorage';
-import { ServerPersistence, type ServerPlayerRepository } from '../persistence/ServerPersistence';
+import type { PersistenceFactory, RuntimePersistence } from '../../game-core/persistence/PersistenceFactory';
 import { SocialOpportunityService } from '../social/SocialOpportunityService';
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { GameBridge, type GameCommands, type GameEventSource } from "../bridge";
@@ -29,8 +29,7 @@ const DEV_WALLET_PHP = 1_000_000;
 export type GameRuntimeOptions = {
   initialScene?: SceneId;
   bootstrap?: RuntimeBootstrap;
-  repository?: ServerPlayerRepository;
-  hydrate?: (dto: import("@pang-daily/contracts").PlayerBootstrap) => RuntimeBootstrap;
+  persistence?: PersistenceFactory;
 };
 
 /**
@@ -60,10 +59,12 @@ export class GameRuntime {
   private readonly opportunities: SocialOpportunityService;
   private started = false;
   private disposed = false;
-  private persistence?: ServerPersistence;
+  private persistence?: RuntimePersistence;
   private saveElapsed = 0;
 
   constructor(canvas: HTMLCanvasElement, options: GameRuntimeOptions = {}) {
+    if (options.bootstrap && !options.persistence) throw new Error('Server bootstrap requires server persistence.');
+    if (!options.bootstrap && process.env.NODE_ENV === 'production') throw new Error('Sign in to load a server save.');
     this.initialScene = options.initialScene ?? INITIAL_SCENE;
     this.engine = new Engine(canvas, true, { stencil: true, powerPreference: "high-performance" }, true);
     this.audio = new GameAudio(this.events);
@@ -99,8 +100,8 @@ export class GameRuntime {
     const access = this.opportunities.access;
     session.useSocialAccess(access);
     const jobs = options.bootstrap ? new JobSession(session, HUB_JOBS, options.bootstrap.jobs) : loadJobSession(session, HUB_JOBS, storage);
-    if (options.bootstrap && options.repository && options.hydrate) {
-      this.persistence = new ServerPersistence(options.repository, options.hydrate, options.bootstrap, session, inventory, jobs, message => emit('persistenceError', message), fresh => { loadedSocial = fresh.social; });
+    if (options.bootstrap && options.persistence) {
+      this.persistence = options.persistence({ initial: options.bootstrap, wallet: session, inventory, jobs, report: message => emit('persistenceError', message), refresh: fresh => { loadedSocial = fresh.social; } });
       socialStorage.executeSocial = intent => this.persistence!.execute(intent);
       session.usePersistence(this.persistence); inventory.usePersistence(this.persistence);
       for (const race of options.bootstrap.interruptedRaces ?? []) void this.persistence.execute({ type: 'race_complete', ...race, finish: false }).catch(error => emit('persistenceError', `Interrupted race could not be saved: ${error instanceof Error ? error.message : String(error)}`));

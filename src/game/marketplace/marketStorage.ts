@@ -1,3 +1,5 @@
+/** Compatibility-only browser persistence for standalone development/test fixtures.
+ * Account sessions use the server service and never restore these browser values. */
 import { InventorySession } from '../../game-core/inventory/InventorySession';
 import { MarketplaceSession } from '../../game-core/marketplace/MarketplaceSession';
 import type { VehicleSession } from '../../game-core/maintenance/VehicleSession';

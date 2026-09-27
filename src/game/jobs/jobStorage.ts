@@ -1,3 +1,5 @@
+/** Compatibility-only browser persistence for standalone development/test fixtures.
+ * Account sessions use the server service and never restore these browser values. */
 import type { JobDefinition } from '../../game-core/jobs/jobs';
 import { JobSession } from '../../game-core/jobs/JobSession';
 import type { VehicleSession } from '../../game-core/maintenance/VehicleSession';

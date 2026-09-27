@@ -1,3 +1,5 @@
+/** Compatibility-only browser persistence for standalone development/test fixtures.
+ * Account sessions use the server service and never restore these browser values. */
 const ACTIVE_CAR_KEY = 'pang-daily.active-car.v1';
 
 type StoragePort = Pick<Storage, 'getItem' | 'setItem'>;

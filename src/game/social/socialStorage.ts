@@ -1,3 +1,5 @@
+/** Compatibility-only browser persistence for standalone development/test fixtures.
+ * Account sessions use the server service and never restore these browser values. */
 import { SOCIAL_CONTENT } from '@/game-core/social/catalog';
 import type { PersistentIntent, PersistentReceipt } from '@/game-core/persistence/PersistencePort';
 import { SocialSession } from '@/game-core/social/SocialSession';

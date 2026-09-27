@@ -7,7 +7,10 @@ export class PlayerApiError extends Error {
 }
 async function request(path: string, method = 'GET', body?: unknown, signal?: AbortSignal) {
   const response = await fetch(`/api${path}`, { method, credentials: 'same-origin', cache: 'no-store', signal,
-    headers: { 'X-Pang-Request': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    headers: { 'X-Pang-Request': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined }).catch(error => {
+      if (signal?.aborted) throw error;
+      throw new PlayerApiError(0, 'NETWORK_UNAVAILABLE', 'Your save is unavailable while offline or disconnected. Reconnect and retry.');
+    });
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as { code?: string; message?: string; requestId?: string };
     throw new PlayerApiError(response.status, error.code ?? 'API_UNAVAILABLE', error.message ?? 'Unable to reach your save. Please retry.', error.requestId);

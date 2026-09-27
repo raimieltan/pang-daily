@@ -35,6 +35,8 @@ const SCENES: { id: SceneId; label: string }[] = [
 
 /** Presentation-only overlay. Reads the UI store and sends intents via commands. */
 export function HudOverlay() {
+  const offline = usePersistenceStore(s => s.offline);
+  const saving = usePersistenceStore(s => s.saving);
   const saveError = usePersistenceStore(s => s.error);
   const [toolsOpen, setToolsOpen] = useState(false);
   const intro = useHudStore(s => s.raceIntro);
@@ -52,6 +54,8 @@ export function HudOverlay() {
 
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
+      {offline && <p role="status" className="absolute bottom-14 left-3 rounded bg-black/90 p-3 text-sm text-amber-200">Offline. Progress requires a connection to save. Reconnect and retry any failed action.</p>}
+      {saving && <p role="status" className="absolute top-10 left-3 text-xs text-white/70">Saving progress…</p>}
       {saveError && <div role="alert" className="pointer-events-auto absolute top-14 left-3 right-3 z-50 rounded border border-red-400/50 bg-black/90 p-3 text-sm text-red-200">
         <p>Progress could not be saved: {saveError}</p>
         <button type="button" className="mt-2 underline" onClick={() => useGameUiStore.getState().commands?.retryPersistence()}>Retry save</button>

@@ -1,9 +1,7 @@
 "use client";
 
 import { bindPersistenceStore } from '@/state/persistenceStore';
-import { playerApi } from '@/lib/player/playerApi';
-import { runtimeBootstrap } from '@/lib/player/runtimeBootstrap';
-
+import { playerService } from '@/lib/player/playerService';
 
 import { useEffect, useRef } from "react";
 import { bindGameUiStore, useGameUiStore } from "@/state/gameUiStore";
@@ -16,13 +14,13 @@ import { bindAutoPartsStore } from '@/state/autoPartsStore';
 import { bindJobStore } from "@/state/jobStore";
 import { bindMarketStore } from "@/state/marketStore";
 import { bindSocialStore } from "@/state/socialStore";
-import type { RuntimeBootstrap } from '@/lib/player/runtimeBootstrap';
+import type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
 
 /**
  * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
  * Lifecycle only — no game logic belongs in this component.
  */
-export function GameCanvas({ bootstrap }: { bootstrap?: RuntimeBootstrap }) {
+export function GameCanvas({ bootstrap }: { bootstrap: RuntimeBootstrap }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -36,7 +34,7 @@ export function GameCanvas({ bootstrap }: { bootstrap?: RuntimeBootstrap }) {
       .then(({ createGame }) => {
         if (cancelled) return;
 
-        const game = createGame(canvas, { bootstrap, repository: bootstrap ? playerApi : undefined, hydrate: runtimeBootstrap });
+        const game = createGame(canvas, { bootstrap, persistence: playerService.persistence });
         // Bind before start() so no early event is missed.
         const unbinders = [
           bindGameUiStore(game),
