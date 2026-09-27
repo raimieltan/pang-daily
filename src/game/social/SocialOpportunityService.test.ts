@@ -28,3 +28,26 @@ it('publishes persisted discovery once, rechecks race access, and retains discov
  expect(restored.raceRejection('the_wall')).toBeNull();
  bridge.dispose();
 });
+
+
+it('publishes only changed public views at low frequency and does not replay changes after reload', () => {
+ const values = new Map<string, string>();
+ const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+ const bridge = new GameBridge();
+ const service = new SocialOpportunityService(bridge.runtime, storage);
+ const views: unknown[] = [], changes: unknown[] = [];
+ bridge.ui.events.on('socialViewChanged', view => views.push(view));
+ bridge.ui.events.on('socialChangesApplied', notice => changes.push(notice));
+ for (let i = 0; i < 9; i++) service.update(0.1);
+ expect(views).toHaveLength(0);
+ service.update(1); service.update(1);
+ expect(views).toHaveLength(1);
+ const session = loadSocialSession(storage);
+ session.applyEvent({ type: 'dialogue', eventId: 'dialogue:casey:casey_intro', sourceId: 'casey_intro', npcId: 'casey', dialogueId: 'casey_intro' });
+ service.update(1); service.update(1);
+ expect(views).toHaveLength(2); expect(changes).toHaveLength(1);
+ const restored = new SocialOpportunityService(bridge.runtime, storage);
+ restored.update(1);
+ expect(changes).toHaveLength(1);
+ bridge.dispose();
+});

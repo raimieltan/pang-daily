@@ -1,0 +1,34 @@
+name: pang-daily
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: pang
+      POSTGRES_PASSWORD: pang_dev
+      POSTGRES_DB: pang_daily
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pang -d pang_daily"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  db-test:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: pang_test
+      POSTGRES_PASSWORD: pang_test
+      POSTGRES_DB: pang_daily_test
+    ports:
+      - "127.0.0.1:55433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pang_test -d pang_daily_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  postgres-dev:

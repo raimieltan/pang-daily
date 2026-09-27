@@ -14,6 +14,8 @@ import type { RaceId, SpawnPointId } from "./types";
 import type { ServiceComponent } from "../../game-core/maintenance/condition";
 
 export type GameCommandMap = {
+  openContacts: void;
+  closeContacts: void;
   openAutoPartsShop: void;
   closeAutoPartsShop: void;
   quoteAutoPart: { partId: string };
@@ -124,6 +126,8 @@ export class CommandBus {
 
 /** The ergonomic, React-facing form of `GameCommandMap`. */
 export interface GameCommands {
+  openContacts(): void;
+  closeContacts(): void;
   openAutoPartsShop(): void;
   closeAutoPartsShop(): void;
   quoteAutoPart(partId: string): void;
@@ -175,6 +179,8 @@ type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>)
 
 export function createGameCommands(dispatch: Dispatch): GameCommands {
   return {
+    openContacts: () => dispatch('openContacts'),
+    closeContacts: () => dispatch('closeContacts'),
     openAutoPartsShop: () => dispatch('openAutoPartsShop'),
     closeAutoPartsShop: () => dispatch('closeAutoPartsShop'),
     quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),

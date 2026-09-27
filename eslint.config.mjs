@@ -6,6 +6,18 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    files: ["apps/api/src/**/*.ts"],
+    ignores: ["apps/api/src/database/**", "apps/api/src/generated/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["**/generated/prisma/**", "@prisma/*", "prisma/*"], message: "Prisma belongs in the database/persistence service boundary." },
+          { group: ["@/state/**", "@/components/**", "**/src/state/**", "**/src/game/**"], message: "API modules must not depend on browser state or runtime simulation." },
+        ],
+      }],
+    },
+  },
+  {
     // The game runtime talks to the UI only through src/game/bridge (TECH_ARCHITECTURE §5).
     files: ["src/game/**"],
     rules: {
@@ -33,6 +45,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "apps/api/dist/**",
+    "apps/api/src/generated/**",
   ]),
 ]);
 

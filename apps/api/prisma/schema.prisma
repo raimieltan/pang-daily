@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Infrastructure metadata only. Player/save models belong to subsequent tickets.
+model SchemaVersion {
+  id        Int      @id
+  version   Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}

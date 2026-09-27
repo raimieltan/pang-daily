@@ -1,5 +1,8 @@
 "use client";
 
+import { ContactsApp } from './ContactsApp';
+import { SocialFeedback } from './SocialFeedback';
+import { useSocialStore } from '@/state/socialStore';
 import { useState } from "react";
 import { useHudStore } from "@/state/hudStore";
 import { useGraphicsStore } from "@/state/graphicsStore";
@@ -42,6 +45,7 @@ export function HudOverlay() {
   const commands = useGameUiStore((s) => s.commands);
   const activeScene = useGameUiStore((s) => s.activeScene);
   const loadingScene = useGameUiStore((s) => s.loadingScene);
+  const contactsOpen = useSocialStore(s => s.contactsOpen);
   const marketOpen = useMarketStore((s) => s.view !== null);
 
   return (
@@ -50,12 +54,13 @@ export function HudOverlay() {
         <div>
           <p className="tape-brand">PANG DAILY</p>
           <p className="mt-2 text-[10px] tracking-[0.24em] text-white/50">ILOILO, PH / {time === "night" ? "02:13 AM" : time === "morning" ? "06:24 AM" : "04:38 PM"}</p>
-          <RecognitionBadge />
+          <RecognitionBadge showNotices={false} />
         </div>
         <div className="pointer-events-auto flex items-center gap-4">
           {settings?.analog && settings.analogPreset !== "CLEAN" && <span className="tape-rec hidden sm:inline"><i /> REC</span>}
           {status === "ready" && <>
             <SoundButton />
+            <button type="button" className={buttonClass} aria-expanded={contactsOpen} onClick={() => contactsOpen ? commands?.closeContacts() : commands?.openContacts()}>Contacts · P</button>
             <button type="button" className={buttonClass} onClick={() => marketOpen ? commands?.closeMarketplace() : commands?.openMarketplace()} aria-expanded={marketOpen}>{marketOpen ? "Close phone" : "Phone · Baligya"}</button>
             <button type="button" className={buttonClass} onClick={() => setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen}>{toolsOpen ? "Close settings" : "Settings"}</button>
             <button type="button" className={buttonClass} onClick={() => paused ? commands?.resume() : commands?.pause()}>{paused ? "Resume" : "Menu"}</button>
@@ -66,7 +71,7 @@ export function HudOverlay() {
       {(status === "loading" || loadingScene) && <div className="tape-loading"><p className="tape-eyebrow">PANG DAILY / VOL. 01</p><p className="mt-4 text-4xl font-light tracking-[0.16em]">FINDING SIGNAL</p><p className="mt-3 text-white/50">Loading {loadingScene ?? "the road"}…</p></div>}
       {status === "error" && <p className="self-center text-red-300">Failed to start: {errorMessage}</p>}
 
-      {paused && status === "ready" && !toolsOpen && <nav className="tape-menu pointer-events-auto" aria-label="Pause menu">
+      {paused && status === "ready" && !toolsOpen && !contactsOpen && <nav className="tape-menu pointer-events-auto" aria-label="Pause menu">
         <p className="tape-eyebrow">TAPE PAUSED / ILOILO AFTER HOURS</p>
         <h1>NIGHT RUN</h1>
         <button onClick={() => commands?.resume()}>DRIVE <span>↗</span></button>
@@ -90,6 +95,8 @@ export function HudOverlay() {
         <LocationToast /><CommandNotice /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
       </div>}
       {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /><MarketplaceApp /><AutoPartsShopPanel /></>}
+      <ContactsApp />
+      {status === "ready" && !contactsOpen && <div className="absolute top-40 left-4 z-30"><SocialFeedback /></div>}
       <RaceIntro />
     </div>
   );

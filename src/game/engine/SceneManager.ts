@@ -44,6 +44,10 @@ export class SceneManager<Id extends string> {
   private readonly socialStorage: SceneContext['socialStorage'] = { getItem: () => null, setItem: () => {} },
   ) {}
 
+  setPaused(paused: boolean): void {
+    this.current?.systems.forEach(system => system.setPaused?.(paused));
+  }
+
   get activeId(): Id | null {
     return this.current?.ready ? this.current.id : null;
   }

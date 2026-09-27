@@ -16,7 +16,8 @@ try {
  await call('seed'); await call('tick'); await call('tick');
  expect(await call('notices')).toHaveLength(4);
  expect(await call('raceAccess')).toBeNull();
- await expect(page.getByTestId('recognition')).toContainText('Discovered:');
+ for (let n = 0; n < 8 && !(await page.getByTestId('social-feedback').innerText()).includes('Discovered:'); n++) await page.getByRole('button', { name: 'Dismiss social update' }).click();
+ await expect(page.getByTestId('social-feedback')).toContainText('Discovered:');
 
  await call('openMarket');
  await page.getByRole('button', { name: `${await call('sukiTitle')}, ₱1,000`, exact: true }).click();

@@ -32,6 +32,7 @@ export class InputManager implements GameSystem {
   private readonly axes = new Map<AxisAction, number>();
   private readonly down = new Set<ButtonAction>();
   private readonly justPressed = new Set<ButtonAction>();
+  private suspended = false;
   private context: 'gameplay' | 'dialogue' = 'gameplay';
   private readonly blockedKeys = new Set<string>();
   private readonly blockedPadButtons = new Set<number>();
@@ -71,6 +72,15 @@ export class InputManager implements GameSystem {
     this.axes.clear(); this.down.clear(); this.justPressed.clear(); this.keysTapped.clear();
   }
 
+  /** A phone/menu owns input; release held controls before returning to gameplay. */
+  setPaused(paused: boolean): void {
+    this.suspended = paused;
+    this.onBlur();
+    const pad = activeGamepad(this.gamepads());
+    pad?.buttons.forEach((button, index) => { if (button.pressed) this.blockedPadButtons.add(index); });
+    pad?.axes.forEach((value, index) => { if (Math.abs(value) > this.config.deadzones.stick) this.blockedPadAxes.add(index); });
+  }
+
   /** Swap bindings or deadzones at runtime (settings screen, tuning). */
   setConfig(config: InputConfig): void {
     this.config = config;
@@ -78,6 +88,7 @@ export class InputManager implements GameSystem {
   }
 
   update(): void {
+    if (this.suspended) return;
     const physicalPad = activeGamepad(this.gamepads());
     this.blockedKeys.forEach((code) => { if (!this.keysDown.has(code)) this.blockedKeys.delete(code); });
     this.blockedPadButtons.forEach((index) => { if (!physicalPad?.buttons[index]?.pressed && (physicalPad?.buttons[index]?.value ?? 0) <= this.config.deadzones.trigger) this.blockedPadButtons.delete(index); });
@@ -115,6 +126,7 @@ export class InputManager implements GameSystem {
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
+    if (this.suspended) return;
     if (isTyping(event) || !this.boundKeys.has(event.code)) return;
     // Arrow keys and Space would otherwise scroll the page or press a focused HUD button.
     event.preventDefault();

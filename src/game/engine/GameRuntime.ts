@@ -42,6 +42,9 @@ export class GameRuntime {
   private readonly resizeObserver: ResizeObserver;
   private readonly initialScene: SceneId;
   private paused = false;
+  private contactsOpen = false;
+  private dialogueOpen = false;
+  private contactsWasPaused = false;
   private lastStatsAt = 0;
   private readonly opportunities: SocialOpportunityService;
   private started = false;
@@ -79,6 +82,7 @@ export class GameRuntime {
       emit('socialReputationUpdated', progress);
       if (tierChange) emit('socialTierChanged', tierChange);
     });
+    this.events.on('dialogueViewChanged', view => { this.dialogueOpen = view !== null; });
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),
       onReady: (sceneId) => emit("sceneReady", { sceneId }),
@@ -91,6 +95,22 @@ export class GameRuntime {
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);
 
+    handle('openContacts', () => {
+      if (this.contactsOpen) return;
+      if (this.dialogueOpen) this.commands.closeDialogue();
+      this.commands.closeMarketplace();
+      this.contactsWasPaused = this.paused;
+      this.contactsOpen = true;
+      this.opportunities.update(1);
+      this.setPaused(true);
+      emit('contactsOpened', true);
+    });
+    handle('closeContacts', () => {
+      if (!this.contactsOpen) return;
+      this.contactsOpen = false;
+      emit('contactsOpened', false);
+      this.setPaused(this.contactsWasPaused);
+    });
     // Runtime-wide commands; gameplay commands are registered by scene systems.
     handle("pause", () => this.setPaused(true));
     handle("resume", () => this.setPaused(false));
@@ -143,6 +163,7 @@ export class GameRuntime {
   private setPaused(paused: boolean): void {
     if (this.paused === paused) return;
     this.paused = paused;
+    this.scenes.setPaused(paused);
     this.bridge.runtime.emit("paused", { paused });
   }
 }

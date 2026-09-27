@@ -1,0 +1,42 @@
+import { expect, it } from 'vitest';
+import { SOCIAL_CONTENT } from './catalog';
+import { SocialSession } from './SocialSession';
+import { socialView, socialChanges } from './presentation';
+import { raceValidation } from '../../../tests/fixtures/raceValidation';
+const session = () => new SocialSession(SOCIAL_CONTENT);
+it('hides strangers and rewards; separates respect from unfriendly trust and known requirements', () => {
+ const game = session();
+ expect(socialView(game.snapshot())).toMatchObject({ contacts: [], crews: [], opportunities: [] });
+ game.applyEvent({ type: 'dialogue', npcId: 'casey', dialogueId: 'casey_intro', eventId: 'meet', sourceId: 'casey_intro' });
+ const state = game.snapshot(); state.npcs.casey.trust = 20; state.npcs.casey.respect = 70;
+ const unchanged = JSON.stringify(state);
+ const view = socialView(state);
+ expect(JSON.stringify(state)).toBe(unchanged);
+ expect(view.contacts[0].summary).toContain('Unfriendly');
+ expect(view.contacts[0].summary).toContain('Respects');
+ expect(view.opportunities[0]).toMatchObject({ name: 'A future race invitation', requirements: ['Reach Regular reputation'] });
+ expect(JSON.stringify(view)).not.toContain('10%');
+ expect(view.crews[0]).toMatchObject({ membership: 'none', standing: 0 });
+});
+it('groups trust/respect/recognition/discovery from a race, deduplicates and never replays saved events', () => {
+ const game = session();
+ game.applyEvent({ type: 'dialogue', npcId: 'casey', dialogueId: 'casey_intro', eventId: 'meet', sourceId: 'casey_intro' });
+ const before = game.snapshot();
+ game.applyEvent({ type: 'race', npcId: 'casey', raceId: 'pahuway_descent', attemptId: 'one', sourceId: 'one', eventId: 'race:one', position: 2, racers: 2, timeMs: 120000, validation: raceValidation('pahuway_descent') });
+ const after = game.snapshot();
+ const notices = socialChanges(before, after);
+ expect(notices).toHaveLength(1);
+ expect(notices[0].lines.join(' ')).toContain('Casey:');
+ expect(notices[0].lines.join(' ')).toContain('respect');
+ expect(notices[0].lines.join(' ')).toContain('Iloilo car scene: +5');
+ expect(socialChanges(after, new SocialSession(SOCIAL_CONTENT, after).snapshot())).toEqual([]);
+});
+it('keeps histories bounded, uses readable copy and clears a repaired broken favor', () => {
+ const game = session();
+ game.applyEvent({ type: 'dialogue', npcId: 'mang_boy', dialogueId: 'talyer_mang_boy', eventId: 'meet', sourceId: 'talyer_mang_boy' });
+ const state = game.snapshot();
+ state.favors.mang_boy_parts_help = { favorId: 'mang_boy_parts_help', npcId: 'mang_boy', status: 'failed', runId: 'talyer_oil_errand#1' };
+ expect(socialView(state).contacts[0].favors[0].nextStep).toContain('making amends');
+ state.favors.mang_boy_recovery = { favorId: 'mang_boy_recovery', npcId: 'mang_boy', status: 'completed', runId: 'talyer_battery_drop#1' };
+ expect(socialView(state).contacts[0].favors).toEqual([]);
+});

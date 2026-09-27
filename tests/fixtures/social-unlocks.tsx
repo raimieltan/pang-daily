@@ -17,6 +17,7 @@ import { bindMaintenanceStore } from '@/state/maintenanceStore';
 import { bindSocialStore } from '@/state/socialStore';
 import { MarketplaceApp } from '@/components/hud/MarketplaceApp';
 import { RepairPanel } from '@/components/hud/RepairPanel';
+import { SocialFeedback } from '@/components/hud/SocialFeedback';
 import { RecognitionBadge } from '@/components/hud/RecognitionBadge';
 import { DialogueBox } from '@/components/hud/DialogueBox';
 
@@ -43,7 +44,7 @@ new MaintenanceSystem(bridge.runtime, wallet, {
 }, () => false, () => false, { rejection: () => null, interactions: { handle: () => () => {} } });
 const notices: string[] = [];
 bridge.ui.events.on('socialOpportunityDiscovered', notice => notices.push(notice.id));
-createRoot(document.getElementById('root')!).render(<><RecognitionBadge /><MarketplaceApp /><RepairPanel /><DialogueBox /></>);
+createRoot(document.getElementById('root')!).render(<><RecognitionBadge showNotices={false} /><SocialFeedback /><MarketplaceApp /><RepairPanel /><DialogueBox /></>);
 
 Object.assign(window, { socialUnlockTest: {
  seed: () => {
@@ -51,6 +52,7 @@ Object.assign(window, { socialUnlockTest: {
   session.applyEvent({ type: 'dialogue', eventId: 'intro-casey', sourceId: 'casey_intro', npcId: 'casey', dialogueId: 'casey_intro' });
   for (let i = 0; i < 2; i++) session.applyEvent({ validation: raceValidation('pahuway_descent'), type: 'race', eventId: `race:${i}`, sourceId: `race:${i}`, attemptId: `race:${i}`, npcId: 'casey', raceId: 'pahuway_descent', position: 1, racers: 2, timeMs: 120000 });
   session.chooseConversation('casey_intro', 'casey_post_race', 'congratulate_casey');
+  for (const [npcId, dialogueId] of [['mang_boy', 'talyer_mang_boy'], ['jun_surplus', 'seller_jun_surplus']]) session.applyEvent({ type: 'dialogue', eventId: `dialogue:${npcId}:${dialogueId}`, sourceId: dialogueId, npcId, dialogueId });
   const state = session.snapshot();
   state.npcs.jun_surplus.trust = 52;
   state.npcs.mang_boy.trust = 58;

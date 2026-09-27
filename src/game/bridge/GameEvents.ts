@@ -25,6 +25,9 @@ import type {
 } from "./types";
 
 export type GameEventMap = {
+  contactsOpened: boolean;
+  socialViewChanged: import('../../game-core/social/presentation').SocialView;
+  socialChangesApplied: import('../../game-core/social/presentation').SocialNotice[];
   raceAttemptStarted: { raceId: string; attemptId: string; npcId: string; vehicleId: string; totalCheckpoints: number };
   socialOpportunityDiscovered: { id: string; name: string };
   socialReputationUpdated: import('../../game-core/social/reputation').ReputationProgress;

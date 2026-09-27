@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useModalFocus } from './useModalFocus';
+import './socialUi.css';
 import { useGameEvent } from '@/components/game/useGameEvent';
 import { DIALOGUE_ENTRIES } from '@/game-core/social/dialogue';
 import { CONVERSATIONS } from '@/game-core/social/conversation';
@@ -14,6 +16,15 @@ export function DialogueBox() {
  const [view, setView] = useState<View | null>(null);
  const [subtitle, setSubtitle] = useState<string | null>(null);
  const commands = useGameUiStore((state) => state.commands);
+ const panel = useRef<HTMLDivElement>(null);
+ const close = useCallback(() => commands?.closeDialogue(), [commands]);
+ useModalFocus(panel, !!view, close);
+ useEffect(() => {
+  if (!view) return;
+  const selected = [...(panel.current?.querySelectorAll<HTMLButtonElement>('[data-choice-id]') ?? [])].find(button => button.dataset.choiceId === view.selectedChoiceId);
+  selected?.focus();
+  selected?.scrollIntoView?.({ block: 'nearest' });
+ }, [view]);
  useGameEvent('dialogueViewChanged', (next) => { setView(next); setSubtitle(null); });
  useGameEvent('dialogueTriggered', ({ dialogueId }) => {
   if (CONVERSATIONS.some((entry) => entry.id === dialogueId)) return;
@@ -27,7 +38,7 @@ export function DialogueBox() {
  }, [subtitle]);
  useEffect(() => () => commands?.closeDialogue(), [commands]);
 
- if (view) return <div className="pointer-events-auto max-w-lg self-center rounded border border-amber-200/40 bg-black/85 px-4 py-3 text-sm text-white" data-testid="dialogue" role="dialog" aria-label={`Conversation with ${view.speaker}`}>
+ if (view) return <div ref={panel} tabIndex={-1} aria-modal="true" className="social-dialogue pointer-events-auto max-w-lg self-center rounded border border-amber-200/40 bg-black/85 px-4 py-3 text-sm text-white" data-testid="dialogue" role="dialog" aria-label={`Conversation with ${view.speaker}`}>
   <p><strong className="text-amber-100">{view.speaker}:</strong> {view.text}</p>
   {view.rival && <div className="mt-2 text-xs text-white/65" data-testid="rival-history">
     <p>{view.rival.wins} wins · {view.rival.losses} losses · {view.rival.dnfs} DNFs</p>

@@ -26,6 +26,27 @@ function setup(config: InputConfig = DEFAULT_INPUT_CONFIG) {
 }
 
 describe("InputManager keyboard", () => {
+  it('clears gameplay while phone owns input and blocks held controls until released', () => {
+    const { input, key, connectPad } = setup();
+    const pad = connectPad();
+    key('keydown', 'KeyW'); input.update();
+    expect(input.axis('moveY')).toBe(1);
+    input.setPaused(true);
+    key('keydown', 'ArrowDown');
+    pad.buttons[PadButton.A] = { pressed: true, value: 1 };
+    pad.axes[PadAxis.LEFT_Y] = -1;
+    input.update();
+    expect(input.axis('moveY')).toBe(0);
+    input.setPaused(false); input.update();
+    expect(input.axis('moveY')).toBe(0);
+    expect(input.pressed('interact')).toBe(false);
+    pad.buttons[PadButton.A] = { pressed: false, value: 0 };
+    pad.axes[PadAxis.LEFT_Y] = 0;
+    key('keyup', 'KeyW'); input.update();
+    key('keydown', 'KeyW'); input.update();
+    expect(input.axis('moveY')).toBe(1);
+    input.dispose();
+  });
   it('requires dialogue movement keys and gamepad controls to release before gameplay resumes', () => {
     const { input, key, connectPad } = setup();
     const pad = connectPad();

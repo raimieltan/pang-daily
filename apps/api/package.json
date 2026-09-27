@@ -1,0 +1,33 @@
+{
+  "name": "@pang-daily/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "yarn build && concurrently --kill-others -n compiler,server \"tsc -p tsconfig.json --watch\" \"node --watch dist/src/main.js\"",
+    "build": "yarn db:generate && tsc -p tsconfig.json",
+    "start": "node dist/src/main.js",
+    "typecheck": "yarn db:generate && tsc -p tsconfig.json --noEmit",
+    "test": "yarn build && node --test dist/test/config.test.js",
+    "test:integration": "yarn build && node scripts/integration.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:deploy": "prisma migrate deploy",
+    "db:reset": "node scripts/reset.mjs",
+    "db:seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "dotenv": "^17.2.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "prisma": "^7.0.0",
+    "tsx": "^4.20.0"
+  }
+}

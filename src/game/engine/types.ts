@@ -14,6 +14,8 @@ import type { SocialStoragePort } from '../social/socialStorage';
  */
 export interface GameSystem {
   readonly name: string;
+  /** Suppress gameplay input while a runtime UI owns the screen. */
+  setPaused?(paused: boolean): void;
   /** Called once per frame while the scene is active and the game is not paused. */
   update?(dtSeconds: number): void;
   /** Called when the owning scene is torn down. Release anything not owned by the Scene. */

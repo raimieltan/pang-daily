@@ -4,11 +4,26 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "yarn build:api && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:web": "next dev",
+    "dev:api": "yarn workspace @pang-daily/api dev",
+    "dev:stack": "yarn db:up && yarn db:deploy && concurrently --kill-others -n web,api \"yarn dev:web\" \"yarn dev:api\"",
+    "build:api": "yarn workspace @pang-daily/api build",
+    "typecheck:api": "yarn workspace @pang-daily/api typecheck",
+    "test:api": "yarn workspace @pang-daily/api test",
+    "test:api:integration": "yarn db:test:up && yarn workspace @pang-daily/api test:integration",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose stop db",
+    "db:test:up": "docker compose up -d --wait db-test",
+    "db:generate": "yarn workspace @pang-daily/api db:generate",
+    "db:migrate": "yarn workspace @pang-daily/api db:migrate",
+    "db:deploy": "yarn workspace @pang-daily/api db:deploy",
+    "db:reset": "yarn workspace @pang-daily/api db:reset",
+    "db:seed": "yarn workspace @pang-daily/api db:seed"
   },
   "dependencies": {
     "@babylonjs/core": "^9.28.0",
@@ -38,7 +53,14 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite": "^6.4.0 || ^7.0.0 || ^8.0.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "concurrently": "^9.2.1"
   },
-  "packageManager": "yarn@1.22.22"
+  "packageManager": "yarn@1.22.22",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }
