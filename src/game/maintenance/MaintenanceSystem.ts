@@ -7,6 +7,7 @@ import type { GameSystem } from '../engine/types';
 import type { InteractionSystem } from '../interaction/InteractionSystem';
 
 export interface MaintenanceVehicle {
+  readonly performanceStats?: { fuelConsumption: number };
   readonly definition: { spec: VehicleDefinition };
   readonly impactSerial: number;
   readonly impactStrength: number;
@@ -77,7 +78,7 @@ export class MaintenanceSystem implements GameSystem {
     if (!Number.isFinite(dt) || dt <= 0) return;
     if (this.driving()) {
       const sample = this.vehicle.maintenanceSample(this.racing());
-      this.pendingFuel += drivingFuelLiters(sample.speedMps, sample.throttle, dt);
+      this.pendingFuel += drivingFuelLiters(sample.speedMps, sample.throttle, dt) * (this.vehicle.performanceStats?.fuelConsumption ?? 1);
       if (this.pendingFuel >= this.fuelRemaining) this.vehicle.setFuelAvailable?.(false);
       const loss = drivingWear(sample, dt, this.definition.reliability.wearRate);
       for (const key of SERVICE_COMPONENTS) this.pending[key] += loss[key];

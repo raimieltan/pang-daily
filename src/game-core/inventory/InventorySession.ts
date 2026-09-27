@@ -2,12 +2,17 @@ import { z } from 'zod';
 import { PART_SLOTS, partDefinition, partIdSchema, type PartSlot } from '../parts/parts';
 import { PAINT_FINISHES, type PaintFinish } from '../exterior/BodyPart';
 import { vehicleAppearanceSchema, type VehicleAppearance } from '../exterior/VehicleAppearance';
+import { performancePart } from '../performance/catalog';
+import { checkPerformanceCompatibility } from '../performance/compatibility';
+import type { InstallContext } from '../performance/schema';
+import type { VehicleDefinition } from '../vehicles/VehicleDefinition';
 
 /** How the true condition of an item came out. Installation and seller trust hook in here later. */
 export const REVEAL_METHODS = ['mechanic', 'known'] as const;
 export type RevealMethod = typeof REVEAL_METHODS[number];
 
 const origins = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('parts_shop'), shopId: z.string().min(1), transactionId: z.number().int().positive(), paidPhp: z.number().int().positive() }),
   z.object({ kind: z.literal('marketplace'), listingId: z.string().min(1), sellerId: z.string().min(1), paidPhp: z.number().int().positive(),
     advertisedGrade: z.enum(['like_new', 'good', 'fair', 'as_is']) }),
   z.object({ kind: z.literal('grant'), reason: z.string().min(1) }),
@@ -26,6 +31,7 @@ const itemSchema = z.object({
 export type InventoryItem = z.infer<typeof itemSchema>;
 const installsSchema = z.record(z.string().min(1), z.partialRecord(z.enum(PART_SLOTS), z.string().min(1)));
 const inventorySaveSchema = z.object({ version: z.literal(1), serial: z.number().int().nonnegative(), items: z.array(itemSchema), installed: installsSchema,
+  retiredKeys: z.array(z.string().min(1)).default([]),
   appearance: z.record(z.string().min(1), vehicleAppearanceSchema).default({}),
   stockSpoilerRemoved: z.record(z.string().min(1), z.boolean()).optional(),
 })
@@ -50,7 +56,7 @@ export class InventorySession {
 
   constructor(saved?: unknown, private readonly persist?: (save: InventorySave) => void, private readonly now: () => number = Date.now) {
     const parsed = inventorySaveSchema.safeParse(saved);
-    this.state = parsed.success ? parsed.data : { version: 1, serial: 0, items: [], installed: {}, appearance: {} };
+    this.state = parsed.success ? parsed.data : { version: 1, serial: 0, items: [], installed: {}, appearance: {}, retiredKeys: [] };
   }
 
   snapshot(): InventorySave { return structuredClone(this.state); }
@@ -58,6 +64,8 @@ export class InventorySession {
   items(): InventoryItem[] { return structuredClone(this.state.items); }
   item(itemId: string): InventoryItem | undefined { const item = this.find(itemId); return item && structuredClone(item); }
   byKey(key: string): InventoryItem | undefined { const item = this.state.items.find(i => i.key === key); return item && structuredClone(item); }
+  /** Receipt replay must not resurrect a part the player subsequently sold or scrapped. */
+  hasAcquisition(key: string): boolean { return !!this.byKey(key) || this.state.retiredKeys.includes(key); }
   /** Where the item is fitted, or null when loose in the trunk. */
   installation(itemId: string): Installation | null {
     for (const [vehicleId, slots] of Object.entries(this.state.installed)) {
@@ -102,6 +110,7 @@ export class InventorySession {
   add(input: AddItem): InventoryItem | Rejection {
     if (!partDefinition(input.partId)) return { rejected: 'Unknown part.' };
     if (input.key) { const existing = this.byKey(input.key); if (existing) return existing; }
+    if (input.key && this.state.retiredKeys.includes(input.key)) return { rejected: 'That acquisition was already delivered and removed.' };
     const parsed = itemSchema.safeParse({ id: `item-${this.state.serial + 1}`, partId: input.partId, condition: input.condition,
       revealedBy: input.condition === null ? 'known' : input.revealedBy ?? null, acquiredAt: this.now(), origin: input.origin, key: input.key ?? null, finish: null });
     if (!parsed.success) return { rejected: 'Invalid inventory item.' };
@@ -114,6 +123,7 @@ export class InventorySession {
     const item = this.find(itemId);
     if (!item) return { rejected: 'You do not have that part.' };
     if (this.installation(itemId)) return { rejected: 'Take the part off the car first.' };
+    if (item.key) this.state.retiredKeys.push(item.key);
     this.state.items = this.state.items.filter(i => i !== item); this.changed();
     return structuredClone(item);
   }
@@ -136,7 +146,7 @@ export class InventorySession {
   }
 
   /** Fits the item into every slot its part needs, returning whatever it displaced to the trunk. */
-  install(vehicleId: string, itemId: string): { installation: Installation; displaced: string[] } | Rejection {
+  install(vehicleId: string, itemId: string, context?: InstallContext & { vehicle: VehicleDefinition }, beforeCommit?: () => void | Rejection): { installation: Installation; displaced: string[] } | Rejection {
     const item = this.find(itemId), part = item && partDefinition(item.partId);
     if (!item || !part) return { rejected: 'You do not have that part.' };
     if (!vehicleId) return { rejected: 'Choose a car.' };
@@ -147,13 +157,24 @@ export class InventorySession {
     // A displaced multi-slot part (coilovers) comes off entirely, not just the overlapping slot.
     for (const slot of Object.keys(slots) as PartSlot[]) if (displaced.includes(slots[slot]!)) delete slots[slot];
     for (const slot of part.slots) slots[slot] = itemId;
+    if (performancePart(part.id)) {
+      if (!context || context.vehicle.id !== vehicleId || !Number.isFinite(context.mechanicLevel) || !Number.isFinite(context.reputation)) return { rejected: 'Performance installation requires the car and mechanic context.' };
+      const ids = new Set(Object.values(slots));
+      const proposed = this.state.items.filter(i => ids.has(i.id) && performancePart(i.partId));
+      const check = checkPerformanceCompatibility(context.vehicle, proposed, { context });
+      if (!check.compatible) return { rejected: check.issues.map(issue => issue.message).join('; ') };
+    }
+    const payment = beforeCommit?.();
+    if (payment) return payment;
     this.state.installed[vehicleId] = slots; this.changed();
     return { installation: { vehicleId, slots: [...part.slots] }, displaced };
   }
 
-  uninstall(itemId: string): InventoryItem | Rejection {
+  uninstall(itemId: string, beforeCommit?: () => void | Rejection): InventoryItem | Rejection {
     const where = this.installation(itemId);
     if (!where) return { rejected: 'That part is not installed.' };
+    const payment = beforeCommit?.();
+    if (payment) return payment;
     const slots = this.state.installed[where.vehicleId];
     for (const slot of where.slots) delete slots[slot];
     if (Object.keys(slots).length === 0) delete this.state.installed[where.vehicleId];

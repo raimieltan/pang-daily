@@ -338,6 +338,24 @@ function talyer() {
   });
   a.zone({ id: "talyer_apron", kind: "parking", rect: rect(5, 145, 40, 150), locationId: "talyer" });
 
+  // Brand-new parts counter next door, facing the barangay road. Customers stay outside the counter.
+  a.surface({ kind: 'concrete', center: [58.5, 156], size: [15, 22] });
+  a.block({ center: [58.5, 1.8, 165.5], size: [14, 3.6, .3], color: WALL.cream, collide: true });
+  for (const x of [51.5, 65.5]) a.block({ center: [x, 1.8, 159], size: [.3, 3.6, 13], color: WALL.cream, collide: true });
+  a.block({ center: [58.5, 3.8, 158.5], size: [15, .2, 15], color: '#2c5358' });
+  a.block({ center: [58.5, .65, 153], size: [10, 1.3, .65], color: '#366a70', collide: true });
+  a.block({ center: [58.5, 2.9, 151.6], size: [13, 1.2, .15], color: '#163c41' });
+  const shopSign = pixelText('AUTO PARTS'), shopPixel = .12;
+  for (const run of shopSign.runs) a.block({
+    center: [58.5 - shopSign.columns * shopPixel / 2 + (run.col + run.length / 2) * shopPixel, 3.35 - (run.row + .5) * shopPixel, 151.5],
+    size: [run.length * shopPixel, shopPixel, .03], color: '#f4e3a9', glow: true,
+  });
+  // Stacked sealed cartons behind the counter, rather than used pull-outs on the ground.
+  for (const x of [54, 57, 60, 63]) for (const y of [.45, 1.3]) a.block({ center: [x, y, 162], size: [1.8, .8, 1.2], color: y < 1 ? '#ae8b59' : '#c9b78d' });
+  a.lamp({ id: 'auto_parts_counter', at: [58.5, 3.5, 153], profile: 'fluorescent', strength: 1.2 });
+  a.zone({ id: 'auto_parts_counter', kind: 'interact', rect: rect(53, 149, 64, 152.5), locationId: 'talyer',
+    interaction: { action: 'browse_auto_parts', label: 'Banwa Auto Supply · Brand-new parts', priority: 2 } });
+
   // Neighbours: sari-sari store house and a vacant lot with tall grass.
   house([-5, 160], [14, 12], { wall: WALL.sand, roof: ROOF.gi, facingDeg: 180, window: true });
   a.prop("sign_roadside", [-5, 149], { rotDeg: 0, tint: "#ffe9b0" });

@@ -6,6 +6,8 @@ import { bindGraphicsStore } from "@/state/graphicsStore";
 import { bindHudStore } from "@/state/hudStore";
 import { bindVehicleDebugStore } from "@/state/vehicleDebugStore";
 import { bindMaintenanceStore } from "@/state/maintenanceStore";
+import { bindPerformanceStore } from '@/state/performanceStore';
+import { bindAutoPartsStore } from '@/state/autoPartsStore';
 import { bindJobStore } from "@/state/jobStore";
 import { bindMarketStore } from "@/state/marketStore";
 
@@ -35,6 +37,8 @@ export function GameCanvas() {
           bindVehicleDebugStore(game.events),
           bindGraphicsStore(game.events),
           bindMaintenanceStore(game.events),
+          bindPerformanceStore(game.events),
+          bindAutoPartsStore(game.events),
           bindJobStore(game.events),
           bindMarketStore(game.events),
         ];

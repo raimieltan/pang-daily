@@ -1,4 +1,5 @@
 import { parseVehicleDefinition, type VehicleDefinition } from "./VehicleDefinition";
+import { STOCK_CARB_ENGINE } from '../performance/catalog';
 
 /**
  * Baseline starter: a fictional mid-'90s 1.5L FWD compact sedan, the kind every Iloilo family
@@ -11,6 +12,7 @@ import { parseVehicleDefinition, type VehicleDefinition } from "./VehicleDefinit
 export const BANWA_DALAGAN_1996: VehicleDefinition = parseVehicleDefinition({
   schemaVersion: 1,
   id: "banwa_dalagan_1996",
+  engine: STOCK_CARB_ENGINE,
   tags: ["banwa_dalagan", "sedan", "compact", "nineties", "fwd"],
   identity: {
     make: "Banwa",

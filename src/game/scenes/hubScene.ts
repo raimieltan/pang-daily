@@ -45,6 +45,9 @@ import { Sky, skyLast } from "../rendering/Sky";
 import { VehicleLights } from "../rendering/VehicleLights";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
+import { PerformanceSystem } from "../vehicles/PerformanceSystem";
+import { TalyerPerformanceSystem } from '../vehicles/TalyerPerformanceSystem';
+import { AutoPartsShopSystem, autoPartsShopRejection } from '../marketplace/AutoPartsShopSystem';
 import { WheelSystem } from "../vehicles/WheelSystem";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
@@ -174,6 +177,10 @@ export const hubScene: SceneDefinition = {
     addSystem(jobSystem);
     addSystem(new CustomizationSystem(bridge, inventory, maintainedCar, talyer));
     addSystem(new WheelSystem(bridge, inventory, maintainedCar));
+  addSystem(new PerformanceSystem(inventory, maintainedCar));
+  addSystem(new TalyerPerformanceSystem(bridge, inventory, session, maintainedCar.definition.spec, talyer));
+  addSystem(new AutoPartsShopSystem(bridge, session, inventory, interactions,
+    () => autoPartsShopRejection({ mode: modes.mode, position: modes.position, racing: race.active }, zones)));
     addSystem(new ExteriorSystem(bridge, inventory, maintainedCar, talyer));
     let footstepTime = 0;
     let footstepDistance = 0;

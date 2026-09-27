@@ -25,6 +25,12 @@ import type {
 } from "./types";
 
 export type GameEventMap = {
+  autoPartsShop: import('../marketplace/AutoPartsShopSystem').AutoPartsShopView | null;
+  autoPartsQuote: import('../marketplace/AutoPartsShopSystem').AutoPartsQuote | null;
+  autoPartPurchased: import('../../game-core/shops/AutoPartsShop').AutoPartsPurchase;
+  performanceWorkshop: import('../vehicles/TalyerPerformanceSystem').PerformanceWorkshopView | null;
+  performanceQuote: import('../vehicles/TalyerPerformanceSystem').PerformanceQuote | null;
+  performanceInstalled: import('../vehicles/TalyerPerformanceSystem').PerformanceReceipt;
   fuelPanel: boolean;
   fuelQuote: import('../maintenance/FuelSystem').FuelQuote | null;
   fuelPurchased: import('../maintenance/FuelSystem').FuelReceipt;

@@ -20,7 +20,7 @@ function setup() {
   const focus = { position: new Vector3(12.5, 0, 19), mode: 'walking' as PlayerMode };
   const position = new Vector3(10, 0, 19);
   const sample = { speedMps: 0, throttle: 1, brake: 0, slip: 0, handbrake: 0, grounded: true, racing: false };
-  const vehicle = { definition: { spec: car }, impactSerial: 0, impactStrength: 0, maintenanceSample: () => sample, setCondition: vi.fn(), setFuelAvailable: vi.fn() };
+  const vehicle = { definition: { spec: car }, performanceStats: { fuelConsumption: 1 }, impactSerial: 0, impactStrength: 0, maintenanceSample: () => sample, setCondition: vi.fn(), setFuelAvailable: vi.fn() };
   const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap(c => c.zones));
   const interactions = new InteractionSystem(bridge.runtime, focus, [() => zones]);
   const unbind = bindMaintenanceStore(bridge.ui.events);
@@ -74,4 +74,11 @@ it('cuts engine drive on depletion and restores it after refueling', () => {
   s.maintenance.update(.5); expect(s.vehicle.setFuelAvailable).toHaveBeenLastCalledWith(false);
   s.maintenance.update(.5); expect(s.session.summary(car).fuelLiters).toBe(0);
   s.session.refuel(car, { liters: 1 }); expect(s.vehicle.setFuelAvailable).toHaveBeenLastCalledWith(true);
+});
+
+it('uses final performance fuel consumption while preserving the stock distance/load calculation', () => {
+  const s = setup(); s.focus.mode = 'driving'; s.sample.speedMps = 20;
+  s.vehicle.performanceStats.fuelConsumption = 1.5;
+  s.maintenance.update(.5); s.maintenance.dispose();
+  expect(s.session.summary(car).fuelLiters).toBeCloseTo(35 - drivingFuelLiters(20, 1, .5) * 1.5);
 });

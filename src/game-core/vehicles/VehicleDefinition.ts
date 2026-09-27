@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { engineDefinitionSchema } from '../performance/schema';
 
 /**
  * Reusable definition of a (fictionalized) car model: what the car *is*, independent of
@@ -25,6 +26,8 @@ export const CONDITION_COMPONENTS = [
   "tires",
   "body",
   "electrical",
+  "clutch",
+  "cooling",
 ] as const;
 
 /** Stats that condition can degrade. */
@@ -270,7 +273,7 @@ const conditionEffectSchema = z.strictObject({
 
 export const vehicleConditionSchema = z.strictObject(
   Object.fromEntries(CONDITION_COMPONENTS.map((c) => [c, unit])) as Record<ConditionComponent, typeof unit>,
-);
+).extend({ clutch: unit.default(1), cooling: unit.default(1) });
 
 export type VehicleCondition = z.infer<typeof vehicleConditionSchema>;
 
@@ -291,6 +294,7 @@ export const vehicleDefinitionSchema = z.strictObject({
   tags: z.array(slug).min(1),
   drivetrain: drivetrainSchema,
   power: powerSchema,
+  engine: engineDefinitionSchema.optional(),
   weight: weightSchema,
   grip: gripSchema,
   braking: brakingSchema,

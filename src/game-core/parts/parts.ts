@@ -3,16 +3,18 @@ import { EXTERIOR_SLOTS, type ExteriorSlot } from '../vehicles/VehicleDefinition
 import type { ServiceComponent } from '../maintenance/condition';
 import { WHEEL_PARTS, wheelPart } from '../wheels/catalog';
 import { BODY_PARTS, bodyPart } from '../exterior/catalog';
+import { PERFORMANCE_PARTS, NEW_PERFORMANCE_PARTS } from '../performance/catalog';
+import type { PerformanceCategory } from '../performance/schema';
 
 /**
  * Equip slots on an owned car. Exterior slots are the vehicle schema's `EXTERIOR_SLOTS` (the
  * model's attachment points); the rest are wheel/performance/interior positions. A part fills one
  * or more slots — a headlight pair takes both sides, coilovers replace shocks and springs.
  */
-export const PERFORMANCE_SLOTS = ['wheels', 'tires', 'shocks', 'springs', 'brakes_front', 'alternator', 'cylinder_head', 'gearbox', 'clutch', 'seat_driver'] as const;
+export const PERFORMANCE_SLOTS = ['wheels', 'tires', 'shocks', 'springs', 'brakes_front', 'alternator', 'cylinder_head', 'gearbox', 'clutch', 'seat_driver', 'engine', 'fuel_system', 'intake', 'turbo', 'cooling', 'ecu', 'differential', 'fuel_support', 'turbo_support'] as const;
 export const PART_SLOTS = [...PERFORMANCE_SLOTS, ...EXTERIOR_SLOTS] as const;
 export type PartSlot = typeof PERFORMANCE_SLOTS[number] | ExteriorSlot;
-export type PartCategory = 'wheels' | 'tires' | 'suspension' | 'brakes' | 'engine' | 'drivetrain' | 'exhaust' | 'body' | 'lighting' | 'interior';
+export type PartCategory = 'wheels' | 'tires' | 'suspension' | 'brakes' | 'drivetrain' | 'body' | 'lighting' | 'interior' | PerformanceCategory;
 
 /**
  * Part definitions (TECH_ARCHITECTURE §17), shared by the marketplace, inventory and later the
@@ -20,6 +22,7 @@ export type PartCategory = 'wheels' | 'tires' | 'suspension' | 'brakes' | 'engin
  * generated copy can roll. `component` links the part to the wear system it will replace on install.
  */
 export type PartTemplate = {
+  marketplaceAvailable?: boolean;
   id: string; name: string; category: PartCategory; fits: string; component: ServiceComponent | null;
   slots: readonly PartSlot[]; priceRange: readonly [number, number]; conditionRange: readonly [number, number]; weight: number;
 };
@@ -41,6 +44,13 @@ function body(id: string, weight: number): PartTemplate {
 }
 
 export const PART_TEMPLATES: readonly PartTemplate[] = [
+  ...PERFORMANCE_PARTS.map((part): PartTemplate => {
+    if (!(PART_SLOTS as readonly string[]).includes(part.slot)) throw new Error(`Unknown performance slot: ${part.slot}`);
+    return { id: part.id, name: part.name, category: part.category, fits: part.compatibleTags.join(', '),
+      component: null, slots: [part.slot as PartSlot], priceRange: part.priceRangePhp, conditionRange: part.conditionRange,
+      marketplaceAvailable: !NEW_PERFORMANCE_PARTS.some(p => p.id === part.id),
+      weight: part.rarity === 'rare' ? 1 : part.rarity === 'uncommon' ? 2 : 3 };
+  }),
   { id: 'used_coilovers_01', name: 'Used coilovers (adjustable)', category: 'suspension', fits: 'Most 90s sedans', component: 'suspension', slots: ['shocks', 'springs'], priceRange: [6500, 9000], conditionRange: [.35, .85], weight: 2 },
   { id: 'stock_shocks_set', name: 'Stock shocks, set of 4', category: 'suspension', fits: 'Banwa Dalagan', component: 'suspension', slots: ['shocks'], priceRange: [1800, 2600], conditionRange: [.3, .9], weight: 3 },
   { id: 'lowering_springs', name: 'Lowering springs', category: 'suspension', fits: 'Universal-ish', component: 'suspension', slots: ['springs'], priceRange: [2500, 3800], conditionRange: [.45, .95], weight: 2 },

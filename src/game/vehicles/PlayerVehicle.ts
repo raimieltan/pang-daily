@@ -24,7 +24,9 @@ import { calculateFitment, wheelModifiers, type Fitment, type WheelPart } from "
 import { WheelSwapper, type WheelAssetSource } from "./WheelSwapper";
 import type { VehicleCondition } from "../../game-core/vehicles/VehicleDefinition";
 import type { WearSample } from "../../game-core/maintenance/condition";
-import { conditionHandling } from "../maintenance/conditionHandling";
+import { calculateVehiclePerformance, type PerformanceStats } from '../../game-core/performance/calculator';
+import type { InstalledPerformancePart } from '../../game-core/performance/schema';
+import { performanceFailureRisks } from '../../game-core/performance/failures';
 import type { HandlingConfig } from "./handling/HandlingConfig";
 
 const G = 9.81;
@@ -71,6 +73,18 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private releaseImpact: () => void;
   private baseConfig: HandlingConfig;
   private condition: VehicleCondition = { ...PRISTINE_CONDITION };
+  private performanceParts: InstalledPerformancePart[] = [];
+  private calculatedPerformance: PerformanceStats | null = null;
+  get performanceStats(): PerformanceStats {
+    return this.calculatedPerformance ?? calculateVehiclePerformance(this.definition.spec).stats;
+  }
+  get performanceWarnings() {
+    return performanceFailureRisks(this.performanceStats, this.condition, { throttle: this.controller.model.state.throttle, speedMps: this.speed });
+  }
+  setPerformanceParts(parts: readonly InstalledPerformancePart[]): void {
+    this.performanceParts = parts.map(part => ({ ...part }));
+    this.setCondition(this.condition);
+  }
   private wheelEffects: StatModifiers = NO_MODIFIERS;
   private bodyEffects: ExteriorEffects = NO_EXTERIOR_EFFECTS;
   readonly wheels: WheelSwapper;
@@ -233,8 +247,9 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   setCondition(condition: VehicleCondition): void {
     this.condition = { ...condition };
-    this.controller.setConfig(conditionHandling(this.baseConfig, this.definition.spec, this.condition,
-      combineModifiers(this.wheelEffects, this.bodyEffects.modifiers)));
+    this.calculatedPerformance = calculateVehiclePerformance(this.definition.spec, this.performanceParts, this.condition,
+      { modifiers: combineModifiers(this.wheelEffects, this.bodyEffects.modifiers) }).stats;
+    this.controller.setPerformance(this.baseConfig, calculateVehiclePerformance(this.definition.spec).stats, this.performanceStats);
   }
 
   /** The wheel part on the car (null = stock wheels). */

@@ -12,6 +12,7 @@ import { loadHavok } from "../physics/havok";
 import { PhysicsWorld } from "../physics/PhysicsWorld";
 import { isHandlingPresetId } from "../vehicles/handling/presets";
 import { PlayerVehicle } from "../vehicles/PlayerVehicle";
+import { PerformanceSystem } from "../vehicles/PerformanceSystem";
 import { WheelSystem } from "../vehicles/WheelSystem";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
@@ -78,6 +79,7 @@ export const drivingScene: SceneDefinition = {
     addSystem(new MaintenanceSystem(bridge, session, player, () => controls.enabled));
     addSystem(new CustomizationSystem(bridge, inventory, player, () => 'Visit Mang Boy’s talyer for paint and suspension.'));
     addSystem(new WheelSystem(bridge, inventory, player));
+  addSystem(new PerformanceSystem(inventory, player));
     addSystem(new ExteriorSystem(bridge, inventory, player, () => 'Visit Mang Boy’s talyer to fit exterior parts.'));
     addSystem(chase);
   },

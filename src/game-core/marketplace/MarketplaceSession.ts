@@ -132,8 +132,8 @@ export class MarketplaceSession {
     const shown = item.revealedBy && item.condition !== null ? item.condition : null;
     const part = partDefinition(item.partId)!;
     return {
-      id: item.id, partId: item.partId, title: part.name, category: part.category, paidPhp: origin?.paidPhp ?? null,
-      seller: origin ? seller(origin.sellerId)?.name ?? 'Unknown seller' : null,
+      id: item.id, partId: item.partId, title: part.name, category: part.category, paidPhp: item.origin.kind === 'grant' ? null : item.origin.paidPhp,
+      seller: origin ? seller(origin.sellerId)?.name ?? 'Unknown seller' : item.origin.kind === 'parts_shop' ? 'Banwa Auto Supply' : null,
       advertised: origin ? { grade: origin.advertisedGrade, label: GRADE_LABEL[origin.advertisedGrade] } : null,
       installedOn: this.inventory.installation(item.id)?.vehicleId ?? null, finish: item.finish,
       actual: shown === null ? null : { condition: shown, label: `${Math.round(shown * 100)}%`, verdict: origin ? verdictFor(origin.advertisedGrade, shown) : null, method: item.revealedBy! },

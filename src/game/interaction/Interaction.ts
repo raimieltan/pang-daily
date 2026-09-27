@@ -20,6 +20,7 @@ export const INTERACTION_ACTIONS = [
   "talk_mechanic",
   "refuel",
   "browse_jobs",
+  "browse_auto_parts",
   "job_objective",
 ] as const;
 

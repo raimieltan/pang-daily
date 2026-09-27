@@ -1,4 +1,5 @@
-import { NO_MODIFIERS, resolveVehicleStats, type StatModifiers } from '../../game-core/vehicles/vehicleStats';
+import { NO_MODIFIERS, type StatModifiers } from '../../game-core/vehicles/vehicleStats';
+import { calculateVehiclePerformance, type PerformanceStats } from '../../game-core/performance/calculator';
 import type { VehicleCondition, VehicleDefinition } from '../../game-core/vehicles/VehicleDefinition';
 import type { HandlingConfig } from '../vehicles/handling/HandlingConfig';
 
@@ -8,10 +9,16 @@ import type { HandlingConfig } from '../vehicles/handling/HandlingConfig';
  */
 export function conditionHandling(base: HandlingConfig, definition: VehicleDefinition, condition: VehicleCondition,
   modifiers: StatModifiers = NO_MODIFIERS): HandlingConfig {
-  const healthy = resolveVehicleStats(definition), worn = resolveVehicleStats(definition, condition, modifiers);
+  return performanceHandling(base, calculateVehiclePerformance(definition).stats,
+    calculateVehiclePerformance(definition, [], condition, { modifiers }).stats);
+}
+
+/** Controller boundary: final numbers only, no installed part definitions. */
+export function performanceHandling(base: HandlingConfig, healthy: PerformanceStats, worn: PerformanceStats): HandlingConfig {
   const power = (worn.powerHp / healthy.powerHp) * (healthy.weightKg / worn.weightKg) * worn.acceleration;
   const grip = worn.tireGrip / healthy.tireGrip;
   return { ...base,
+    pedals: { ...base.pedals, throttleRise: base.pedals.throttleRise * worn.throttleResponse / (1 + worn.turboLagSeconds) },
     drive: { ...base.drive, accelerationMps2: base.drive.accelerationMps2 * power,
       reverseAccelerationMps2: base.drive.reverseAccelerationMps2 * power },
     tires: { ...base.tires, frontGrip: base.tires.frontGrip * grip, rearGrip: base.tires.rearGrip * grip },

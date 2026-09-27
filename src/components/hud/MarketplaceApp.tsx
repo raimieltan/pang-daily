@@ -25,6 +25,9 @@ const VERDICT: Record<Verdict, { text: string; tone: string }> = {
 const CATEGORIES: { id: PartCategory | 'all'; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'wheels', label: 'Wheels' }, { id: 'body', label: 'Body' }, { id: 'tires', label: 'Tires' }, { id: 'suspension', label: 'Suspension' },
   { id: 'brakes', label: 'Brakes' }, { id: 'engine', label: 'Engine' }, { id: 'drivetrain', label: 'Drivetrain' },
+  { id: 'fuel_system', label: 'Carb / EFI' }, { id: 'intake', label: 'Intake' }, { id: 'turbo', label: 'Turbo' },
+  { id: 'cooling', label: 'Cooling' }, { id: 'ecu', label: 'ECU' }, { id: 'clutch', label: 'Clutch' },
+  { id: 'transmission', label: 'Transmission' }, { id: 'differential', label: 'Differential' }, { id: 'supporting_mod', label: 'Supporting parts' },
   { id: 'exhaust', label: 'Exhaust' }, { id: 'lighting', label: 'Lights' }, { id: 'interior', label: 'Interior' },
 ];
 
@@ -226,7 +229,9 @@ function Glyph({ category }: { category: PartCategory }) {
     case 'tires': return <g {...s}><circle cx="50" cy="50" r="42" strokeWidth={12} /><circle cx="50" cy="50" r="20" /></g>;
     case 'suspension': return <g {...s}><path d="M50 4v12M50 84v12M30 16h40M30 84h40M34 24l32 8-32 8 32 8-32 8 32 8-32 8" /></g>;
     case 'brakes': return <g {...s}><circle cx="46" cy="54" r="36" /><circle cx="46" cy="54" r="10" /><path d="M72 18a44 44 0 0 1 16 30l-14 2a30 30 0 0 0-10-20z" fill="#e8e2d4" /></g>;
+    case 'fuel_system': case 'intake': case 'turbo': case 'cooling': case 'ecu': case 'supporting_mod':
     case 'engine': return <g {...s}><rect x="18" y="32" width="60" height="42" rx="4" /><path d="M30 32v-10h26v10M78 44h10v18H78M18 50H8" /></g>;
+    case 'clutch': case 'transmission': case 'differential':
     case 'drivetrain': return <g {...s}><circle cx="50" cy="50" r="28" /><circle cx="50" cy="50" r="10" />{Array.from({ length: 8 }, (_, i) => <line key={i} x1="50" y1="22" x2="50" y2="10" transform={`rotate(${i * 45} 50 50)`} />)}</g>;
     case 'exhaust': return <g {...s}><path d="M6 60h30" /><rect x="36" y="42" width="44" height="36" rx="18" /><circle cx="80" cy="60" r="8" /></g>;
     case 'lighting': return <g {...s}><path d="M14 30h48a24 24 0 0 1 0 40H14z" /><circle cx="56" cy="50" r="10" /></g>;

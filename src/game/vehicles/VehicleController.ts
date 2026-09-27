@@ -3,6 +3,8 @@ import type { PhysicsWorld } from "../physics/PhysicsWorld";
 import { ArcadeHandlingModel, type DriverInput } from "./handling/ArcadeHandlingModel";
 import type { HandlingConfig } from "./handling/HandlingConfig";
 import type { VehicleBody } from "./VehicleBody";
+import type { PerformanceStats } from '../../game-core/performance/calculator';
+import { performanceHandling } from '../maintenance/conditionHandling';
 
 /** Per-second pull back to the spot the car was held at. Soaks up solver drift on slopes. */
 const HOLD_ANCHOR_RATE = 10;
@@ -82,6 +84,10 @@ export class VehicleController {
     // Keep Havok's pitch/roll, replace yaw.
     angular.subtractInPlace(up.scale(Vector3.Dot(angular, up))).addInPlace(up.scale(yawRate));
     body.setAngularVelocity(angular);
+  }
+
+  setPerformance(base: HandlingConfig, stock: PerformanceStats, final: PerformanceStats): void {
+    this.setConfig(performanceHandling(base, stock, final));
   }
 
   setConfig(config: HandlingConfig): void {

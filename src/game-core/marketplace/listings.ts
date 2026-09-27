@@ -53,7 +53,7 @@ export const LISTING_LIFETIME_MS: readonly [number, number] = [8 * 60_000, 25 * 
  */
 export function generateListing(seed: number, id: string, now: number, lifetimeMs = LISTING_LIFETIME_MS): Listing {
   const r = rng(seed);
-  const template = pick(r, PART_TEMPLATES, t => t.weight);
+  const template = pick(r, PART_TEMPLATES.filter(t => t.marketplaceAvailable !== false), t => t.weight);
   const seller = pick(r, SELLERS);
   const actualCondition = Math.round(between(r, template.conditionRange) * 100) / 100;
   const honestGrade = gradeFor(actualCondition);

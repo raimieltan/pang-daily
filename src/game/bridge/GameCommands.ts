@@ -14,6 +14,13 @@ import type { RaceId, SpawnPointId } from "./types";
 import type { ServiceComponent } from "../../game-core/maintenance/condition";
 
 export type GameCommandMap = {
+  openAutoPartsShop: void;
+  closeAutoPartsShop: void;
+  quoteAutoPart: { partId: string };
+  buyAutoPart: { quoteId: string };
+  quotePerformancePart: { itemId: string; operation: 'install' | 'remove' };
+  installPerformancePart: { quoteId: string };
+  dismissPerformanceQuote: void;
   pause: void;
   resume: void;
   /** Tears down the current scene and builds `sceneId` (re-creates it if already active). */
@@ -114,6 +121,13 @@ export class CommandBus {
 
 /** The ergonomic, React-facing form of `GameCommandMap`. */
 export interface GameCommands {
+  openAutoPartsShop(): void;
+  closeAutoPartsShop(): void;
+  quoteAutoPart(partId: string): void;
+  buyAutoPart(quoteId: string): void;
+  quotePerformancePart(itemId: string, operation: 'install' | 'remove'): void;
+  installPerformancePart(quoteId: string): void;
+  dismissPerformanceQuote(): void;
   pause(): void;
   resume(): void;
   switchScene(sceneId: SceneId): void;
@@ -155,6 +169,13 @@ type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>)
 
 export function createGameCommands(dispatch: Dispatch): GameCommands {
   return {
+    openAutoPartsShop: () => dispatch('openAutoPartsShop'),
+    closeAutoPartsShop: () => dispatch('closeAutoPartsShop'),
+    quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),
+    buyAutoPart: quoteId => dispatch('buyAutoPart', { quoteId }),
+    quotePerformancePart: (itemId, operation) => dispatch('quotePerformancePart', { itemId, operation }),
+    installPerformancePart: quoteId => dispatch('installPerformancePart', { quoteId }),
+    dismissPerformanceQuote: () => dispatch('dismissPerformanceQuote'),
     pause: () => dispatch("pause"),
     resume: () => dispatch("resume"),
     switchScene: (sceneId) => dispatch("switchScene", { sceneId }),
