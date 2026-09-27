@@ -1,0 +1,13 @@
+# Social state and events
+
+Scene recognition uses the same event ledger and atomic social save, but has its own points, authored tier thresholds, and persisted per-source reward counters. See [the early balance table](../../../docs/SOCIAL_REPUTATION_BALANCE.md) for thresholds, boundaries, repeat policy, and a reachable starting path. `getReputationProgress` is the shared UI/gating projection; tier transitions are raised only after a successful save.
+
+`SOCIAL_CONTENT` owns stable NPC, crew, scene, event, favor, relationship flag, and unlock IDs. Roles may overlap. Rivalry alone does not establish hostility. Friendship, hostility, and mentorship require explicit authored flags.
+
+Each NPC starts unintroduced with independent trust and respect values of **50**. Both are whole numbers clamped to **0–100**. `SocialSession.applyEvent` is the only gameplay mutation entry point. Its input identifies the event, source, target, and outcome; it cannot carry score rewards. `SOCIAL_RULES` selects rewards and reasons. Every applied event records its source, reason, actual bounded trust/respect changes, and flag changes. The event ledger and resulting state are saved in one write. A failed validation or failed storage write changes neither.
+
+Dialogue introductions and choices are once per NPC or choice. Reopening a greeting or standing nearby gives no reward. A post-race choice can explicitly make Casey a friend or hostile contact; race results alone do neither. Job favor events use the existing validated job `runId`, job ID, and terminal status. The talyer parts errand can be offered, accepted, completed, failed, or abandoned. A failed or abandoned commitment lowers trust; completing the authored battery follow-up favor restores it and offers mentorship. A spoken apology is recorded as a choice but does not itself restore trust.
+
+Repeatable positive rewards are capped per NPC and authored source: **3** results for Casey's Pahuway race, **3** repairs, **3** inspections, and **3** Marketplace purchases from Jun Surplus Parts. These limits live in `SOCIAL_REPEAT_LIMITS`. Later valid events are logged with zero reward. Race attempts use a UUID assigned when the race starts; jobs use persistent run IDs; services and purchases use wallet transaction IDs. Replayed deliveries have no additional effect after reload.
+
+The contract has no React or Babylon dependency. `SocialEventBridge` translates completed game outcomes into social events. `socialStorage.ts` persists the same typed snapshot that the UI reads, following the game's tab-scoped session storage pattern. Content validation checks duplicate IDs and references; tests also check those references against authored hub, job, seller, and dialogue content.

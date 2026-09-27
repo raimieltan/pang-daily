@@ -10,6 +10,7 @@ import { bindPerformanceStore } from '@/state/performanceStore';
 import { bindAutoPartsStore } from '@/state/autoPartsStore';
 import { bindJobStore } from "@/state/jobStore";
 import { bindMarketStore } from "@/state/marketStore";
+import { bindSocialStore } from "@/state/socialStore";
 
 /**
  * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
@@ -41,6 +42,7 @@ export function GameCanvas() {
           bindAutoPartsStore(game.events),
           bindJobStore(game.events),
           bindMarketStore(game.events),
+          bindSocialStore(game.events),
         ];
         game.start();
 

@@ -16,7 +16,7 @@ export interface MaintenanceVehicle {
   setFuelAvailable?(available: boolean): void;
   setHoodOpen?(open: boolean): void;
 }
-export type WorkshopAccess = { rejection(): string | null; interactions: Pick<InteractionSystem, 'handle'> };
+export type WorkshopAccess = { rejection(): string | null; interactions: Pick<InteractionSystem, 'handle'>; onTalk?(): void };
 
 /** Scene adapter only: sample runtime driving, publish slow summaries, validate workshop access. */
 export class MaintenanceSystem implements GameSystem {
@@ -46,7 +46,7 @@ export class MaintenanceSystem implements GameSystem {
     };
     this.release.push(session.subscribe(publish)); publish();
     if (workshop) {
-      this.release.push(workshop.interactions.handle('talk_mechanic', () => this.inspect()));
+      this.release.push(workshop.interactions.handle('talk_mechanic', () => { const outcome = this.inspect(); workshop.onTalk?.(); return outcome; }));
       this.release.push(bridge.handle('inspectVehicle', () => this.inspect()));
       this.release.push(bridge.handle('dismissRepair', () => this.closeQuote()));
       this.release.push(bridge.handle('repairVehicle', ({ quoteId, components }) => {

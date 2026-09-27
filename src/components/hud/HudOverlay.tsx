@@ -7,6 +7,7 @@ import { RaceIntro } from "./RaceIntro";
 import { useGameUiStore } from "@/state/gameUiStore";
 import { CommandNotice } from "./CommandNotice";
 import { DialogueBox } from "./DialogueBox";
+import { RecognitionBadge } from "./RecognitionBadge";
 import type { SceneId } from "@/game";
 import { DrivingHud } from "./DrivingHud";
 import { GraphicsDebugPanel } from "./GraphicsDebugPanel";
@@ -49,6 +50,7 @@ export function HudOverlay() {
         <div>
           <p className="tape-brand">PANG DAILY</p>
           <p className="mt-2 text-[10px] tracking-[0.24em] text-white/50">ILOILO, PH / {time === "night" ? "02:13 AM" : time === "morning" ? "06:24 AM" : "04:38 PM"}</p>
+          <RecognitionBadge />
         </div>
         <div className="pointer-events-auto flex items-center gap-4">
           {settings?.analog && settings.analogPreset !== "CLEAN" && <span className="tape-rec hidden sm:inline"><i /> REC</span>}

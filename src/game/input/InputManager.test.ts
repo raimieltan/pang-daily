@@ -26,6 +26,44 @@ function setup(config: InputConfig = DEFAULT_INPUT_CONFIG) {
 }
 
 describe("InputManager keyboard", () => {
+  it('requires dialogue movement keys and gamepad controls to release before gameplay resumes', () => {
+    const { input, key, connectPad } = setup();
+    const pad = connectPad();
+    input.setContext('dialogue');
+    key('keydown', 'KeyW');
+    pad.buttons[PadButton.A] = { pressed: true, value: 1 };
+    pad.axes[PadAxis.LEFT_Y] = -1;
+    input.update();
+    input.setContext('gameplay');
+    input.update();
+    expect(input.axis('throttle')).toBe(0);
+    expect(input.axis('moveY')).toBe(0);
+    expect(input.pressed('interact')).toBe(false);
+    key('keyup', 'KeyW');
+    pad.buttons[PadButton.A] = { pressed: false, value: 0 };
+    pad.axes[PadAxis.LEFT_Y] = 0;
+    input.update();
+    key('keydown', 'KeyW');
+    input.update();
+    expect(input.axis('moveY')).toBe(1);
+    input.dispose();
+  });
+  it('captures dialogue keys without leaking movement and restores gameplay on close', () => {
+    const { input, key } = setup();
+    input.setContext('dialogue');
+    key('keydown', 'ArrowUp'); key('keydown', 'Enter');
+    input.update();
+    expect(input.axis('throttle')).toBe(0);
+    expect(input.axis('moveY')).toBe(0);
+    expect(input.pressed('dialogueUp')).toBe(true);
+    expect(input.pressed('dialogueConfirm')).toBe(true);
+    expect(input.pressed('interact')).toBe(false);
+    key('keyup', 'ArrowUp'); key('keyup', 'Enter');
+    input.setContext('gameplay'); input.update();
+    expect(input.pressed('dialogueConfirm')).toBe(false);
+    key('keydown', 'KeyW'); input.update();
+    expect(input.axis('throttle')).toBe(1);
+  });
   it("maps bound keys to named axes and clears them on release", () => {
     const { input, key } = setup();
     key("keydown", "KeyW");
@@ -97,6 +135,20 @@ describe("InputManager keyboard", () => {
 });
 
 describe("InputManager gamepad", () => {
+  it('routes pad navigation and cancel to dialogue without entering the car', () => {
+    const { input, connectPad } = setup();
+    const pad = connectPad();
+    input.setContext('dialogue');
+    pad.buttons[PadButton.B] = { pressed: true, value: 1 };
+    pad.buttons[PadButton.A] = { pressed: true, value: 1 };
+    pad.buttons[13] = { pressed: true, value: 1 };
+    input.update();
+    expect(input.pressed('dialogueDown')).toBe(true);
+    expect(input.pressed('dialogueConfirm')).toBe(true);
+    expect(input.pressed('dialogueCancel')).toBe(true);
+    expect(input.pressed('enterExit')).toBe(false);
+    expect(input.pressed('interact')).toBe(false);
+  });
   it("reads triggers and the left stick through their deadzones", () => {
     const { input, connectPad } = setup();
     const pad = connectPad();

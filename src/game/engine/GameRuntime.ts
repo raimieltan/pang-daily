@@ -7,6 +7,7 @@ import { loadVehicleSession } from "../maintenance/sessionStorage";
 import { loadJobSession } from "../jobs/jobStorage";
 import { HUB_JOBS } from "../jobs/hubJobs";
 import { loadInventorySession, loadMarketplaceSession } from "../marketplace/marketStorage";
+import { SocialEventBridge } from "../social/SocialEventBridge";
 import { MarketplaceService } from "../marketplace/MarketplaceService";
 import { grantCustomizationTestKit } from '../vehicles/developmentParts';
 
@@ -36,6 +37,7 @@ export class GameRuntime {
   private readonly audio: GameAudio;
   private readonly scenes: SceneManager<SceneId>;
   private readonly market: MarketplaceService;
+  private readonly social: SocialEventBridge;
   private readonly resizeObserver: ResizeObserver;
   private readonly initialScene: SceneId;
   private paused = false;
@@ -61,6 +63,15 @@ export class GameRuntime {
     const inventory = loadInventorySession(storage);
     if (process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
     this.market = new MarketplaceService(this.bridge.runtime, loadMarketplaceSession(session, inventory, storage));
+    const socialFallback = new Map<string, string>();
+ const socialStorage = storage ?? {
+ getItem: key => socialFallback.get(key) ?? null,
+ setItem: (key, value) => { socialFallback.set(key, value); },
+ };
+ this.social = new SocialEventBridge(this.events, socialStorage, error => emit('error', { message: `Social event rejected: ${error.message}` }), (progress, tierChange) => {
+      emit('socialReputationUpdated', progress);
+      if (tierChange) emit('socialTierChanged', tierChange);
+    });
     this.scenes = new SceneManager(this.engine, scenes, this.bridge.runtime, {
       onLoading: (sceneId) => emit("sceneLoading", { sceneId }),
       onReady: (sceneId) => emit("sceneReady", { sceneId }),
@@ -68,7 +79,7 @@ export class GameRuntime {
         const reason = error instanceof Error ? error.message : String(error);
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
-    }, session, loadJobSession(session, HUB_JOBS, storage), this.market, inventory);
+    }, session, loadJobSession(session, HUB_JOBS, storage), this.market, inventory, socialStorage);
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);
@@ -93,6 +104,7 @@ export class GameRuntime {
     this.resizeObserver.disconnect();
     this.audio.dispose();
     this.market.dispose();
+    this.social.dispose();
     this.engine.stopRenderLoop();
     this.scenes.dispose();
     this.engine.dispose();

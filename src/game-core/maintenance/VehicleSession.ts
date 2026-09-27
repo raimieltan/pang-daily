@@ -32,7 +32,7 @@ function migrateSession(saved: unknown): unknown {
 export type SessionSnapshot = z.infer<typeof sessionSchema>;
 export type RepairQuote = { id: string; vehicleId: string; vehicleName: string; revision: number; lines: RepairLine[]; totalPhp: number };
 export type MaintenanceSummary = { vehicleId: string; vehicleName: string; condition: VehicleCondition; walletPhp: number; fuelLiters?: number; fuelCapacityLiters?: number };
-export type RepairReceipt = { vehicleId: string; components: ServiceComponent[]; costPhp: number; walletPhp: number };
+export type RepairReceipt = { vehicleId: string; components: ServiceComponent[]; costPhp: number; walletPhp: number; transactionId: number };
 
 /** Session authority: economy and owned-car data outlive every Babylon scene. */
 export class VehicleSession {
@@ -81,7 +81,7 @@ export class VehicleSession {
     if ('rejected' in payment) return payment;
     for (const key of components) car.condition[key] = 1;
     car.revision++;
-    const receipt = { vehicleId: definition.id, components, costPhp, walletPhp: this.state.walletPhp };
+    const receipt = { vehicleId: definition.id, components, costPhp, walletPhp: this.state.walletPhp, transactionId: payment.id };
     this.changed(); return receipt;
   }
   earn(amountPhp: number, source: MoneySource) { return this.transfer(amountPhp, source, false); }

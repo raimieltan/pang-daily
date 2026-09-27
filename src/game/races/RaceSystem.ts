@@ -34,6 +34,7 @@ export class RaceSystem implements GameSystem {
   private gates;
   private materials: StandardMaterial[];
   private resultSent = false;
+  private attemptId: string | null = null;
   introRemaining = 0;
   private scene: Scene;
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
@@ -98,6 +99,7 @@ export class RaceSystem implements GameSystem {
     if (this.active) return { rejected: "Race already in progress" };
     if (this.modes.mode !== "driving") return { rejected: "Get into your car to race" };
     if (!this.player.placeAt({ position: new Vector3(route.start.x, route.start.y, route.start.z), headingRad: route.heading })) return { rejected: "Start grid is unavailable" };
+    this.attemptId = crypto.randomUUID();
     this.selected=route; this.race=new Race(route);
     this.gates.forEach(g=>g.setEnabled(g.metadata.routeId===route.id));
     this.race.reset(); this.bridge.emit("raceProgress", this.race.snapshot());
@@ -144,7 +146,7 @@ export class RaceSystem implements GameSystem {
       const prize = this.race.position === 1 ? this.selected.rival?.prizePhp ?? 0 : 0;
       const paid = prize > 0 && this.garage.wallet?.earn(prize, { kind: "race_prize", source: `race:${this.selected.id}`,
         description: `Beat ${this.selected.rival!.name} · ${this.selected.name}`, relatedEntityId: this.selected.id });
-      this.bridge.emit("raceFinished", { ...this.standing(), timeMs: Math.round(this.race.playerTime! * 1000),
+      this.bridge.emit("raceFinished", { ...this.standing(), attemptId: this.attemptId ?? undefined, timeMs: Math.round(this.race.playerTime! * 1000),
         ...(paid && !("rejected" in paid) ? { prizePhp: prize } : {}) });
     }
     if (phase !== this.race.phase) this.publisher.flush(this.race.snapshot());

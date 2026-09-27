@@ -104,7 +104,7 @@ function ListingDetail({ listing, onBack }: { listing: ListingView; onBack(): vo
         <dt className="text-white/45">Fits</dt><dd className="text-white/80">{listing.fits}</dd>
         <dt className="text-white/45">Meet-up</dt><dd className="text-white/80">{listing.meetup} or padala via rider</dd>
       </dl>
-      <div className="mt-4 flex items-center gap-3 border-y border-white/10 py-3">
+    <div className="mt-4 flex items-center gap-3 border-y border-white/10 py-3" data-interaction-id={`marketplace:seller:${listing.seller.id}`}>
         <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-200/15 text-amber-100">{listing.seller.name[0]}</span>
         <div className="text-xs"><p className="text-white/90">{listing.seller.name}</p>
           <p className="text-white/45"><span className="text-amber-200">★ {listing.seller.rating.toFixed(1)}</span> · {listing.seller.sales} sold · on Baligya since {listing.seller.since}</p>

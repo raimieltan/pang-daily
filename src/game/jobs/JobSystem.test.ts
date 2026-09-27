@@ -10,6 +10,8 @@ import { bindJobStore, useJobStore } from '../../state/jobStore';
 import { JobSystem } from './JobSystem';
 import { HATID_SUKI_HOME, HUB_JOBS, KYO_ICE_RUN, TALYER_BATTERY_DROP, TALYER_OIL_ERRAND } from './hubJobs';
 import { loadJobSession } from './jobStorage';
+import { SocialEventBridge } from '../social/SocialEventBridge';
+import { loadSocialSession } from '../social/socialStorage';
 
 const BOARD = { x: 139.2, z: 98.4 };
 const TALYER_BOARD = { x: 41.6, z: 154 };
@@ -34,10 +36,30 @@ function setup(storage?: Pick<Storage, 'getItem' | 'setItem'>, wallet = new Vehi
   const errors: string[] = []; bridge.ui.events.on('commandRejected', e => errors.push(e.reason));
   cleanup.push(() => { system.dispose(); interactions.dispose(); unbind(); bridge.dispose(); });
   const at = (p: { x: number; z: number }, mode: PlayerMode) => { player.position.set(p.x, 0, p.z); player.mode = mode; system.update(.1); };
-  return { commands: bridge.ui.commands, wallet, jobs, player, vehicle, world, system, marker, errors, at };
+  return { bridge, commands: bridge.ui.commands, wallet, jobs, player, vehicle, world, system, marker, errors, at };
 }
 const job = () => useJobStore.getState().job;
 const payouts = (wallet: VehicleSession) => wallet.snapshot().transactions.filter(tx => tx.kind === 'job_payout');
+
+it('changes a favor only after the validated job run ends, then repairs an abandoned commitment', () => {
+  const values = new Map<string, string>();
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+  const s = setup(storage);
+  const social = new SocialEventBridge(s.bridge.ui.events, storage, error => { throw error; });
+  cleanup.push(() => social.dispose());
+  s.at(TALYER_BOARD, 'walking'); s.commands.interact(); s.commands.acceptJob('talyer_oil_errand');
+  const before = loadSocialSession(storage).snapshot();
+  s.at(TALYER_OIL_ERRAND.objectives[1].area, 'walking'); s.commands.interact();
+  expect(loadSocialSession(storage).snapshot()).toEqual(before);
+  s.commands.abandonJob();
+  expect(loadSocialSession(storage).snapshot().npcs.mang_boy.trust).toBe(38);
+
+  s.at(TALYER_BOARD, 'walking'); s.commands.interact(); s.commands.acceptJob('talyer_battery_drop');
+  s.at(TALYER_BATTERY_DROP.objectives[0].area, 'driving'); s.commands.interact();
+  s.at(TALYER_BATTERY_DROP.objectives[1].area, 'walking'); s.commands.interact();
+  expect(loadSocialSession(storage).snapshot().favors.mang_boy_recovery.status).toBe('completed');
+  expect(loadSocialSession(storage).snapshot().npcs.mang_boy.trust).toBe(54);
+});
 
 it('is discovered at the Kyo board, starts in the car, and pays once after pickup then drop-off', () => {
   const s = setup();

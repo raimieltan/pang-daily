@@ -22,6 +22,8 @@ export type GameCommandMap = {
   installPerformancePart: { quoteId: string };
   dismissPerformanceQuote: void;
   pause: void;
+  chooseDialogue: { choiceId: string };
+  closeDialogue: void;
   resume: void;
   /** Tears down the current scene and builds `sceneId` (re-creates it if already active). */
   switchScene: { sceneId: SceneId };
@@ -129,6 +131,8 @@ export interface GameCommands {
   installPerformancePart(quoteId: string): void;
   dismissPerformanceQuote(): void;
   pause(): void;
+  chooseDialogue(choiceId: string): void;
+  closeDialogue(): void;
   resume(): void;
   switchScene(sceneId: SceneId): void;
   spawnAt(spawnPointId: SpawnPointId): void;
@@ -177,6 +181,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     installPerformancePart: quoteId => dispatch('installPerformancePart', { quoteId }),
     dismissPerformanceQuote: () => dispatch('dismissPerformanceQuote'),
     pause: () => dispatch("pause"),
+    chooseDialogue: (choiceId) => dispatch('chooseDialogue', { choiceId }),
+    closeDialogue: () => dispatch('closeDialogue'),
     resume: () => dispatch("resume"),
     switchScene: (sceneId) => dispatch("switchScene", { sceneId }),
     spawnAt: (spawnPointId) => dispatch("spawnAt", { spawnPointId }),

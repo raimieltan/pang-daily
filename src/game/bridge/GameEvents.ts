@@ -25,6 +25,8 @@ import type {
 } from "./types";
 
 export type GameEventMap = {
+  socialReputationUpdated: import('../../game-core/social/reputation').ReputationProgress;
+  socialTierChanged: { sceneId: string; from: import('../../game-core/social/reputation').ReputationTier; to: import('../../game-core/social/reputation').ReputationTier; points: number };
   autoPartsShop: import('../marketplace/AutoPartsShopSystem').AutoPartsShopView | null;
   autoPartsQuote: import('../marketplace/AutoPartsShopSystem').AutoPartsQuote | null;
   autoPartPurchased: import('../../game-core/shops/AutoPartsShop').AutoPartsPurchase;
@@ -99,6 +101,7 @@ export type GameEventMap = {
   raceStandingChanged: RaceStanding;
   raceFinished: RaceResult;
   dialogueTriggered: { dialogueId: DialogueId };
+  dialogueViewChanged: { dialogueId: string; nodeId: string; speaker: string; text: string; choices: readonly { id: string; text: string }[]; selectedChoiceId: string | null } | null;
   /** Got in or out of the car. Sent on scene setup and after every change. */
   playerModeChanged: PlayerModeChange;
   /** The on-foot prompt changed; null hides it. Sent on change only. */

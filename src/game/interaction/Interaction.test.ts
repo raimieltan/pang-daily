@@ -19,6 +19,12 @@ const onMountainShoulder = (p: { x: number; z: number }) => {
 };
 
 describe("world interactions", () => {
+  it('offers Casey rather than the overlapping job board when standing beside the rival', () => {
+    const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap(chunk => chunk.zones));
+    expect(resolveInteraction(zones, 138.8, 97.5, 'walking')?.id).toBe('casey_corner');
+    expect(resolveInteraction(zones, 137.5, 97.5, 'walking')?.id).toBe('casey_corner');
+    expect(resolveInteraction(zones, 141.5, 98.4, 'walking')?.id).toBe('kyo_job_board');
+  });
   it("resolves priority, distance and ID independently of source order", () => {
     const zones = [zone("z", 1.0004), zone("b", 1.0008), zone("a", 1.0012)];
     for (const order of [zones, [...zones].reverse(), [zones[1], zones[0], zones[2]]]) {

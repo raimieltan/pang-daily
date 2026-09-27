@@ -527,6 +527,10 @@ function coffeeShop() {
     locationId: "coffee_shop",
     interaction: { action: "hang_out", label: "Tambay muna", dialogueId: "kyo_tambay" },
   });
+  a.zone({
+    id: "casey_corner", kind: "interact", rect: rect(137.3, 95.8, 140.5, 98.2), locationId: "coffee_shop",
+    interaction: { action: "talk_contact", label: "Talk to Casey", priority: 2, dialogueId: "casey_intro" },
+  });
   // The door is the counter for now; reach lets it work from the terrace, and it outranks tambay there.
   a.zone({
     id: "kyo_counter",

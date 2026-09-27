@@ -1,43 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useGameEvent } from "@/components/game/useGameEvent";
+import { useEffect, useState } from 'react';
+import { useGameEvent } from '@/components/game/useGameEvent';
+import { DIALOGUE_ENTRIES } from '@/game-core/social/dialogue';
+import { CONVERSATIONS } from '@/game-core/social/conversation';
+import type { GameEventMap } from '@/game/bridge/GameEvents';
+import { useGameUiStore } from '@/state/gameUiStore';
 
-const DISMISS_AFTER_MS = 4000;
+type View = NonNullable<GameEventMap['dialogueViewChanged']>;
 
-/**
- * Placeholder lines until dialogue becomes data-driven content.
- * The game only says *which* dialogue fired; wording lives on the UI side.
- */
-const LINES: Record<string, { speaker: string; line: string }> = {
-  kyo_order: { speaker: "Barista", line: "Kape muna? Park ka lang, boss." },
-  kyo_tambay: { speaker: "Regular", line: "Tambay muna. May bagong project ka?" },
-  talyer_mang_boy: { speaker: "Mang Boy", line: "Tingnan natin, boss. Piliin mo muna ang kaya ng budget." },
-  talyer_tambay: { speaker: "Friend", line: "Dito muna tayo habang nasa lift ang kotse." },
-  debug_sprint_start: { speaker: "Friend", line: "Easy on the first corner, boss." },
-  debug_sprint_finish: { speaker: "Friend", line: "Not bad for a daily." },
-};
-
+/** Presentation and intents only; the runtime owns conditions, effects, and input capture. */
 export function DialogueBox() {
-  const [dialogueId, setDialogueId] = useState<string | null>(null);
+ const [view, setView] = useState<View | null>(null);
+ const [subtitle, setSubtitle] = useState<string | null>(null);
+ const commands = useGameUiStore((state) => state.commands);
+ useGameEvent('dialogueViewChanged', (next) => { setView(next); setSubtitle(null); });
+ useGameEvent('dialogueTriggered', ({ dialogueId }) => {
+  if (CONVERSATIONS.some((entry) => entry.id === dialogueId)) return;
+  setSubtitle(dialogueId);
+ });
+ useGameEvent('sceneLoading', () => { setView(null); setSubtitle(null); });
+ useEffect(() => {
+  if (!subtitle) return;
+  const timer = setTimeout(() => setSubtitle(null), 4000);
+  return () => clearTimeout(timer);
+ }, [subtitle]);
+ useEffect(() => () => commands?.closeDialogue(), [commands]);
 
-  useGameEvent("dialogueTriggered", ({ dialogueId }) => setDialogueId(dialogueId));
-
-  useEffect(() => {
-    if (!dialogueId) return;
-    const timer = setTimeout(() => setDialogueId(null), DISMISS_AFTER_MS);
-    return () => clearTimeout(timer);
-  }, [dialogueId]);
-
-  if (!dialogueId) return null;
-  const entry = LINES[dialogueId] ?? { speaker: "???", line: dialogueId };
-
-  return (
-    <div
-      className="max-w-md self-center rounded border border-white/30 bg-black/60 px-4 py-2 text-sm"
-      data-testid="dialogue"
-    >
-      <span className="text-white/90">{entry.speaker}:</span> {entry.line}
-    </div>
-  );
+ if (view) return <div className="pointer-events-auto max-w-lg self-center rounded border border-amber-200/40 bg-black/85 px-4 py-3 text-sm text-white" data-testid="dialogue" role="dialog" aria-label={`Conversation with ${view.speaker}`}>
+  <p><strong className="text-amber-100">{view.speaker}:</strong> {view.text}</p>
+  <div className="mt-3 flex flex-col gap-2">
+   {view.choices.map((choice) => <button key={choice.id} type="button" data-choice-id={choice.id} className={`rounded border px-3 py-2 text-left ${choice.id === view.selectedChoiceId ? 'border-amber-200 text-amber-100' : 'border-white/30 text-white/80'}`} onClick={() => commands?.chooseDialogue(choice.id)}>{choice.text}</button>)}
+   <button type="button" aria-label="Leave conversation" className="self-end rounded border border-white/30 px-3 py-1 text-white/70" onClick={() => commands?.closeDialogue()}>Leave</button>
+  </div>
+ </div>;
+ if (!subtitle) return null;
+ const entry = DIALOGUE_ENTRIES[subtitle];
+ if (!entry) return null;
+ return <p className="max-w-md self-center border border-white/30 bg-black/60 px-4 py-2 text-sm text-white/90" data-testid="dialogue">{entry.speaker}: {entry.line}</p>;
 }

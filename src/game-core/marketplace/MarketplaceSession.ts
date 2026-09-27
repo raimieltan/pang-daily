@@ -23,8 +23,8 @@ export type OwnedPartView = {
   actual: { condition: number; label: string; verdict: Verdict | null; method: RevealMethod } | null;
 };
 export type MarketplaceView = { listings: ListingView[]; parts: OwnedPartView[]; inspectionFeePhp: number; nextExpirySeconds: number | null };
-export type PartPurchase = { listingId: string; part: OwnedPartView; pricePhp: number; transactionId: number };
-export type PartInspection = { part: OwnedPartView; feePhp: number };
+export type PartPurchase = { listingId: string; sellerId: string; part: OwnedPartView; pricePhp: number; transactionId: number };
+export type PartInspection = { part: OwnedPartView; feePhp: number; transactionId: number };
 type Wallet = Pick<VehicleSession, 'spend' | 'snapshot'>;
 type Inventory = Pick<InventorySession, 'add' | 'reveal' | 'item' | 'items' | 'byKey' | 'installation' | 'subscribe'>;
 const purchaseKey = (listingId: string) => `marketplace:${listingId}`;
@@ -89,7 +89,7 @@ export class MarketplaceSession {
     if ('rejected' in payment) return { rejected: payment.rejected };
     const item = this.deliver(listing);
     if ('rejected' in item) return item; // Unreachable for catalog parts; the ledger replay retries on load.
-    return { listingId, part: this.partView(item), pricePhp: listing.askingPricePhp, transactionId: payment.id };
+    return { listingId, sellerId: listing.sellerId, part: this.partView(item), pricePhp: listing.askingPricePhp, transactionId: payment.id };
   }
 
   /** Paid reveal of an owned item's true condition. Any inventory item can go on the bench. */
@@ -101,7 +101,7 @@ export class MarketplaceSession {
     if ('rejected' in payment) return { rejected: payment.rejected };
     const revealed = this.inventory.reveal(itemId, method);
     if ('rejected' in revealed) return revealed;
-    return { part: this.partView(revealed), feePhp: MECHANIC_INSPECTION_PHP };
+    return { part: this.partView(revealed), feePhp: MECHANIC_INSPECTION_PHP, transactionId: payment.id };
   }
 
   /** Inventory first (keyed, so repeatable), then take the listing down. */

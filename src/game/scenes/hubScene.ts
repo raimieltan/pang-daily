@@ -33,6 +33,8 @@ import { WalkingCharacter } from "../characters/WalkingCharacter";
 import { WalkControls } from "../input/WalkControls";
 import { interactablesFromZones } from "../interaction/Interaction";
 import { InteractionSystem } from "../interaction/InteractionSystem";
+import { DialogueController } from '../social/DialogueController';
+import { CONVERSATIONS } from '@/game-core/social/conversation';
 import { PlayerModes } from "../player/PlayerModes";
 import { DEFAULT_CHASE_CAMERA } from "../cameras/ChaseCameraConfig";
 import type { SceneDefinition } from "../engine/types";
@@ -71,7 +73,7 @@ import { buildChunk, WorldKit } from "../world/WorldChunk";
  * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
-  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory, restart }) {
+  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory, socialStorage, restart }) {
     const params = new URLSearchParams(window.location.search);
     const havok = await loadHavok();
     if (signal.aborted) return;
@@ -163,6 +165,10 @@ export const hubScene: SceneDefinition = {
       boards: zones.filter((zone) => zone.action === "browse_jobs"), marker: new JobMarker(scene),
     });
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage.interactions, race.interactions, jobSystem.interactions]));
+    const dialogue = addSystem(new DialogueController(bridge, input, socialStorage));
+    for (const action of ['talk_contact', 'order_coffee', 'hang_out'] as const) {
+      interactions.handle(action, (target) => target.dialogueId && CONVERSATIONS.some((item) => item.id === target.dialogueId) ? dialogue.open(target.dialogueId) : undefined);
+    }
     modes.useInteractions(interactions);
     garage.connect(interactions);
     race.connect(interactions);
@@ -172,7 +178,7 @@ export const hubScene: SceneDefinition = {
       speedKmh: maintainedCar.speedKmh, racing: race.active,
     });
     addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
-      () => race.race.phase === 'RUNNING', { interactions, rejection: talyer }));
+      () => race.race.phase === 'RUNNING', { interactions, rejection: talyer, onTalk: () => { dialogue.open('talyer_mang_boy'); } }));
     // Marketplace parts ride in the trunk: bring the car to Mang Boy to have one inspected.
     market.useWorkshop({ rejection: talyer });
     addSystem(new FuelSystem(bridge, session, maintainedCar.definition.spec, {

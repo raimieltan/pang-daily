@@ -72,6 +72,8 @@ export type RaceStanding = {
 };
 
 export type RaceResult = RaceStanding & {
+ /** Unique per start, so a replayed result cannot count as a new race. */
+ attemptId?: string;
   timeMs: number;
   /** Paid for beating a named rival. */
   prizePhp?: number;

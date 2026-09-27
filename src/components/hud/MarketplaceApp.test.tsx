@@ -38,6 +38,7 @@ it('browses listings with price, place and advertised condition but never the hi
   const cards = container.querySelectorAll('ul li button');
   expect(cards).toHaveLength(8);
   click(cards[0]);
+  expect(container.querySelector(`[data-interaction-id="marketplace:seller:${market.snapshot().listings[0].sellerId}"]`)).not.toBeNull();
   expect(container.querySelector('[data-testid="advertised-grade"]')?.textContent).toBeTruthy();
   expect(container.textContent).toMatch(/★ \d\.\d/);
   expect(container.textContent).toContain('listing ends in');

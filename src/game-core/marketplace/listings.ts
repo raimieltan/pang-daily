@@ -76,7 +76,7 @@ export const seller = (id: string): Seller | undefined => SELLERS.find(s => s.id
 export type ListingView = {
   id: string; title: string; category: PartCategory; fits: string; askingPricePhp: number;
   advertised: { grade: Grade; label: string; blurb: string };
-  seller: { name: string; rating: number; sales: number; since: number; replies: string };
+  seller: { id: string; name: string; rating: number; sales: number; since: number; replies: string };
   location: string; meetup: string; postedSecondsAgo: number; expiresInSeconds: number; photoSeed: number;
 };
 export function listingView(listing: Listing, now: number): ListingView {
@@ -84,7 +84,7 @@ export function listingView(listing: Listing, now: number): ListingView {
   return {
     id: listing.id, title: part.name, category: part.category, fits: part.fits, askingPricePhp: listing.askingPricePhp,
     advertised: { grade: listing.advertisedGrade, label: GRADE_LABEL[listing.advertisedGrade], blurb: listing.blurb },
-    seller: { name: by.name, rating: by.rating, sales: by.sales, since: by.since, replies: by.replies },
+    seller: { id: by.id, name: by.name, rating: by.rating, sales: by.sales, since: by.since, replies: by.replies },
     location: listing.location, meetup: MEETUPS[listing.location] ?? listing.location,
     postedSecondsAgo: Math.max(0, Math.floor((now - listing.postedAt) / 1000)),
     expiresInSeconds: Math.max(0, Math.ceil((listing.expiresAt - now) / 1000)), photoSeed: listing.photoSeed,

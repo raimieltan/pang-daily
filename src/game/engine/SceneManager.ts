@@ -40,7 +40,8 @@ export class SceneManager<Id extends string> {
     private readonly session = new VehicleSession(),
     private readonly jobs = new JobSession(session, HUB_JOBS),
     private readonly market: SceneContext["market"] = { useWorkshop: () => () => {} },
-    private readonly inventory = new InventorySession(),
+  private readonly inventory = new InventorySession(),
+  private readonly socialStorage: SceneContext['socialStorage'] = { getItem: () => null, setItem: () => {} },
   ) {}
 
   get activeId(): Id | null {
@@ -74,6 +75,7 @@ export class SceneManager<Id extends string> {
       session: this.session,
       jobs: this.jobs,
       inventory: this.inventory,
+      socialStorage: this.socialStorage,
       market: {
         useWorkshop: (workshop) => {
           const release = this.market.useWorkshop(workshop);

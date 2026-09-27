@@ -35,6 +35,10 @@ export const BUTTON_ACTIONS = [
   "enterExit",
   /** Use whatever the on-foot prompt offers, including getting back in the car. */
   "interact",
+  "dialogueUp",
+  "dialogueDown",
+  "dialogueConfirm",
+  "dialogueCancel",
 ] as const;
 
 export type AxisAction = keyof typeof AXIS_ACTIONS;
@@ -113,6 +117,10 @@ export const DEFAULT_INPUT_CONFIG: InputConfig = {
     recenterCamera: { keys: ["KeyC"], pad: [PadButton.R3] },
     enterExit: { keys: ["KeyF"], pad: [PadButton.RB] },
     interact: { keys: ["KeyF"], pad: [PadButton.A, PadButton.RB] },
+    dialogueUp: { keys: ["ArrowUp", "KeyW"], pad: [12] },
+    dialogueDown: { keys: ["ArrowDown", "KeyS"], pad: [13] },
+    dialogueConfirm: { keys: ["Enter", "Space"], pad: [PadButton.A] },
+    dialogueCancel: { keys: ["Escape"], pad: [PadButton.B] },
   },
   deadzones: { stick: 0.12, stickOuter: 0.04, trigger: 0.05 },
 };

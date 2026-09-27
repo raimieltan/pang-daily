@@ -32,6 +32,10 @@ export class InputManager implements GameSystem {
   private readonly axes = new Map<AxisAction, number>();
   private readonly down = new Set<ButtonAction>();
   private readonly justPressed = new Set<ButtonAction>();
+  private context: 'gameplay' | 'dialogue' = 'gameplay';
+  private readonly blockedKeys = new Set<string>();
+  private readonly blockedPadButtons = new Set<number>();
+  private readonly blockedPadAxes = new Set<number>();
 
   constructor(
     private readonly target: EventTarget = window,
@@ -57,6 +61,16 @@ export class InputManager implements GameSystem {
     return this.justPressed.has(action);
   }
 
+  setContext(context: 'gameplay' | 'dialogue'): void {
+    if (this.context === context) return;
+    this.context = context;
+    this.keysDown.forEach((code) => this.blockedKeys.add(code));
+    const pad = activeGamepad(this.gamepads());
+    pad?.buttons.forEach((button, index) => { if (button.pressed || button.value > this.config.deadzones.trigger) this.blockedPadButtons.add(index); });
+    pad?.axes.forEach((value, index) => { if (Math.abs(value) > this.config.deadzones.stick) this.blockedPadAxes.add(index); });
+    this.axes.clear(); this.down.clear(); this.justPressed.clear(); this.keysTapped.clear();
+  }
+
   /** Swap bindings or deadzones at runtime (settings screen, tuning). */
   setConfig(config: InputConfig): void {
     this.config = config;
@@ -64,20 +78,26 @@ export class InputManager implements GameSystem {
   }
 
   update(): void {
-    const pad = activeGamepad(this.gamepads());
+    const physicalPad = activeGamepad(this.gamepads());
+    this.blockedKeys.forEach((code) => { if (!this.keysDown.has(code)) this.blockedKeys.delete(code); });
+    this.blockedPadButtons.forEach((index) => { if (!physicalPad?.buttons[index]?.pressed && (physicalPad?.buttons[index]?.value ?? 0) <= this.config.deadzones.trigger) this.blockedPadButtons.delete(index); });
+    this.blockedPadAxes.forEach((index) => { if (Math.abs(physicalPad?.axes[index] ?? 0) <= this.config.deadzones.stick) this.blockedPadAxes.delete(index); });
+    const activeKeys = this.blockedKeys.size ? new Set([...this.keysDown].filter((code) => !this.blockedKeys.has(code))) : this.keysDown;
+    const pad = physicalPad && (this.blockedPadButtons.size || this.blockedPadAxes.size) ? { ...physicalPad, buttons: physicalPad.buttons.map((button, index) => this.blockedPadButtons.has(index) ? { ...button, pressed: false, value: 0 } : button), axes: physicalPad.axes.map((value, index) => this.blockedPadAxes.has(index) ? 0 : value) } as Gamepad : physicalPad;
     const { axes, buttons, deadzones } = this.config;
 
     for (const action of Object.keys(AXIS_ACTIONS) as AxisAction[]) {
-      const value = readAxis(axes[action], this.keysDown, pad, deadzones);
+      const value = this.context === 'dialogue' ? 0 : readAxis(axes[action], activeKeys, pad, deadzones);
       this.axes.set(action, AXIS_ACTIONS[action] === "unit" ? clamp(value, 0, 1) : clamp(value, -1, 1));
     }
 
     for (const action of BUTTON_ACTIONS) {
       const { keys = [], pad: padButtons = [] } = buttons[action];
+      const enabled = action.startsWith('dialogue') === (this.context === 'dialogue');
       const isDown =
-        keys.some((code) => this.keysDown.has(code) || this.keysTapped.has(code)) ||
-        (!!pad && padButtons.some((i) => pad.buttons[i]?.pressed));
-      const tapped = keys.some((code) => this.keysTapped.has(code));
+        enabled && (keys.some((code) => !this.blockedKeys.has(code) && (this.keysDown.has(code) || this.keysTapped.has(code))) ||
+        (!!pad && padButtons.some((i) => pad.buttons[i]?.pressed)));
+      const tapped = enabled && keys.some((code) => !this.blockedKeys.has(code) && this.keysTapped.has(code));
       if ((isDown && !this.down.has(action)) || tapped) this.justPressed.add(action);
       else this.justPressed.delete(action);
       if (isDown) this.down.add(action);
@@ -105,10 +125,12 @@ export class InputManager implements GameSystem {
 
   private onKeyUp = (event: KeyboardEvent) => {
     this.keysDown.delete(event.code);
+    this.blockedKeys.delete(event.code);
   };
 
   /** Keys released while the tab is unfocused never send keyup; drop them all. */
   private onBlur = () => {
+    this.blockedKeys.clear();
     this.keysDown.clear();
     this.keysTapped.clear();
     this.axes.clear();

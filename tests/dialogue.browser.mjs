@@ -1,0 +1,105 @@
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
+import { chromium, expect } from '@playwright/test';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const server = await createServer({ configFile: false, root, optimizeDeps: { entries: ['tests/fixtures/dialogue.html'] }, resolve: { alias: { '@': `${root}src` } }, esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 4175, strictPort: true } });
+let browser;
+try {
+ await server.listen();
+ browser = await chromium.launch({ headless: true });
+ const page = await browser.newPage();
+ const errors = [];
+ page.on('pageerror', error => errors.push(error.message));
+ await page.goto('http://127.0.0.1:4175/tests/fixtures/dialogue.html');
+ await page.waitForFunction(() => !!window.dialogueTest && window.dialogueReady);
+ const call = (method, ...args) => page.evaluate(({ method, args }) => window.dialogueTest[method](...args), { method, args });
+ const key = async code => { await page.keyboard.down(code); await call('tick'); await page.keyboard.up(code); await call('tick'); };
+ const dialogue = page.getByRole('dialog');
+
+ await call('seed', 'fresh');
+ expect(await call('interact')).toBeUndefined();
+ expect((await call('focus')).id).toBe('casey_corner');
+ await expect(dialogue).toContainText('Ikaw ang may daily?');
+ await key('Escape');
+ await expect(dialogue).toHaveCount(0);
+ for (let repeat = 0; repeat < 3; repeat++) {
+  await call('interact');
+  await expect(dialogue).toContainText('Ara ka naman.');
+  await expect(dialogue.getByRole('button')).toHaveCount(1);
+  await key('Enter');
+  await expect(dialogue).toHaveCount(0);
+ }
+ console.log('PASS world-zone interaction, first meeting, fallback, empty choices, cancel, repeated open/close');
+
+ await call('seed', 'low');
+ await call('interact');
+ await expect(dialogue).toContainText('Wala ko gana sa hambog.');
+ await call('close');
+ await call('seed', 'race');
+ await call('interact');
+ await expect(dialogue).toContainText('Maayo nga run.');
+ const before = await call('snapshot');
+ await call('invalidate');
+ expect(await call('choose', 'congratulate_casey')).toHaveProperty('rejected');
+ expect((await call('snapshot')).appliedEvents).toEqual(before.appliedEvents);
+ await expect(dialogue.locator('[data-choice-id]')).toHaveCount(0);
+ console.log('PASS low-trust/post-race conditions and stale choice rejection');
+
+ await call('seed', 'race');
+ await call('interact');
+ await key('ArrowDown');
+ expect((await call('view')).selectedChoiceId).toBe('insult_casey');
+ await key('ArrowUp');
+ await key('Enter');
+ const consumed = await call('snapshot');
+ expect(consumed.npcs.casey.relationshipFlags).toContain('trusted_friend');
+ expect(await call('choose', 'congratulate_casey')).toHaveProperty('rejected');
+ expect((await call('snapshot')).appliedEvents).toEqual(consumed.appliedEvents);
+ await page.reload();
+ await page.waitForFunction(() => !!window.dialogueTest && window.dialogueReady);
+ await call('interact');
+ await expect(dialogue.locator('[data-choice-id="congratulate_casey"]')).toHaveCount(0);
+ expect((await call('snapshot')).appliedEvents).toEqual(consumed.appliedEvents);
+ console.log('PASS keyboard selection, duplicate confirmation, consumed choice after reload');
+
+ await call('seed', 'race');
+ await call('interact');
+ await call('pad', 13, true);
+ expect((await call('view')).selectedChoiceId).toBe('insult_casey');
+ await call('pad', 13, false);
+ await call('pad', 12, true);
+ await call('pad', 12, false);
+ await call('pad', 0, true);
+ expect((await call('snapshot')).npcs.casey.relationshipFlags).toContain('trusted_friend');
+ await call('pad', 1, true);
+ await expect(dialogue).toHaveCount(0);
+ await call('tick');
+ expect(await call('axes')).toEqual({ throttle: 0, walk: 0, interact: false });
+ await call('pad', 0, false);
+ await call('pad', 1, false);
+ await call('interact');
+ await page.keyboard.down('w');
+ await call('tick');
+ expect((await call('axes')).walk).toBe(0);
+ await key('Escape');
+ expect((await call('axes')).walk).toBe(0);
+ await page.keyboard.up('w');
+ await call('tick');
+ await page.keyboard.down('w');
+ await call('tick');
+ expect((await call('axes')).walk).toBe(1);
+ await page.keyboard.up('w');
+ await call('tick');
+ await call('interact');
+ await call('sceneExit');
+ await expect(dialogue).toHaveCount(0);
+ await page.keyboard.down('w');
+ await call('tick');
+ expect((await call('axes')).walk).toBe(1);
+ expect(errors).toEqual([]);
+ console.log('PASS gamepad select/confirm/cancel, held-input quarantine, scene-exit controls; no browser errors');
+} finally {
+ await browser?.close();
+ await server.close();
+}
