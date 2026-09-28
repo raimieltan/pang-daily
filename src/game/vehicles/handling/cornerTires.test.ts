@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ArcadeHandlingModel, CORNERS, type AxleContact, type DriverInput } from "./ArcadeHandlingModel";
 import { resolveHandlingPreset } from "./HandlingConfig";
 import { HANDLING_PRESETS } from "./presets";
-import { newAssembly, puncture, tireResponse, type TireSurface } from "@/game-core/tires";
+import { STOCK_SETUP, newAssembly, puncture, tireResponse, type TireSurface } from "@/game-core/tires";
+import { applyHandlingOverrides } from "./HandlingConfig";
 
 const DT = 1 / 120;
 const GROUNDED: AxleContact = { front: 1, rear: 1 };
@@ -94,4 +95,34 @@ describe("per-corner tires", () => {
     expect(m.corners[2].brakeN).toBeGreaterThan(m.corners[0].brakeN * 3);
     expect(Math.abs(m.state.yawRate)).toBeLessThan(1e-9);
   });
+
+  it("a wheel set's grip and worn tread on every corner match the old whole-car grip multiplier, without counting it twice", () => {
+    const base = resolveHandlingPreset(HANDLING_PRESETS, "fwd_worn_sedan");
+    // Old path: mags (+6%) and half-worn tread (0.8 loss at bald) folded into the axle grip.
+    const factor = 1.06 * (1 - 0.8 * 0.5);
+    const old = new ArcadeHandlingModel(applyHandlingOverrides(base, { tires: { frontGrip: base.tires.frontGrip * factor, rearGrip: base.tires.rearGrip * factor } }));
+    const now = new ArcadeHandlingModel(base);
+    const setup = { ...STOCK_SETUP, gripScale: 1.06, tread: 0.5, treadGripLoss: 0.8 };
+    now.tires.forEach((t) => Object.assign(t, tireResponse(newAssembly("x"), "asphalt", setup)));
+    old.state.vx = now.state.vx = 70 / 3.6;
+    for (let t = 0; t < 2; t += DT) { old.step(DT, input(.5, 0, .4), GROUNDED); now.step(DT, input(.5, 0, .4), GROUNDED); }
+    expect(now.state.vx).toBeCloseTo(old.state.vx, 6);
+    expect(now.state.yawRate).toBeCloseTo(old.state.yawRate, 6);
+    // A donut is its own wheel: the set and the tread don't touch it.
+    expect(tireResponse(newAssembly("d", "donut"), "asphalt", setup)).toEqual(tireResponse(newAssembly("d", "donut"), "asphalt"));
+  });
+
+  it("a braking-biased compound only raises braking and traction friction", () => {
+    const stock = car(80), bias = car(80);
+    bias.tires.forEach((t) => { t.longitudinalGrip = 1.2; });
+    drift(stock, 1, input(0, 1, 0));
+    drift(bias, 1, input(0, 1, 0));
+    expect(bias.state.vx).toBeLessThan(stock.state.vx);
+    const cornerA = car(60), cornerB = car(60);
+    cornerB.tires.forEach((t) => { t.longitudinalGrip = 1.2; });
+    drift(cornerA, 2, input(0, 0, .6)); drift(cornerB, 2, input(0, 0, .6));
+    // Only the little engine braking while coasting feels it, through the friction ellipse.
+    expect(Math.abs(cornerB.state.yawRate / cornerA.state.yawRate - 1)).toBeLessThan(.02);
+  });
 });
+

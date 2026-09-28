@@ -40,20 +40,35 @@ export const isFlat = (tire: TireAssembly) => tire.pressureKpa <= FLAT_KPA || ti
 /** Riding on the rim: no rubber left between metal and road. */
 export const onRim = (tire: TireAssembly) => tire.failure === 'DESTROYED' || tire.pressureKpa <= RIM_CONTACT_KPA && tire.health < .25;
 
+/**
+ * The car's road wheel set and its rubber, shared by the four road tires: the aftermarket set's
+ * compound (`gripScale`), its braking/traction bias (`longitudinalScale`), how battered the set's
+ * rims are (`rimWear`), and the tread left on the rubber (`tread`, the maintenance `tires` condition)
+ * with the definition's grip loss at bald. A donut is its own wheel and ignores all of this.
+ */
+export type WheelSetup = { gripScale: number; longitudinalScale: number; rimWear: number; tread: number; treadGripLoss: number };
+export const STOCK_SETUP: WheelSetup = { gripScale: 1, longitudinalScale: 1, rimWear: 0, tread: 1, treadGripLoss: 0 };
+/** A fully bent/out-of-round rim loses this share of grip. */
+export const BENT_RIM_GRIP_LOSS = 0.08;
+
 /** What the tire gives the handling model on a surface. Surface factors are applied per corner here, never globally. */
-export function tireResponse(tire: TireAssembly, surface: TireSurface) {
+export function tireResponse(tire: TireAssembly, surface: TireSurface, setup: WheelSetup = STOCK_SETUP) {
   const spec = TIRE_SPECS[tire.spec];
   const p = pressureRatio(tire);
   const ground = SURFACE_TIRE[surface];
+  const road = tire.spec === 'standard';
   if (onRim(tire)) {
     // Steel on road: little grip, lots of drag, and it barely builds sideways force.
-    return { grip: .32 * ground.grip, slipScale: 2.2, rollingResistance: .09 + ground.rolling };
+    return { grip: .32 * ground.grip, longitudinalGrip: 1, slipScale: 2.2, rollingResistance: .09 + ground.rolling };
   }
+  const rim = 1 - BENT_RIM_GRIP_LOSS * Math.max(tire.rimDamage, road ? setup.rimWear : 0);
+  const set = road ? setup.gripScale * (1 - setup.treadGripLoss * (1 - Math.min(1, Math.max(0, setup.tread)))) : 1;
   // Over-inflated: a slightly smaller patch. Under-inflated: soft, draggy, loses grip fast once flat.
   const pressureGrip = p >= 1 ? 1 - .25 * (p - 1) ** 2 : p >= .6 ? 1 - .12 * (1 - p) / .4 : .88 - .38 * (.6 - Math.max(0, p)) / .6;
   const soft = Math.max(0, .95 - p);
   return {
-    grip: spec.gripScale * ground.grip * pressureGrip * (.8 + .2 * tire.health),
+    grip: spec.gripScale * ground.grip * pressureGrip * (.8 + .2 * tire.health) * rim * set,
+    longitudinalGrip: road ? setup.longitudinalScale : 1,
     slipScale: spec.slipScale * (1 + 1.3 * soft),
     rollingResistance: spec.rollingResistance + ground.rolling + .09 * soft ** 1.5,
   };

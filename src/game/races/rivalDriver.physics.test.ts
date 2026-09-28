@@ -14,6 +14,9 @@ import { VehicleController } from '../vehicles/VehicleController';
 import { AIDriver, DRIVER_SKILLS } from './AIDriver';
 import { lineTime } from './racingLine';
 import { rivalCar, rivalLine } from './rivalDriver';
+import { CarTires } from '../vehicles/CarTires';
+import { TireSession } from '@/game-core/tires';
+import { surfaceResolver } from '../world/surfaceAt';
 import { RACE_CALENDAR } from './raceCalendar';
 import type { RaceDefinition } from './Race';
 
@@ -32,12 +35,13 @@ it('keeps mountain rivals on pavement while following their planned pace', () =>
   const kit = new WorldKit(scene);
   const chunks = HUB_LAYOUT.chunks.map(chunk => buildChunk(scene, chunk, kit));
   const mountain = new MountainWorld(scene, kit);
+  const surfaceAt = surfaceResolver(HUB_LAYOUT);
 
   for (const id of ['kyo_block_lap', 'terrace_sprint', 'pahuway_descent', 'the_wall']) {
     const base = RACE_CALENDAR.find(r => r.id === id)!;
     for (const tier of [1, 2, 3, 4, 5] as const) {
       const route: RaceDefinition = { ...base, rival: { ...base.rival!, tier } };
-      const { definition, config } = rivalCar(route);
+      const { definition, config, physics, wheels } = rivalCar(route);
       const line = rivalLine(route, config);
       const body = new VehicleBody(world, definition.collision, config.chassis.massKg, `test-${id}-${tier}`);
       const driver = new AIDriver(line.points, DRIVER_SKILLS[Math.min(3, tier - 1)], {
@@ -45,22 +49,25 @@ it('keeps mountain rivals on pavement while following their planned pace', () =>
         riskTolerance: .5, trafficRiskTolerance: .3, mistakeFrequency: .4,
       }, config.brakes.decelerationMps2, config.chassis.wheelbaseM, 11, line.limits);
       let controller: VehicleController;
-      controller = new VehicleController(world, body, config, { read: () => {
+      controller = new VehicleController(world, body, physics, { read: () => {
         body.updateAxes();
         const model = controller.model;
         return driver.update(world.fixedStep, {
           position: body.position, heading: Math.atan2(body.forward.x, body.forward.z),
           speed: model.state.vx, yawRate: model.state.yawRate, lateralSlip: model.diagnostics.bodySlip,
           frontGripUsage: model.diagnostics.frontGripUse, rearGripUsage: model.diagnostics.rearGripUse,
-          grip: model.surfaceGrip,
+          grip: model.surfaceGrip * tires.usableGrip(),
         }, []);
       } });
+      // Same simulated tires and per-wheel ground as a rival in the game.
+      const tires = new CarTires(new TireSession(), () => 'rival', body, controller.model, surfaceAt, 1, () => wheels);
+      tires.apply();
       const first = route.waypoints[0];
       expect(body.place({ position: new Vector3(first.x, first.y, first.z), headingRad: route.heading })).toBe(true);
 
       let hint = 0, offRoad = 0, worst = 0, impacts = 0, previousSpeed = 0, elapsed = 0, finished = false;
       for (let step = 0; step < Math.round(420 / world.fixedStep); step++) {
-        world.step();
+        world.step(); tires.step(world.fixedStep);
         elapsed += world.fixedStep;
         const speed = controller.model.state.vx;
         let nearest = hint, nearestDistance = Infinity;

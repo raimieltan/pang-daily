@@ -35,5 +35,9 @@ and re-derives handling. The `wheelsState` event carries fitment and the set's l
 (never the hidden condition). In the game, Phone · Baligya → Your parts has a Bolt on / Take off
 button on each wheel set, with the fitment and effects shown under the mounted set.
 
+Physics: the listed `grip` / `braking` modifiers and the set's wear only feed the stats sheet and
+prices. The car gets them per corner as tire parameters (`wheelSetup` → `game-core/tires` `WheelSetup`),
+so `physicalWheelModifiers` leaves the controller only weight and the gearing effect on acceleration.
+
 Not yet: ride-height control (fitment is computed at the current visual height), separate
 front/rear sets, tire wear per set, fitment affecting stats, and gating swaps to the talyer or garage.

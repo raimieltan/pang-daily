@@ -6,7 +6,8 @@ import { resolveHandlingPreset } from '../vehicles/handling/HandlingConfig';
 import { HANDLING_PRESETS } from '../vehicles/handling/presets';
 import type { RaceDefinition } from './Race';
 import { buildRacingLine, carLimits } from './racingLine';
-import { rivalBuildStats, type RaceTier } from './rivals';
+import { rivalBuildStats, rivalWheelSetup, type RaceTier } from './rivals';
+import { STOCK_SETUP } from '@/game-core/tires';
 
 /**
  * Share of the car's cornering and braking limit each tier drives at. The final tier
@@ -18,9 +19,12 @@ export const TIER_PACE: Readonly<Record<RaceTier, number>> = { 1: .8, 2: .85, 3:
 export function rivalCar(route: RaceDefinition) {
   const definition = playerCar(route.rival ? npcCarId(NPC_CAR_BUILDS[route.rival.build]) : null);
   const base = resolveHandlingPreset(HANDLING_PRESETS, definition.handlingPreset);
-  const config = route.rival ? performanceHandling(base, calculateVehiclePerformance(definition.spec).stats,
-    rivalBuildStats(route.rival.build)) : base;
-  return { definition, config };
+  const stock = calculateVehiclePerformance(definition.spec).stats;
+  // `config` is the car as a whole (line planning); `physics` drives it, with the wheel set's grip
+  // left to the simulated tires (`wheels`) so it isn't counted twice.
+  const config = route.rival ? performanceHandling(base, stock, rivalBuildStats(route.rival.build)) : base;
+  const physics = route.rival ? performanceHandling(base, stock, rivalBuildStats(route.rival.build, { physical: true })) : base;
+  return { definition, config, physics, wheels: route.rival ? rivalWheelSetup(route.rival.build) : STOCK_SETUP };
 }
 
 /** Full-width minimum-time line and speed plan for this rival's car. */

@@ -23,6 +23,7 @@ export function AIDebugPanel() {
         <Row label="Offset line / race / target" value={`${m(ai.lineOffset)} / ${m(ai.racecraftOffset)} / ${m(ai.targetOffset)}`} />
         <Row label="Vehicle ahead / traffic limited" value={`${ai.vehicleAhead ? "yes" : "no"} / ${ai.trafficLimited ? "yes" : "no"}`} />
         <Row label="Progress" value={m(ai.routeS)} />
+        {ai.tires && <Row label="Tires FL/FR/RL/RR" value={ai.tires.map(t => t === 'HEALTHY' ? 'ok' : t.toLowerCase()).join(' · ')} />}
         <Bar label="Throttle" value={ai.throttle} />
         <Bar label="Brake" value={ai.brake} />
         <Bar label="Steer" value={ai.steering} signed />

@@ -9,9 +9,10 @@ import type { Interactable } from "../interaction/Interaction";
 import type { InteractionSystem } from "../interaction/InteractionSystem";
 import type { PlayerModes } from "../player/PlayerModes";
 import type { PlayerVehicle } from "./PlayerVehicle";
+import { CarTires } from "./CarTires";
 import {
-  CORNER_IDS, CORNER_NAMES, applyTireService, tireServiceLines, type TireServiceLine, TIRE_SPECS, impactPuncture, isFlat, isLowPressure, loadTireSession, nextCornerStep, performStep,
-  pressureRatio, puncture, stepAssembly, stepLabel, tireResponse, type CornerId, type FailureState, type TireAssembly,
+  CORNER_IDS, CORNER_NAMES, applyTireService, tireServiceLines, type TireServiceLine, TIRE_SPECS, isFlat, isLowPressure, loadTireSession, nextCornerStep, performStep,
+  pressureRatio, puncture, stepLabel, type CornerId, type FailureState, type TireAssembly,
   type TireEvent, type TireSession, type TireSurface, type WheelChangeStep,
 } from "@/game-core/tires";
 
@@ -49,7 +50,6 @@ export type TireTelemetry = {
   }[];
 };
 
-const SURFACE_INTERVAL = 0.1;
 const TELEMETRY_INTERVAL = 0.2;
 const SAVE_INTERVAL = 5;
 /** How far the jack raises the body at its corner, and how far that wheel then hangs clear. */
@@ -69,14 +69,13 @@ const SOFT: readonly TireSurface[] = ["grass"];
 export class TireSystem implements GameSystem {
   readonly name = "tires";
   readonly session: TireSession;
-  private readonly surfaces: TireSurface[] = ["asphalt", "asphalt", "asphalt", "asphalt"];
-  private surfaceAge = Infinity;
+  readonly sim: CarTires;
+  private get surfaces() { return this.sim.surfaces; }
   private telemetryAge = 0;
   private saveAge = 0;
   private dirty = false;
   private lastStatus = "";
   private readonly overspeed = [false, false, false, false];
-  private seed: number;
   private readonly releases: (() => void)[] = [];
   private readonly tmp = new Vector3();
   private jackMesh?: Mesh;
@@ -89,12 +88,12 @@ export class TireSystem implements GameSystem {
     private readonly player: PlayerVehicle,
     /** On-foot modes for wheel-change prompts and blocking the driver's seat; absent in the test track. */
     private readonly modes: PlayerModes | undefined,
-    private readonly surfaceAt: (x: number, z: number) => TireSurface,
+    surfaceAt: (x: number, z: number) => TireSurface,
     storage?: StoragePort | TireSession,
     seed = 0x7123,
   ) {
     this.session = storage && "vehicle" in storage ? storage : loadTireSession(storage as StoragePort | undefined);
-    this.seed = seed;
+    this.sim = new CarTires(this.session, () => player.id, player.body, player.controller.model, surfaceAt, seed, () => player.tireSetup);
     this.session.vehicle(player.id);
     this.releases.push(player.onImpact((strength, point) => this.impact(strength, point)));
     this.releases.push(bridge.handle("debugPuncture", ({ corner, failure }) => this.fail(corner, failure)));
@@ -174,24 +173,9 @@ export class TireSystem implements GameSystem {
 
   update(dt: number): void {
     if (dt <= 0) return;
-    const model = this.player.controller.model;
-    this.surfaceAge += dt;
-    if (this.surfaceAge >= SURFACE_INTERVAL) {
-      this.surfaceAge = 0;
-      this.player.body.wheels.forEach((wheel, i) => {
-        this.player.body.toWorld(wheel.local, this.tmp);
-        this.surfaces[i] = this.surfaceAt(this.tmp.x, this.tmp.z);
-      });
-    }
     let changed = false;
-    CORNER_IDS.forEach((corner, i) => {
-      const tire = this.session.mounted(this.player.id, corner);
-      if (!tire) return;
-      const speed = model.corners[i].grounded ? model.corners[i].wheelSpeed : 0;
-      if (Math.abs(speed) > 0.05 || tire.leakKpaPerMin > 0) this.dirty = true;
-      const events = stepAssembly(tire, dt, speed, this.surfaces[i], this.random());
-      if (events.length) changed = this.report(corner, tire, events) || changed;
-    });
+    for (const { corner, tire, events } of this.sim.step(dt)) changed = this.report(corner, tire, events) || changed;
+    this.dirty ||= this.player.speedKmh > 0.2 || CORNER_IDS.some((c) => (this.session.mounted(this.player.id, c)?.leakKpaPerMin ?? 0) > 0);
     this.apply();
     this.animateJack(dt);
     this.saveAge += dt;
@@ -203,26 +187,8 @@ export class TireSystem implements GameSystem {
 
   /** Pushes every corner's tire to the handling model and the visuals. */
   private apply() {
-    const car = this.car;
-    const model = this.player.controller.model;
-    CORNER_IDS.forEach((corner, i) => {
-      const tire = this.session.assembly(car.corners[corner]);
-      const input = model.tires[i];
-      input.installed = !!tire;
-      input.raised = car.jacked === corner;
-      if (tire) Object.assign(input, tireResponse(tire, this.surfaces[i]));
-      this.visual(i, tire);
-    });
-  }
-
-  private visual(i: number, tire: TireAssembly | undefined) {
-    const wheel = this.player.visual.model.wheels.find((w) => w.id === this.player.body.wheels[i].id);
-    if (wheel) {
-      wheel.socket.setEnabled(!!tire);
-      const squash = !tire ? 1 : isFlat(tire) ? 0.84 : 1 - 0.1 * Math.max(0, 0.8 - pressureRatio(tire));
-      const donut = tire?.spec === "donut";
-      wheel.socket.scaling.set(donut ? 0.6 : 1, squash * (donut ? 0.86 : 1), donut ? 0.86 : 1);
-    }
+    this.sim.apply();
+    this.sim.showWheels(this.player.visual.model.wheels);
   }
 
   /**
@@ -295,18 +261,8 @@ export class TireSystem implements GameSystem {
   }
 
   private impact(strength: number, point: Vector3 | null | undefined) {
-    const { body } = this.player;
-    let corner: CornerId = CORNER_IDS[0], best = Infinity;
-    body.wheels.forEach((wheel, i) => {
-      body.toWorld(wheel.local, this.tmp);
-      const d = point ? Vector3.DistanceSquared(point, this.tmp) : i;
-      if (d < best) { best = d; corner = CORNER_IDS[i]; }
-    });
-    // Only hits near a wheel can reach the tire.
-    if (point && best > 1.1 ** 2) return;
-    const tire = this.session.mounted(this.player.id, corner);
-    const failure = tire && impactPuncture(tire, strength, this.random());
-    if (failure) this.fail(corner, failure);
+    const hit = this.sim.impact(strength, point);
+    if (hit) this.fail(hit.corner, hit.failure);
   }
 
   private fail(corner: CornerId, failure: "SLOW_LEAK" | "RAPID_LEAK" | "BLOWOUT") {
@@ -387,14 +343,6 @@ export class TireSystem implements GameSystem {
         };
       }),
     };
-  }
-
-  /** Mulberry32: deterministic hazard and impact rolls. */
-  private random() {
-    let t = (this.seed = (this.seed + 0x6d2b79f5) | 0);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
   dispose(): void {

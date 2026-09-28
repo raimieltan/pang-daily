@@ -14,6 +14,9 @@ import { VehicleController } from '../vehicles/VehicleController';
 import { AIDriver, DRIVER_SKILLS } from './AIDriver';
 import { MIDNIGHT_RUN } from './raceCalendar';
 import { rivalCar, rivalLine } from './rivalDriver';
+import { CarTires } from '../vehicles/CarTires';
+import { TireSession } from '@/game-core/tires';
+import { surfaceResolver } from '../world/surfaceAt';
 
 const require = createRequire(import.meta.url);
 let havok: Awaited<ReturnType<typeof loadHavok>>;
@@ -27,8 +30,9 @@ it('Sean finishes the full Chapter One route faster than a perfect stock-car pla
   const world = new PhysicsWorld(scene, havok), kit = new WorldKit(scene);
   const chunks = HUB_LAYOUT.chunks.map(chunk => buildChunk(scene, chunk, kit));
   const mountain = new MountainWorld(scene, kit);
+  const surfaceAt = surfaceResolver(HUB_LAYOUT);
   const route = MIDNIGHT_RUN;
-  const { definition, config } = rivalCar(route);
+  const { definition, config, physics, wheels } = rivalCar(route);
   const line = rivalLine(route, config);
   const body = new VehicleBody(world, definition.collision, config.chassis.massKg, 'test-sean');
   const seed = 'Sean'.split('').reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 1);
@@ -37,23 +41,26 @@ it('Sean finishes the full Chapter One route faster than a perfect stock-car pla
     riskTolerance: .5, trafficRiskTolerance: .3, mistakeFrequency: .4,
   }, config.brakes.decelerationMps2, config.chassis.wheelbaseM, seed, line.limits);
   let controller: VehicleController;
-  controller = new VehicleController(world, body, config, { read: () => {
+  controller = new VehicleController(world, body, physics, { read: () => {
     body.updateAxes();
     const model = controller.model;
     return driver.update(world.fixedStep, {
       position: body.position, heading: Math.atan2(body.forward.x, body.forward.z), speed: model.state.vx,
       yawRate: model.state.yawRate, lateralSlip: model.diagnostics.bodySlip,
       frontGripUsage: model.diagnostics.frontGripUse, rearGripUsage: model.diagnostics.rearGripUse,
-      grip: model.surfaceGrip,
+      grip: model.surfaceGrip * tires.usableGrip(),
     }, []);
   } });
+  // Same simulated tires and per-wheel ground as a rival in the game.
+  const tires = new CarTires(new TireSession(), () => 'rival', body, controller.model, surfaceAt, 1, () => wheels);
+  tires.apply();
   const first = route.waypoints[0];
   expect(body.place({ position: new Vector3(first.x + 2.8, first.y, first.z), headingRad: route.heading })).toBe(true);
 
   let elapsed = 0, finished = false, maxSpeed = 0;
   let hint = 0, offRoad = 0, worst = 0, impacts = 0, previousSpeed = 0;
   for (let step = 0; step < Math.round(400 / world.fixedStep); step++) {
-    world.step(); elapsed += world.fixedStep;
+    world.step(); tires.step(world.fixedStep); elapsed += world.fixedStep;
     const speed = controller.model.state.vx;
     maxSpeed = Math.max(maxSpeed, speed);
     let nearest = hint, distance = Infinity;

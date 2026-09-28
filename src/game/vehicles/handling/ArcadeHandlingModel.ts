@@ -61,6 +61,8 @@ export type WheelCorner = (typeof CORNERS)[number];
 export type CornerTire = {
   /** Friction scale from tire spec, pressure, health and surface. */
   grip: number;
+  /** Extra scale on braking/traction friction only (compound bias); the friction ellipse's long axis. */
+  longitudinalGrip: number;
   /** Peak slip angle scale: >1 = softer, slower-building lateral force (low pressure, donut). */
   slipScale: number;
   /** Extra rolling resistance as a share of this corner's normal load (0.015 = 1.5% of load). */
@@ -92,7 +94,7 @@ export type CornerForces = {
   steerAngle: number;
 };
 
-export const NEUTRAL_CORNER: CornerTire = { grip: 1, slipScale: 1, rollingResistance: 0, installed: true, raised: false };
+export const NEUTRAL_CORNER: CornerTire = { grip: 1, longitudinalGrip: 1, slipScale: 1, rollingResistance: 0, installed: true, raised: false };
 /** Slip ratio at which a healthy tire peaks; used to estimate wheel spin/lock from force demand. */
 const PEAK_SLIP_RATIO = 0.1;
 
@@ -355,8 +357,9 @@ export class ArcadeHandlingModel {
     // Extra rolling drag from soft, flat or damaged tires, opposing each corner's own motion.
     const rolling = loads.map((load, i) => this.tires[i].rollingResistance * load *
       (this.tires[i].installed && !this.tires[i].raised ? 1 : 0) * Math.min(1, speed / 0.5) * motion);
-    const frontAxle = axlePair(frontDrive, frontRetard, 0, rolling[0], rolling[1], caps[0], caps[1], this.frontLatDemand, c.assists.traction, ABS_LIMIT);
-    const rearAxle = axlePair(rearDrive, rearRetard, handbrakeForce, rolling[2], rolling[3], caps[2], caps[3], this.rearLatDemand, c.assists.traction, handbrake > 0 ? 1 : ABS_LIMIT);
+    const longCaps = caps.map((cap, i) => cap * this.tires[i].longitudinalGrip);
+    const frontAxle = axlePair(frontDrive, frontRetard, 0, rolling[0], rolling[1], longCaps[0], longCaps[1], this.frontLatDemand, c.assists.traction, ABS_LIMIT);
+    const rearAxle = axlePair(rearDrive, rearRetard, handbrakeForce, rolling[2], rolling[3], longCaps[2], longCaps[3], this.rearLatDemand, c.assists.traction, handbrake > 0 ? 1 : ABS_LIMIT);
     const fxs = [frontAxle.left, frontAxle.right, rearAxle.left, rearAxle.right];
     const frontFx = { force: fxs[0].force + fxs[1].force, driveApplied: fxs[0].drive + fxs[1].drive };
     const rearFx = { force: fxs[2].force + fxs[3].force, driveApplied: fxs[2].drive + fxs[3].drive };
@@ -377,7 +380,9 @@ export class ArcadeHandlingModel {
     const rearSlidingGrip = 1 - 0.3 * smoothstep(10 * DEG, 30 * DEG, Math.abs(rearSlip));
     const fys = caps.map((cap, i) => {
       const front = i < 2;
-      const latCap = Math.sqrt(Math.max(0, cap ** 2 - fxs[i].force ** 2));
+      // Friction ellipse: longitudinal use is measured against the longitudinal cap.
+      const longUse = longCaps[i] > 0 ? fxs[i].force / longCaps[i] : 0;
+      const latCap = cap * Math.sqrt(Math.max(0, 1 - longUse ** 2));
       const curve = tireCurve((front ? frontSlip : rearSlip) / ((front ? d.frontPeakSlip : d.rearPeakSlip) * this.tires[i].slipScale),
         front ? c.balance.understeer : c.balance.rearSlideFalloff);
       return { force: -latCap * curve * (front ? 1 : rearSlidingGrip), curve };

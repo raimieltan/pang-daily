@@ -182,7 +182,9 @@ export const hubScene: SceneDefinition = {
       fuelLiters: () => session.summary(maintainedCar.definition.spec).fuelLiters ?? 0,
       boards: zones.filter((zone) => zone.action === "browse_jobs"), marker: new JobMarker(scene),
     });
-    const tires = new TireSystem(bridge, maintainedCar, modes, surfaceResolver(CONNECTED_LAYOUT), socialStorage);
+    const surfaceAt = surfaceResolver(CONNECTED_LAYOUT);
+    race.setSurfaces(surfaceAt);
+    const tires = new TireSystem(bridge, maintainedCar, modes, surfaceAt, socialStorage);
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions, tires.interactions]));
     tires.connect(interactions);
     addSystem(tires);

@@ -28,6 +28,8 @@ import { VehicleBody } from '../vehicles/VehicleBody';
 import { VehicleController } from '../vehicles/VehicleController';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
 import type { TrafficSystem } from '../traffic/TrafficSystem';
+import { CarTires } from '../vehicles/CarTires';
+import { CORNER_IDS, TireSession, puncture, type TireSurface } from '@/game-core/tires';
 
 export class RaceSystem implements GameSystem {
   readonly name = "race";
@@ -61,6 +63,12 @@ export class RaceSystem implements GameSystem {
   private raceLine?: RaceLineVisual;
   private traffic?: TrafficSystem;
   setTraffic(traffic: TrafficSystem) { this.traffic = traffic; }
+  private surfaceAt: (x: number, z: number) => TireSurface = () => 'asphalt';
+  /** Ground lookup for the rival's tires (the same one the player's tires use). */
+  setSurfaces(surfaceAt: (x: number, z: number) => TireSurface) { this.surfaceAt = surfaceAt; }
+  /** The rival's four simulated tires; a fresh, unsaved set every race. */
+  private rivalTires?: CarTires;
+  private releaseRivalImpact?: () => void;
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
     private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE],
     private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn" | "snapshot"> & Partial<Pick<VehicleSession, "persistent" | "execute">>; access?: (raceId: string) => string | null } = {},
@@ -198,10 +206,16 @@ export class RaceSystem implements GameSystem {
     if (this.race.rival.departed) { this.root.setEnabled(false); this.disposeRival(); }
     this.respawnHold = Math.max(0, this.respawnHold - dt);
     if (this.pendingRespawn !== undefined) { this.respawnRival(this.pendingRespawn); this.pendingRespawn = undefined; }
+    if (this.rivalBody && this.rivalTires) {
+      this.rivalTires.step(dt);
+      const wheels = (this.current ?? this.visual)?.model.wheels;
+      if (wheels) this.rivalTires.showWheels(wheels);
+    }
     if (this.driver && (this.telemetryAge += dt) >= .2) {
       this.telemetryAge = 0;
       const snapshot = this.driver.debug();
-      if (snapshot) this.bridge.emit('aiTelemetry', { driverId: this.selected.rival?.name ?? 'rival', ...snapshot });
+      const tires = this.rivalTires && CORNER_IDS.map(c => this.rivalTires!.mounted(c)?.failure ?? 'DESTROYED');
+      if (snapshot) this.bridge.emit('aiTelemetry', { driverId: this.selected.rival?.name ?? 'rival', ...snapshot, tires });
     }
     (this.current ?? this.visual)?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
     this.gates.filter(g=>g.metadata.routeId===this.selected.id).forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
@@ -262,7 +276,7 @@ export class RaceSystem implements GameSystem {
   private createRival(route: RaceDefinition) {
     this.disposeRival();
     if (!this.world) return;
-    const { definition, config } = rivalCar(route);
+    const { definition, config, physics, wheels } = rivalCar(route);
     const tier = route.rival?.tier ?? 2;
     const skill = DRIVER_SKILLS[Math.min(3, Math.max(0, tier - 1))];
     const seed = (route.rival?.name ?? route.id).split('').reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 1);
@@ -303,7 +317,8 @@ export class RaceSystem implements GameSystem {
         position: body.position, heading: Math.atan2(body.forward.x, body.forward.z), speed: model.state.vx,
         yawRate: model.state.yawRate, lateralSlip: model.diagnostics.bodySlip,
         frontGripUsage: model.diagnostics.frontGripUse, rearGripUsage: model.diagnostics.rearGripUse,
-        grip: model.surfaceGrip, reversing: model.state.reversing,
+        // Tires the driver can feel: a flat or a grass verge means braking earlier and cornering slower.
+        grip: model.surfaceGrip * (this.rivalTires?.usableGrip() ?? 1), reversing: model.state.reversing,
       }, nearby, probes.sample(step, model.state.vx));
       // Applied in `update`, outside the physics step that is reading this input.
       if (result.respawnRequest) this.pendingRespawn = result.respawnRequest.routeS;
@@ -312,7 +327,21 @@ export class RaceSystem implements GameSystem {
     this.rivalBody = body;
     this.driver = driver;
     this.probes = probes;
-    this.rivalController = new VehicleController(this.world, body, config, source);
+    this.rivalController = new VehicleController(this.world, body, physics, source);
+    const rivalId = `rival-${route.id}`;
+    this.rivalTires = new CarTires(new TireSession(), () => rivalId, body, this.rivalController.model, this.surfaceAt, seed, () => wheels);
+    this.rivalTires.apply();
+    // Same hard-hit threshold as the player car: impulse / mass as a velocity change.
+    body.body.setCollisionCallbackEnabled(true);
+    const impacts = body.body.getCollisionObservable();
+    const observer = impacts.add((event) => {
+      const deltaV = Math.abs(event.impulse) / config.chassis.massKg;
+      if (deltaV < 2.4 || !this.rivalTires) return;
+      const hit = this.rivalTires.impact(Math.min(1, (deltaV - 2.4) / 7 + .2), event.point);
+      const tire = hit && this.rivalTires.mounted(hit.corner);
+      if (hit && tire) puncture(tire, hit.failure);
+    });
+    this.releaseRivalImpact = () => impacts.remove(observer);
   }
   /**
    * Puts a hopelessly stuck rival back on its line: on pavement, aligned with the road,
@@ -341,6 +370,12 @@ export class RaceSystem implements GameSystem {
     this.root.rotationQuaternion.copyFrom(this.rivalBody.node.rotationQuaternion!);
   }
   private disposeRival() {
+    this.releaseRivalImpact?.(); this.releaseRivalImpact = undefined;
+    // The dressed car is reused next race: put its wheels back to a fresh look.
+    if (this.rivalTires) {
+      for (const wheel of (this.current ?? this.visual)?.model.wheels ?? []) { wheel.socket.setEnabled(true); wheel.socket.scaling.set(1, 1, 1); }
+      this.rivalTires = undefined;
+    }
     this.rivalController?.dispose(); this.rivalBody?.dispose();
     this.rivalController = undefined; this.rivalBody = undefined; this.driver = undefined; this.probes = undefined;
   }

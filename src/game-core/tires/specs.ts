@@ -29,3 +29,10 @@ export const SURFACE_TIRE: Record<TireSurface, { grip: number; rolling: number; 
   grass: { grip: .68, rolling: .02, hazardPerKm: .004 },
   gravel: { grip: .74, rolling: .015, hazardPerKm: .03 },
 };
+
+/** Grip lost at bald tread: the definition's `tires → grip` condition hooks, now applied per tire. */
+export function treadGripLoss(definition: { condition: { effects: readonly { component: string; stat: string; maxLoss: number }[] } }) {
+  const kept = definition.condition.effects.filter(e => e.component === 'tires' && e.stat === 'grip')
+    .reduce((share, e) => share * (1 - e.maxLoss), 1);
+  return 1 - kept;
+}

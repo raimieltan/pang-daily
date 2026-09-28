@@ -13,6 +13,11 @@ separate. That module picks the look and small stat modifiers; this one decides 
 - **Response (`tireResponse`).** Turns pressure, health, spec and surface (`SURFACE_TIRE`) into the handling
   model's per-corner `grip`, `slipScale` and `rollingResistance`. A standard tire at nominal pressure on
   asphalt gives exactly 1 / 1 / 0.
+- **Wheel set and tread (`WheelSetup`).** The fitted road wheel set's compound grip, braking bias
+  (`longitudinalGrip`, which acts on the long axis of the friction ellipse) and rim wear, plus the
+  maintenance `tires` condition as tread (with the definition's grip loss at bald), apply per road tire.
+  The controller sees tire condition and wheel grip as neutral, so nothing is counted twice. The stats sheet
+  and repair prices still show them.
 - **Donut.** Less grip, softer response, more drag. `recommendedMaxKph` is advisory only: above it the tire
   wears fast, but nothing caps the car.
 - **Session (`TireSession`, save key `pang-daily.tires.v1`).** Per vehicle it stores the corners, spare,
@@ -42,4 +47,6 @@ Jack: the saved jack state animates the visual. The chassis pivots about the opp
 the jacked wheel hangs clear and the jack grows under the sill. The physics body stays level, and the
 handling model already treats that corner as ungrounded.
 
-Not yet: AI cars on simulated tires, and tire service on server-synced saves.
+Race rivals run the same `CarTires` simulation on a fresh unsaved set each race: per-wheel ground, impact punctures and flat wear. Their driver plans speed from `usableGrip()`, and their dressed car shows flats. Rival tire states appear in the Race AI debug panel.
+
+Not yet: tire service on server-synced saves.

@@ -93,7 +93,7 @@ export type GameEventMap = {
   vehicleTelemetry: VehicleTelemetry;
   vehicleDebugInfo: VehicleDebugInfo;
   /** Race AI debug readout, ~5 Hz while a rival drives. */
-  aiTelemetry: import('../races/AIDriver').AIDebugSnapshot & { driverId: string };
+  aiTelemetry: import('../races/AIDriver').AIDebugSnapshot & { driverId: string; /** Rival tire states, FL/FR/RL/RR. */ tires?: import('../../game-core/tires').FailureState[] };
   /** Entered or left a hub location's area. */
   locationEntered: LocationChange;
   locationExited: LocationChange;

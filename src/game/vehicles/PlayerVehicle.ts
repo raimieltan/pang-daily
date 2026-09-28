@@ -21,7 +21,8 @@ import { combineModifiers, NO_MODIFIERS, PRISTINE_CONDITION, type StatModifiers 
 import { exteriorEffects, NO_EXTERIOR_EFFECTS, resolveBodyPartLook, type BodyPart, type ExteriorEffects, type FittedBodyPart, type PaintFinish } from "../../game-core/exterior";
 import type { ExteriorSlot } from "../../game-core/vehicles/VehicleDefinition";
 import { BodyPartSwapper, type BodyPartAssetSource } from "./BodyPartSwapper";
-import { calculateFitment, wheelModifiers, type Fitment, type WheelPart } from "../../game-core/wheels";
+import { calculateFitment, physicalWheelModifiers, wheelModifiers, wheelSetup, type Fitment, type WheelPart } from "../../game-core/wheels";
+import { treadGripLoss, type WheelSetup } from "../../game-core/tires";
 import { WheelSwapper, type WheelAssetSource } from "./WheelSwapper";
 import type { VehicleCondition } from "../../game-core/vehicles/VehicleDefinition";
 import type { WearSample } from "../../game-core/maintenance/condition";
@@ -87,6 +88,11 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.setCondition(this.condition);
   }
   private wheelEffects: StatModifiers = NO_MODIFIERS;
+  private wheelSet: Omit<WheelSetup, "tread" | "treadGripLoss"> = wheelSetup(null);
+  /** Road wheel set and tread for the tire simulation; see `setCondition`. */
+  get tireSetup(): WheelSetup {
+    return { ...this.wheelSet, tread: this.condition.tires, treadGripLoss: treadGripLoss(this.definition.spec) };
+  }
   private bodyEffects: ExteriorEffects = NO_EXTERIOR_EFFECTS;
   readonly wheels: WheelSwapper;
   private readonly impactListeners = new Set<(strength: number, point: Vector3 | null | undefined) => void>();
@@ -264,7 +270,11 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.controller.engineOperational = condition.engine > 0;
     this.calculatedPerformance = calculateVehiclePerformance(this.definition.spec, this.performanceParts, this.condition,
       { modifiers: combineModifiers(this.wheelEffects, this.bodyEffects.modifiers) }).stats;
-    this.controller.setPerformance(this.baseConfig, calculateVehiclePerformance(this.definition.spec).stats, this.performanceStats);
+    // The stats sheet keeps tire wear and the wheel set's grip; the physics gets them per corner
+    // through the simulated tires (`tireSetup`), so the controller sees them neutral.
+    const physics = calculateVehiclePerformance(this.definition.spec, this.performanceParts, { ...this.condition, tires: 1 },
+      { modifiers: combineModifiers(physicalWheelModifiers(this.wheelEffects), this.bodyEffects.modifiers) }).stats;
+    this.controller.setPerformance(this.baseConfig, calculateVehiclePerformance(this.definition.spec).stats, physics);
   }
 
   /** The wheel part on the car (null = stock wheels). */
@@ -285,6 +295,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   async equipWheels(part: WheelPart | null, condition: number | null = 1): Promise<boolean> {
     if (!(await this.wheels.equip(part))) return false;
     this.wheelEffects = wheelModifiers(this.definition.spec, part, condition);
+    this.wheelSet = wheelSetup(part, condition);
     this.setCondition(this.condition);
     this.onVisualsChanged?.();
     return true;

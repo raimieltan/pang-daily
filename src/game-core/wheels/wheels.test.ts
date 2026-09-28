@@ -4,7 +4,7 @@ import { BANWA_DALAGAN_1996 } from "../vehicles/catalog";
 import { parseVehicleDefinition, wheelSocketName, WHEEL_IDS, type VehicleDefinition } from "../vehicles/VehicleDefinition";
 import { resolveVehicleStats } from "../vehicles/vehicleStats";
 import { calculateFitment } from "./fitment";
-import { BENT_RIM_GRIP_LOSS, wheelModifiers } from "./modifiers";
+import { BENT_RIM_GRIP_LOSS, physicalWheelModifiers, wheelModifiers, wheelSetup } from "./modifiers";
 import { WHEEL_PARTS, wheelPart } from "./catalog";
 import { parseWheelPart } from "./WheelPart";
 
@@ -107,3 +107,14 @@ describe("wheelModifiers", () => {
     expect(wheelModifiers(car, mags, null)).toEqual(wheelModifiers(car, mags, 1));
   });
 });
+
+describe("wheel set as tire parameters", () => {
+  it("moves grip, braking bias and rim wear to the tires and keeps only weight and gearing on the car", () => {
+    const mags = wheelPart("mags_15_4x100")!;
+    expect(wheelSetup(mags, .25)).toEqual({ gripScale: 1.06, longitudinalScale: 1.03, rimWear: .75 });
+    expect(wheelSetup(null)).toEqual({ gripScale: 1, longitudinalScale: 1, rimWear: 0 });
+    const listed = wheelModifiers(car, mags, .25);
+    expect(physicalWheelModifiers(listed)).toEqual({ ...listed, grip: 1, braking: 1 });
+  });
+});
+
