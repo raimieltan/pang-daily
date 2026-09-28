@@ -84,7 +84,7 @@ export class VehicleSession {
   }
   repair(definition: VehicleDefinition, quote: RepairQuote, selected: readonly ServiceComponent[]): RepairReceipt | { rejected: string } {
     const car = this.state.vehicles[definition.id];
-    if (!car || quote.vehicleId !== definition.id || quote.revision !== car.revision) return { rejected: 'Condition changed. Ask Mang Boy for a new inspection.' };
+    if (!car || quote.vehicleId !== definition.id || quote.revision !== car.revision) return { rejected: 'Condition changed. Ask Tito Jun for a new inspection.' };
     if (!Array.isArray(selected) || selected.length === 0 || selected.some(key => !SERVICE_COMPONENTS.includes(key))) return { rejected: 'Choose at least one repair.' };
     const components = [...new Set<ServiceComponent>(selected)];
     if (quote.benefitId) {

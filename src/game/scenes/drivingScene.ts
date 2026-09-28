@@ -79,10 +79,10 @@ export const drivingScene: SceneDefinition = {
     player.onPlaced = () => chase.snap();
     addSystem(player);
     addSystem(new MaintenanceSystem(bridge, session, player, () => controls.enabled));
-    addSystem(new CustomizationSystem(bridge, inventory, player, () => 'Visit Mang Boy’s talyer for paint and suspension.'));
+    addSystem(new CustomizationSystem(bridge, inventory, player, () => 'Visit Tito Jun’s talyer for paint and suspension.'));
     addSystem(new WheelSystem(bridge, inventory, player));
   addSystem(new PerformanceSystem(inventory, player));
-    addSystem(new ExteriorSystem(bridge, inventory, player, () => 'Visit Mang Boy’s talyer to fit exterior parts.'));
+    addSystem(new ExteriorSystem(bridge, inventory, player, () => 'Visit Tito Jun’s talyer to fit exterior parts.'));
     addSystem(chase);
   },
 };

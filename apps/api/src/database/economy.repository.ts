@@ -16,7 +16,7 @@ import { generateListing, listingView, type Listing } from '@pang-daily/game-cor
 import { HUB_JOBS } from '@pang-daily/game-core/jobs/catalog';
 import { completeObjective, jobPayout, type JobRun } from '@pang-daily/game-core/jobs/jobs';
 import { FUEL_PRICE_PHP_PER_LITER } from '@pang-daily/game-core/economy/economy';
-import { raceEconomy } from '@pang-daily/game-core/economy/raceRules';
+import { raceEconomy, raceOutcome } from '@pang-daily/game-core/economy/raceRules';
 import { SOCIAL_REPEAT_LIMITS } from '@pang-daily/game-core/social/rules';
 import { evaluateEligibility } from '@pang-daily/game-core/social/eligibility';
 import { SOCIAL_OPPORTUNITIES, opportunity } from '@pang-daily/game-core/social/opportunities';
@@ -339,7 +339,12 @@ export class EconomyRepository {
             await tx.raceResult.update({ where: { id: row.id }, data: { checkpointIndex: a.checkpointIndex, lastCheckpointElapsedMs: BigInt(a.elapsedMs) } }); receipt.resourceId = row.attemptId; break;
           }
           if (a.finish && (row.checkpointIndex !== race.checkpoints || a.elapsedMs < race.minimumTimeMs)) refuse('INVALID_RACE_FINISH', 'The route or finish time is invalid.');
-          const outcome = !a.finish ? 'dnf' : a.elapsedMs < race.rivalTimeMs ? 'win' : 'loss';
+          // New clients report the measured physical rival finish. Older clients retain the
+          // published benchmark, which also keeps existing in-flight attempts compatible.
+          const rivalTime = a.opponentElapsedMs === undefined ? race.rivalTimeMs : a.opponentElapsedMs;
+          if (rivalTime !== null && rivalTime < race.minimumTimeMs)
+            refuse('INVALID_RACE_TIME', 'Rival finish time is outside the valid race window.');
+          const outcome = raceOutcome(a.finish, a.elapsedMs, a.opponentElapsedMs, race.rivalTimeMs);
           const rewards = await tx.transaction.count({ where: { playerId, kind: 'RACE_REWARD', source: `race:${race.id}` } });
           const prizePhp = outcome === 'win' && rewards < SOCIAL_REPEAT_LIMITS.racePerRoute ? race.prizePhp : 0;
           const paid = prizePhp ? await pay(php(prizePhp), 'RACE_REWARD', `race:${race.id}`, row.attemptId, `Won ${race.id}`, row.vehicleId) : null;

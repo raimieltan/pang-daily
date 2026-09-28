@@ -2,7 +2,7 @@
 
 The vertical slice tracks engine, transmission, brakes, suspension and tires on the existing 0–1 vehicle-condition schema. The starter uses its authored, already-worn condition. Body/electrical remain in the schema for compatibility, but this loop does not wear or service them.
 
-Drive or race, park on the talyer apron or in a service bay, get out with F, then use **Inspect car · Mang Boy** inside a bay. Inspection is free. Select repairs in the itemized panel and pay; selected systems return to 100%, money is deducted once, and a receipt appears. The remaining systems retain their condition. Leaving the workshop closes the quote. The HUD shows all five condition values and cash.
+Drive or race, park on the talyer apron or in a service bay, get out with F, then use **Inspect car · Tito Jun** inside a bay. Inspection is free. Select repairs in the itemized panel and pay; selected systems return to 100%, money is deducted once, and a receipt appears. The remaining systems retain their condition. Leaving the workshop closes the quote. The HUD shows all five condition values and cash.
 
 The first-session wallet is ₱5,000. This is a starting allowance, not a race reward system. An all-components starter repair costs more than the starting balance, so players choose what to fix. Costs are whole pesos, rounded up to ₱10, with parts and labor included. There is no real money or backend transaction.
 

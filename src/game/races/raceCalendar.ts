@@ -6,7 +6,7 @@ import { laneWaypoints, mountainRace, OVERLOOK_S, ROUTE_LENGTH } from '../world/
 import type { Gate, Point, RaceDefinition, Waypoint } from './Race';
 import { rival } from './rivals';
 
-type Flat = { x: number; z: number };
+type Flat = { x: number; z: number; width?: number; roadOffset?: number };
 const box = (id: string, p: Flat): Gate => ({ id, center: { x: p.x, y: 1, z: p.z }, halfSize: { x: 6, y: 4, z: 6 } });
 
 /**
@@ -16,11 +16,11 @@ const box = (id: string, p: Flat): Gate => ({ id, center: { x: p.x, y: 1, z: p.z
 function paced(points: readonly Flat[], cap: number, lateral = 4.5): Waypoint[] {
   return points.map((p, i) => {
     const a = points[Math.max(0, i - 2)], b = points[Math.min(points.length - 1, i + 2)];
-    if (a === p || b === p) return { x: p.x, y: 0, z: p.z, speed: cap };
+    if (a === p || b === p) return { ...p, y: 0, speed: cap };
     const turn = Math.abs(Math.atan2(Math.sin(Math.atan2(b.x - p.x, b.z - p.z) - Math.atan2(p.x - a.x, p.z - a.z)),
       Math.cos(Math.atan2(b.x - p.x, b.z - p.z) - Math.atan2(p.x - a.x, p.z - a.z))));
     const radius = turn < 1e-4 ? Infinity : Math.hypot(b.x - a.x, b.z - a.z) / (2 * Math.sin(turn / 2));
-    return { x: p.x, y: 0, z: p.z, speed: Math.min(cap, Math.sqrt(radius * lateral)) };
+    return { ...p, y: 0, speed: Math.min(cap, Math.sqrt(radius * lateral)) };
   });
 }
 
@@ -29,7 +29,7 @@ function lane(center: readonly Flat[], from: number, to: number, offset: number)
   const length = polylineLength(center), out: Flat[] = [];
   for (let s = from; s <= to; s += 3) {
     const p = pointAlong(center, ((s % length) + length) % length);
-    out.push({ x: p.x + p.dirZ * offset, z: p.z - p.dirX * offset });
+    out.push({ x: p.x + p.dirZ * offset, z: p.z - p.dirX * offset, width: 9, roadOffset: offset });
   }
   return out;
 }
@@ -50,7 +50,7 @@ export const KYO_BLOCK_LAP: RaceDefinition = {
   checkpoints: [box('Suki 24 corner', at(LOOP_START + 140)), box('Home straight', at(LOOP_START + 280)),
     box('Kyo bend', at(LOOP_START + 470)), box('Main road', at(LOOP_START + 640))],
   finish: box('Bahandi line', at(LOOP_LENGTH + LOOP_START - 20)),
-  waypoints: paced(lane(LOOP, LOOP_START, LOOP_LENGTH + LOOP_START + 60, 3.5), 19),
+  waypoints: paced(lane(LOOP, LOOP_START, LOOP_LENGTH + LOOP_START + 60, 2), 19),
   rival: rival({ name: 'Jun-jun', paint: '#c3b18e', build: 'donor_daily', tier: 1, prizePhp: RACE_REWARDS.kyo_block_lap }),
 };
 
@@ -93,9 +93,10 @@ export const MIDNIGHT_RUN: RaceDefinition = {
   waypoints: [...paced([...KYO_EXIT].flatMap((p, i, all) => {
     // Densify the town leg so curvature pacing sees the corner.
     const next = all[i + 1];
-    if (!next) return [p];
+    if (!next) return [{ ...p, width: 10, roadOffset: 2 }];
     const n = Math.max(1, Math.ceil(Math.hypot(next.x - p.x, next.z - p.z) / 3));
-    return Array.from({ length: n }, (_, k) => ({ x: p.x + (next.x - p.x) * k / n, z: p.z + (next.z - p.z) * k / n }));
+    return Array.from({ length: n }, (_, k) => ({ x: p.x + (next.x - p.x) * k / n, z: p.z + (next.z - p.z) * k / n,
+      width: 10, roadOffset: 2 }));
   }), 19), ...mountainLane],
   rival: rival({ name: 'Sean', paint: '#1f4f9e', build: 'sean_evo_tribute', tier: 5, prizePhp: RACE_REWARDS.midnight_run }),
 };

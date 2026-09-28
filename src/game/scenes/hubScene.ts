@@ -171,7 +171,7 @@ export const hubScene: SceneDefinition = {
     // NPC cars clone whichever owned car their build names; both are loaded by now.
     const npcModels = () => ({ [driven.spec.id]: player.visual.model, [otherDefinition.spec.id]: garage?.model ?? npcTemplate! });
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES, ...RACE_CALENDAR],
-      { models: npcModels, wallet: session, access: new SocialOpportunityService(bridge, socialStorage).raceRejection }));
+      { models: npcModels, wallet: session, access: new SocialOpportunityService(bridge, socialStorage).raceRejection }, world));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
     const maintainedCar = player;
     const jobSystem = new JobSystem(bridge, jobs, {
@@ -197,7 +197,7 @@ export const hubScene: SceneDefinition = {
     });
     talyerSystem = addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
       () => race.race.phase === 'RUNNING', { interactions, rejection: talyer, onTalk: () => dialogue.open('talyer_mang_boy') }));
-    // Marketplace parts ride in the trunk: bring the car to Mang Boy to have one inspected.
+    // Marketplace parts ride in the trunk: bring the car to Tito Jun to have one inspected.
     market.useWorkshop({ rejection: talyer });
     addSystem(new FuelSystem(bridge, session, maintainedCar.definition.spec, {
       interactions, rejection: () => fuelRejection({ mode: modes.mode, player: modes.position,
@@ -225,6 +225,7 @@ export const hubScene: SceneDefinition = {
     const roadUser = () => ({ x: car.position.x, y: car.position.y, z: car.position.z, speed: car.speed, heading: Math.atan2(car.forward.x, car.forward.z) });
     const sedanModel = driven === STARTER_SEDAN ? player.visual.model : garage?.model ?? npcTemplate!;
     const traffic = addSystem(new TrafficSystem(scene, kit, world, sedanModel, TRAFFIC_LANES, roadUser, () => lighting.mood.headlight));
+    race.setTraffic(traffic);
     const listener = () => modes.position;
     const npcSound = (sound: import('../traffic/RoadsidePeople').NpcSound) => bridge.emit('npcSound', sound);
     addSystem(new CafeCustomers(scene, kit, listener, npcSound));

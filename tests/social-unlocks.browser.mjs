@@ -40,12 +40,12 @@ try {
  expect((await call('wallet')).walletPhp).toBe(before.walletPhp - 900);
  await page.getByRole('button', { name: /Your parts/ }).click();
  await expect(page.getByTestId('actual-condition')).toHaveCount(0);
- await page.getByRole('button', { name: 'Have Mang Boy inspect · ₱150' }).click();
+ await page.getByRole('button', { name: 'Have Tito Jun inspect · ₱150' }).click();
  await expect(page.getByTestId('actual-condition')).toHaveCount(1);
  console.log('PASS discounted purchase, owned paid price, explicit paid inspection');
 
  await call('closeMarket'); await call('openRepair');
- await expect(page.getByText('Mang Boy’s repair benefit · 10% off', { exact: true })).toBeVisible();
+ await expect(page.getByText('Tito Jun’s repair benefit · 10% off', { exact: true })).toBeVisible();
  await page.getByRole('group', { name: 'Choose repairs' }).getByRole('checkbox').nth(2).check();
  const pay = page.getByRole('button', { name: /^Pay .* & repair$/ });
  const price = Number((await pay.innerText()).match(/₱([\d,]+)/)[1].replaceAll(',', ''));
@@ -91,7 +91,7 @@ try {
  await call('tick'); expect(await call('notices')).toEqual([]);
  expect((await call('social')).crews.kyo_regulars.membership).toBe('member');
  await call('openRepair');
- await expect(page.getByText('Mang Boy’s repair benefit · 10% off', { exact: true })).toHaveCount(0);
+ await expect(page.getByText('Tito Jun’s repair benefit · 10% off', { exact: true })).toHaveCount(0);
  await expect(page.getByRole('heading', { name: 'Inspection & repair' })).toBeVisible();
  expect(errors).toEqual([]);
  console.log('PASS repair quote/payment, crew acceptance, retained race discovery/membership, reload deduplication, poor-standing basic repair; no browser errors');

@@ -71,7 +71,9 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('job_end'), runId: contentId, outcome: z.enum(['failed','abandoned']), reason: z.string().min(1).max(200) }),
     z.strictObject({ type: z.literal('race_start'), definitionId: contentId, attemptId: id, vehicleId: id }),
     z.strictObject({ type: z.literal('race_checkpoint'), attemptId: id, checkpointIndex: z.number().int().min(1).max(100), elapsedMs: millisecond }),
-    z.strictObject({ type: z.literal('race_complete'), attemptId: id, elapsedMs: millisecond, finish: z.boolean() }),
+  z.strictObject({ type: z.literal('race_complete'), attemptId: id, elapsedMs: millisecond, finish: z.boolean(),
+    /** Null means the player finished while the physical opponent was still on course. */
+    opponentElapsedMs: millisecond.nullable().optional() }),
     z.strictObject({ type: z.literal('social_introduce'), dialogueId: contentId }),
     z.strictObject({ type: z.literal('social_choice'), dialogueId: contentId, nodeId: contentId, choiceId: contentId }),
     z.strictObject({ type: z.literal('starter_origin'), originId: z.enum(['family', 'marketplace', 'project']) }),

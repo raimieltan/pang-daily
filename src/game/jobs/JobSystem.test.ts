@@ -156,7 +156,7 @@ it('persists the job in progress across a runtime restart', () => {
   expect(payouts(wallet)).toHaveLength(1);
 });
 
-it("lists Mang Boy's errands at the talyer board, with on-foot stops for the oil run", () => {
+it("lists Tito Jun's errands at the talyer board, with on-foot stops for the oil run", () => {
   const s = setup();
   s.at(TALYER_BOARD, 'walking'); s.commands.interact();
   expect(useJobStore.getState().board?.listings.map(l => l.id)).toEqual(['talyer_oil_errand', 'talyer_battery_drop', 'talyer_alternator_drop', 'talyer_rims_pickup']);

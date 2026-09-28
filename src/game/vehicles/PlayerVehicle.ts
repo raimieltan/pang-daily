@@ -316,7 +316,11 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   maintenanceSample(racing: boolean): WearSample {
     const { state, diagnostics } = this.controller.model;
     return { speedMps: state.vx, throttle: state.throttle, brake: state.brake,
-      slip: Math.min(1, Math.abs(diagnostics.bodySlip) / .35), handbrake: diagnostics.handbrakeEffect,
+      slip: Math.min(1, Math.max(
+        Math.abs(diagnostics.bodySlip) / .35,
+        Math.abs(diagnostics.frontSlip) / .2 * diagnostics.frontGripUse,
+        Math.abs(diagnostics.rearSlip) / .2 * diagnostics.rearGripUse,
+      )), handbrake: diagnostics.handbrakeEffect,
       grounded: this.body.groundedWheels > 0 && !diagnostics.held, racing };
   }
 
@@ -368,6 +372,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       rearGripUse: round(d.rearGripUse, 2),
       liftOff: round(s.liftOff, 2),
       loadShift: round(s.loadShift, 3),
+      lateralLoadShift: round(s.lateralLoadShift, 3),
       tractionCut: round(d.tractionCut, 2),
       stabilityYaw: round(d.stabilityYaw, 2),
       handbrake: round(d.handbrakeEffect, 2),

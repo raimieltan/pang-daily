@@ -5,7 +5,8 @@ import { ChapterExperience } from './ChapterExperience';
 import { ContactsApp } from './ContactsApp';
 import { SocialFeedback } from './SocialFeedback';
 import { useSocialStore } from '@/state/socialStore';
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { raceLineEnabled, setRaceLineEnabled, subscribeRaceLine } from '@/game/races/raceLineSettings';
 import { useHudStore } from "@/state/hudStore";
 import { useGraphicsStore } from "@/state/graphicsStore";
 import { RaceIntro } from "./RaceIntro";
@@ -42,6 +43,7 @@ export function HudOverlay() {
   const failure = usePersistenceStore(s => s.failure);
   const saved = usePersistenceStore(s => s.saved);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const showRaceLine = useSyncExternalStore(subscribeRaceLine, raceLineEnabled, () => false);
   const intro = useHudStore(s => s.raceIntro);
   const settings = useGraphicsStore(s => s.settings);
   const time = useGraphicsStore(s => s.timeOfDay);
@@ -96,6 +98,10 @@ export function HudOverlay() {
       </nav>}
 
       {status === "ready" && toolsOpen && <div className="pointer-events-auto absolute top-24 right-4 z-30 flex max-h-[76dvh] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-auto sm:right-8">
+        <label className="flex items-center gap-3 border border-white/15 bg-black/85 p-3 text-xs text-white/85">
+          <input type="checkbox" checked={showRaceLine} onChange={event => setRaceLineEnabled(event.target.checked)} />
+          <span>Racing line and braking zones<span className="mt-1 block text-[10px] text-white/60">Green: drive · amber: lift · red: brake</span></span>
+        </label>
         <GraphicsDebugPanel />
         <AudioPanel />
         <details className="bg-black/80 p-3 text-xs"><summary className="cursor-pointer tracking-widest">DEVELOPMENT / {fps} FPS</summary>

@@ -18,8 +18,8 @@ export const SOCIAL_RULES = {
  dialogue: {
   introduction: { trust: 0, respect: 0, reason: 'First conversation' },
   introduce_mang_boy: { trust: 2, respect: 0, reason: 'Shared trusted mechanic introduction', flag: 'introduced_mang_boy' },
-  promise_help: { trust: 2, respect: 0, reason: 'Promised to help Mang Boy', flag: 'promised_help' },
-  apologize: { trust: 0, respect: 0, reason: 'Apologized to Mang Boy', flag: 'apology_offered' },
+  promise_help: { trust: 2, respect: 0, reason: 'Promised to help Tito Jun', flag: 'promised_help' },
+  apologize: { trust: 0, respect: 0, reason: 'Apologized to Tito Jun', flag: 'apology_offered' },
   congratulate_casey: { trust: 3, respect: 0, reason: 'Gave Casey credit after a race', flag: 'trusted_friend' },
   insult_casey: { trust: -10, respect: -5, reason: 'Insulted Casey after a race', flag: 'hostile' },
  },
@@ -36,7 +36,7 @@ export const SOCIAL_RULES = {
   loss: { trust: 0, respect: 2, reason: 'Finished a valid race' },
   dnf: { trust: 0, respect: 0, reason: 'Did not finish the race' },
  },
- service: { repair: { trust: 2, respect: 1, reason: 'Completed a repair with Mang Boy' }, inspection: { trust: 1, respect: 0, reason: 'Completed a part inspection with Mang Boy' } },
+ service: { repair: { trust: 2, respect: 1, reason: 'Completed a repair with Tito Jun' }, inspection: { trust: 1, respect: 0, reason: 'Completed a part inspection with Tito Jun' } },
  marketplace: { purchased: { trust: 1, respect: 0, reason: 'Completed a Marketplace purchase' } },
 } as const satisfies Record<string, Record<string, Reward>>;
 

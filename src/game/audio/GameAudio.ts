@@ -63,7 +63,14 @@ export class GameAudio {
       events.on('weatherChanged', ({ weather }) => { this.rain = weather === 'rain'; this.mix(); }),
       events.on('timeOfDay', ({ time }) => { this.night = time === 'night'; this.mix(); }),
       events.on('vehicleStateUpdated', ({ speedKmh, gear }) => { this.speed = Math.abs(speedKmh); if (this.gear !== null && gear !== this.gear) this.tone(85, .07, .07); this.gear = gear; this.mix(); }),
-      events.on('vehicleTelemetry', (v: VehicleTelemetry) => { this.throttle = v.throttle; this.slip = v.groundedWheels > 0 ? Math.max(Math.abs(v.bodySlipDeg) / 25, v.handbrake) : 0; this.mix(); }),
+      events.on('vehicleTelemetry', (v: VehicleTelemetry) => {
+        this.throttle = v.throttle;
+        // Axle slip announces front washout before the whole car starts sliding.
+        const frontScrub = Math.max(0, (Math.abs(v.frontSlipDeg) - 4) / 10) * v.frontGripUse;
+        const rearScrub = Math.max(0, (Math.abs(v.rearSlipDeg) - 3) / 10) * v.rearGripUse;
+        this.slip = v.groundedWheels > 0 ? Math.min(1, Math.max(frontScrub, rearScrub, Math.abs(v.bodySlipDeg) / 25, v.handbrake)) : 0;
+        this.mix();
+      }),
       events.on('footsteps', ({ distance }) => { this.stepDistance += distance; if (this.stepDistance > .75) { this.stepDistance %= .75; this.tone(90 + Math.random() * 30, .065, .12); } }),
       events.on('interactionTriggered', ({ action }) => { if (action === 'order_coffee') this.tone(1400, .16, .08); else this.tone(480, .08, .06); }),
       events.on('dialogueTriggered', ({ dialogueId }) => this.speak(dialogueVoice(dialogueId), 1)),

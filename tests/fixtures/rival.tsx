@@ -58,7 +58,9 @@ Object.assign(window, { rivalTest: {
   start();
   if (outcome === 'dnf') bridge.ui.commands.abandonRace();
   else {
-   if (outcome === 'loss') for (let i = 0; i < 5000 && race.race.opponentTime === null; i++) race.update(.1);
+   // The UI fixture has no physics world. Feed measured checkpoint positions to the race clock.
+   if (outcome === 'loss') for (const gate of [...LOCAL_ROUTE.checkpoints, LOCAL_ROUTE.finish])
+    race.race.update(.1, position, gate.center);
    if (outcome === 'loss' && race.race.opponentTime === null) throw new Error('AI did not finish');
    finish();
   }

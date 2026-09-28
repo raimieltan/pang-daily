@@ -101,11 +101,11 @@ try {
  await page.reload();
  await page.waitForFunction(() => !!window.dialogueTest && window.dialogueReady);
  await call('open', 'kyo_order');
- await expect(dialogue).toContainText('Nakita mo na si Mang Boy');
+ await expect(dialogue).toContainText('Nakita mo na si Tito Jun');
  await call('close');
  await call('open', 'talyer_mang_boy');
  await expect(dialogue).toContainText('Si Kyo nagpadala sa imo?');
- console.log('PASS keyboard Kyo introduction, reload, and Mang Boy referral');
+ console.log('PASS keyboard Kyo introduction, reload, and Tito Jun referral');
  await call('interact');
  await call('sceneExit');
  await expect(dialogue).toHaveCount(0);

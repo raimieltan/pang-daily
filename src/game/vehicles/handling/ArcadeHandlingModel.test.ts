@@ -138,6 +138,26 @@ describe("ArcadeHandlingModel — FWD balance", () => {
     expect(heavy.diagnostics.understeer).toBeGreaterThan(light.diagnostics.understeer + 0.05);
   });
 
+  it("trail braking moves load forward and helps a settled car rotate", () => {
+    const coast = drive(car(65), 0.8, input(0, 0, 0.55));
+    const trail = drive(car(65), 0.8, input(0, 0.3, 0.55));
+    expect(trail.state.loadShift).toBeGreaterThan(coast.state.loadShift);
+    // Radius is speed / yaw rate; braking should tighten the driven line.
+    expect(trail.state.yawRate / trail.state.vx).toBeGreaterThan(coast.state.yawRate / coast.state.vx);
+  });
+
+  it("cornering shifts load to the outside tires and their net grip changes progressively", () => {
+    const normal = car(85);
+    const sensitive = car(85, "fwd_worn_sedan", { tires: { frontLoadSensitivity: 0.8 } });
+    drive(normal, 1.5, input(0.3, 0, 1));
+    drive(sensitive, 1.5, input(0.3, 0, 1));
+    expect(normal.state.lateralLoadShift).toBeGreaterThan(0.1);
+    expect(sensitive.diagnostics.understeer).toBeGreaterThan(normal.diagnostics.understeer);
+
+    drive(normal, 1.5, input(0.3, 0, -1));
+    expect(normal.state.lateralLoadShift).toBeLessThan(0);
+  });
+
   it("traction assist trades drive force for steering when cornering on full throttle", () => {
     const average = (traction: number) => {
       const m = car(35, "fwd_worn_sedan", { assists: { traction } });
@@ -245,10 +265,10 @@ describe("ArcadeHandlingModel — handbrake", () => {
     expect(m.diagnostics.handbrakeEffect).toBeLessThan(0.15);
   });
 
-  it("is strongest at medium speed and fades at high speed", () => {
+  it("reaches full effect at hairpin speed and stays engaged at high speed", () => {
     const effect = (speed: number) => drive(car(speed), 0.3, hb(0, 0)).diagnostics.handbrakeEffect;
     expect(effect(45)).toBeGreaterThan(effect(25));
-    expect(effect(45)).toBeGreaterThan(effect(110) * 1.5);
+    expect(effect(110)).toBeGreaterThan(effect(45) * 0.9);
   });
 
   it("without steering it bleeds speed in a straight line and never rotates", () => {
@@ -256,8 +276,16 @@ describe("ArcadeHandlingModel — handbrake", () => {
     const pulled = drive(car(45), 1, hb(0, 0));
     expect(pulled.state.yawRate).toBe(0);
     expect(kmh(pulled)).toBeLessThan(kmh(plain) - 3);
-    // A rotation tool, not a brake: nowhere near a full-pedal stop.
+    // Rear-only braking is weaker than the service brakes.
     expect(kmh(pulled)).toBeGreaterThan(30);
+  });
+
+  it("spends rear tire grip on braking even at high speed", () => {
+    const plain = drive(car(110), 0.4, input(0, 0, 0.55));
+    const pulled = drive(car(110), 0.4, hb(0, 0.55));
+    expect(pulled.diagnostics.handbrakeEffect).toBeGreaterThan(0.9);
+    expect(pulled.diagnostics.rearGripUse).toBeGreaterThan(plain.diagnostics.rearGripUse);
+    expect(kmh(pulled)).toBeLessThan(kmh(plain));
   });
 
   it("a tap mid-corner rotates the car into a tighter line, then the front pulls it straight", () => {

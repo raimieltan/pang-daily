@@ -87,7 +87,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
       <Bar label="traction cut" value={t.tractionCut} />
       <Row label="slip body/F/R" value={`${t.bodySlipDeg}° / ${t.frontSlipDeg}° / ${t.rearSlipDeg}°`} />
       <Row label="g long/lat" value={`${t.longAccelG.toFixed(2)} / ${t.latAccelG.toFixed(2)}`} />
-      <Row label="load shift" value={`${(t.loadShift * 100).toFixed(1)}% front`} />
+      <Row label="load shift F/L" value={`${(t.loadShift * 100).toFixed(1)}% / ${(t.lateralLoadShift * 100).toFixed(1)}%`} />
       <Row label="stability" value={t.stabilityYaw.toFixed(2)} />
       {state && <span className="text-white/90">{state}</span>}
     </div>

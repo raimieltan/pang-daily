@@ -15,6 +15,7 @@ export const HANDLING_PRESETS = {
         wheelbaseM: 2.5,
         frontWeight: 0.62,
         cgHeightM: 0.52,
+        trackWidthM: 1.456,
         yawInertiaScale: 1.1,
       },
       steering: {
@@ -43,6 +44,8 @@ export const HANDLING_PRESETS = {
         rearGrip: 1.0,
         frontPeakSlipDeg: 7,
         rearPeakSlipDeg: 6,
+        frontLoadSensitivity: 0.3,
+        rearLoadSensitivity: 0.25,
       },
       balance: {
         understeer: 0.45,
@@ -65,9 +68,7 @@ export const HANDLING_PRESETS = {
         fullEffectSpeedKmh: 45,
         rearGripMultiplier: 0.55,
         frontGripMultiplier: 0.95,
-        yawAssistStrength: 0.85,
-        maxYawRateBonus: 1.6,
-        speedBleedPerSecond: 0.18,
+        rearBrakeMps2: 5,
         engageSmoothing: 12,
         releaseSmoothing: 8,
       },

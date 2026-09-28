@@ -67,3 +67,10 @@ export const RACE_ECONOMY = [
   }
 ].map(race => ({ ...race, prizePhp: RACE_REWARDS[race.id as keyof typeof RACE_REWARDS] }));
 export const raceEconomy = (id: string) => RACE_ECONOMY.find(race => race.id === id);
+/** On-road finish order for physical rivals; the fixed benchmark is legacy fallback. */
+export function raceOutcome(finish: boolean, playerElapsedMs: number,
+  opponentElapsedMs: number | null | undefined, benchmarkMs: number): 'dnf' | 'win' | 'loss' {
+  if (!finish) return 'dnf';
+  const rival = opponentElapsedMs === undefined ? benchmarkMs : opponentElapsedMs;
+  return rival === null || playerElapsedMs < rival ? 'win' : 'loss';
+}

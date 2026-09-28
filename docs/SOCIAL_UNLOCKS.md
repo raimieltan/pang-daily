@@ -8,10 +8,10 @@ Discovery is a permanent record in the existing social save's `unlocks` table. `
 | --- | --- | --- |
 | Casey's invitation to The wall | Meet Casey at Kyo; Regular reputation (12 points) | Discovered race access remains available. Undiscovered access checks current requirements. |
 | Jun's suki offer | Jun trust ≥52; Regular reputation | Discovery remains; the 10% part discount suspends when either threshold is lost. Ordinary Marketplace purchases remain available. |
-| Mang Boy's repair benefit | Trust ≥58; completed oil favor or recovery favor | Discovery remains; the 10% repair discount suspends if trust drops. Reputation is not a requirement. Basic repairs and free vehicle inspection remain available. |
+| Tito Jun's repair benefit | Trust ≥58; completed oil favor or recovery favor | Discovery remains; the 10% repair discount suspends if trust drops. Reputation is not a requirement. Basic repairs and free vehicle inspection remain available. |
 | Kyo Regulars invitation | Casey trust ≥50, respect ≥55, trusted-friend flag; Regular reputation; crew standing ≥0 | Discovery remains; invitation acceptance suspends when any requirement is lost. Accepted membership remains intact; expulsion is outside this slice. |
 
-Earn reputation from valid race finishes or the repeatable ice run. Talk to Casey before or after racing, congratulate Casey after the Pahuway race, then request the crew invitation and choose to join. Finish Mang Boy's oil favor (or recovery favor) for his service benefit. Two purchases from Jun earn the required seller trust; Jun's eligible listings show his offer in their detail panel.
+Earn reputation from valid race finishes or the repeatable ice run. Talk to Casey before or after racing, congratulate Casey after the Pahuway race, then request the crew invitation and choose to join. Finish Tito Jun's oil favor (or recovery favor) for his service benefit. Two purchases from Jun earn the required seller trust; Jun's eligible listings show his offer in their detail panel.
 
 Both PAN-33 race start paths (bridge command and world interaction) call the same fresh eligibility check before positioning the car or beginning countdown. The existing checkpoint, result, replay, and reward paths remain responsible for the race.
 

@@ -124,7 +124,8 @@ acts once the rear slides past 5°. Try both on the skidpad with `…_bald_rears
 | `massKg` | 1080 | Light 1.5 L early-90s sedan. |
 | `wheelbaseM` | 2.50 | Matches `banwa_dalagan_1996_modular.glb` (axles at z +1.28 / −1.22), so the model's pivot matches the wheels you see. |
 | `frontWeight` | 0.62 | Transverse engine over the front axle; the root of the FWD push. Set `collision.centerOfMass.z` to match (0.33 m ahead of the wheelbase centre). |
-| `cgHeightM` | 0.52 | Normal sedan. Only scales load transfer. |
+| `cgHeightM` | 0.52 | Height of the effective centre of gravity; scales front/rear and side-to-side load transfer. |
+| `trackWidthM` | 1.456 | Tire-centre spacing; a wider track reduces side-to-side transfer. |
 | `yawInertiaScale` | 1.1 | Slightly lazy rotation, so the car feels heavy and every rotation is telegraphed. |
 
 **Steering**
@@ -163,6 +164,7 @@ never take all the steering away.
 |---|---|---|
 | `frontGrip` / `rearGrip` | 0.95 / 1.00 | Front below rear: the car is stable and leans toward understeer, like mismatched tires with the worn pair on the driven axle. |
 | `frontPeakSlipDeg` / `rearPeakSlipDeg` | 7 / 6 | Soft, progressive tires. Grip builds and fades gradually, so the limit can be felt before it arrives. |
+| `frontLoadSensitivity` / `rearLoadSensitivity` | 0.30 / 0.25 | Grip lost when load moves from the inside to the outside tire; slightly larger front loss gives a readable limit. |
 
 **Balance**
 
@@ -175,6 +177,13 @@ never take all the steering away.
 | `liftOffMinSpeedKmh` | 35 | No rotation when coasting in traffic or parking. |
 | `liftOffBuildRate` / `ReleaseRate` | 3 / 6 s⁻¹ | Builds over ~0.33 s, releases twice as fast. Getting back on the throttle always calms the car sooner than lifting unsettled it. |
 
+Side-to-side load transfer follows lateral acceleration with the same response rate as
+front/rear transfer. Positive `lateralLoadShift` means the left tires are loaded;
+negative means the right tires are loaded. The paired tires on each axle lose a
+small amount of net grip as the outside tire takes more load. This is an axle
+approximation: individual left/right tire slip and puddle contact are not yet
+simulated. The debug panel shows both front and lateral load shift.
+
 **Assists**
 
 | Param | Value | Why |
@@ -184,23 +193,21 @@ never take all the steering away.
 
 **Handbrake** (Space / pad B)
 
-An arcade rotation tool for hairpins, U-turns and tight town corners, not a parking brake or a
-drift button. Tap and steer to rotate; release and throttle so the front wheels pull the car
-straight. Measured on the baseline (0.5 s tap at 45 km/h, full lock, then throttle 0.6 at 0.3 lock):
-the car rotates ~28° during the tap and travels 11° further round the corner than the same inputs
-without it. Rear slip peaks at ~23° and settles within 0.5 s of release.
+The handbrake requests rear-only braking. Rear longitudinal force uses the same
+friction circle as cornering, while the rear grip multiplier models a sliding or
+locked rear tire. The front tires keep most of their grip, so a timed tap can
+rotate the car into a hairpin and throttle can pull it out. There is no yaw feed
+or separate speed drag. Holding it through a fast corner can cause a large slide.
 
 | Param | Value | Why |
 |---|---|---|
-| `minEffectiveSpeedKmh` / `fullEffectSpeedKmh` | 18 / 45 | Linear ramp from 18 to 45: nothing when parked or crawling, full effect at hairpin-entry speed. Above 45 it fades as 45 / speed (≈ 0.4 at 110), so a highway tap nudges the car rather than spinning it. |
-| `rearGripMultiplier` / `frontGripMultiplier` | 0.55 / 0.95 | The rear lets go; the driven front barely changes, so FWD recovery still comes from the front, not a RWD-style slide. |
-| `yawAssistStrength` / `maxYawRateBonus` | 0.85 / 1.6 rad/s | Feeds yaw toward the steered yaw rate plus up to 1.6 rad/s × effect, and never beyond. Adds rotation only in the steered direction, so with no steering it does nothing. |
-| `speedBleedPerSecond` | 0.18 | Loses 18% of speed per second as body drag, not rear brake force. Braking through the loosened rear would use up its friction circle and lock the car into a spin. Holding too long scrubs the car below 18 km/h, where the handbrake switches itself off, so it can't slide forever. |
-| `engageSmoothing` / `releaseSmoothing` | 12 / 8 s⁻¹ | Exponential fade: ~0.08 s in, ~0.12 s out. A tap is a clean flick; release restores grip progressively instead of snapping. |
+| `minEffectiveSpeedKmh` / `fullEffectSpeedKmh` | 18 / 45 | Ramps from no effect while parking to full effect by hairpin entry speed; stays fully engaged above 45 km/h. |
+| `rearGripMultiplier` / `frontGripMultiplier` | 0.55 / 0.95 | Rear tires lose lateral grip while driven front tires retain steering and recovery authority. |
+| `rearBrakeMps2` | 5 | Rear-only braking request, limited by available rear tire grip. It reduces lateral grip through the friction circle. |
+| `engageSmoothing` / `releaseSmoothing` | 12 / 8 s⁻¹ | The lever builds and releases progressively. |
 
-While it acts, the stability assist runs at half strength so it doesn't cancel the rotation.
-It comes back with rear grip on release and helps the catch. The yaw feed gain (`HANDBRAKE_YAW_GAIN`)
-is a constant in the model; tune `yawAssistStrength` instead. Reversing or airborne: no effect.
+Reversing or airborne: no effect. Tire scrub audio now starts at axle slip, so
+front washout and rear rotation are audible before body slip grows large.
 
 **Low speed**
 
@@ -242,8 +249,8 @@ and a fixed 1/120 s step; at 180 km/h the car moves 0.42 m per step, well within
 | Lift-off snaps or spins | Lower `liftOffBuildRate`, `rearSlideFalloff`, or raise `stability`. |
 | Feels twitchy on keyboard | Raise `turnInSeconds`; don't touch `unwindSeconds`. |
 | Sluggish off the line | `accelerationMps2`, then `throttleRise`. |
-| Handbrake barely rotates | Raise `yawAssistStrength` or lower `rearGripMultiplier` (0.55 → 0.45). For slow hairpins, lower `fullEffectSpeedKmh`. |
-| Handbrake spins or snaps back on release | Lower `maxYawRateBonus`, raise `rearGripMultiplier`, or lower `releaseSmoothing`. |
+| Handbrake barely rotates | Raise `rearBrakeMps2` or lower `rearGripMultiplier` (0.55 → 0.45). For slow hairpins, lower `fullEffectSpeedKmh`. |
+| Handbrake spins or snaps on release | Lower `rearBrakeMps2`, raise `rearGripMultiplier`, or lower `releaseSmoothing`. |
 | Brakes feel wooden | Raise `brakeRise`, lower `frontBias` a little. |
 
 Change one parameter at a time, check it on the skidpad and the hill, then write the new

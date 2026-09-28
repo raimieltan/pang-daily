@@ -44,7 +44,7 @@ export function previewPerformanceInstall(inventory: InventorySession, vehicle: 
   const item = inventory.item(itemId), part = item && performancePart(item.partId);
   if (!item || !part) return { rejected: 'Choose an owned performance part.' };
   if (operation !== 'install' && operation !== 'remove') return { rejected: 'Choose install or remove.' };
-  if (!item.revealedBy) return { rejected: 'Have Mang Boy inspect this used part before quoting the work.' };
+  if (!item.revealedBy) return { rejected: 'Have Tito Jun inspect this used part before quoting the work.' };
   const next = new Inventory(inventory.snapshot());
   if (operation === 'remove' && next.installation(itemId)?.vehicleId !== vehicle.id) return { rejected: 'That part is not on this car.' };
   const result = operation === 'install' ? next.install(vehicle.id, itemId, { ...context, vehicle }) : next.uninstall(itemId);

@@ -6,7 +6,7 @@ import { FIRST_RIVAL } from './rivalHistory';
 import { raceValidation } from '../../../tests/fixtures/raceValidation';
 
 describe('first playable social loop', () => {
- it('lets the Kyo friend introduce Mang Boy once and remembers it across reload', () => {
+ it('lets the Kyo friend introduce Tito Jun once and remembers it across reload', () => {
   let saved: ReturnType<SocialSession['snapshot']> | undefined;
   const session = new SocialSession(SOCIAL_CONTENT, undefined, next => { saved = next; });
   expect(SOCIAL_CONTENT.npcs.find(npc => npc.id === 'kyo_barista')?.roles).toContain('friend');

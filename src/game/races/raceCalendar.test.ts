@@ -1,16 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { LOCAL_ROUTE } from './localRoute';
-import { Race } from './Race';
+import { RoadCorridor, DRIVER_SKILLS } from './AIDriver';
 import { RACE_CALENDAR } from './raceCalendar';
-import { rivalTuning } from './rivals';
+import { rivalBuildStats } from './rivals';
 import { MOUNTAIN_RACES } from '../world/mountain/route';
 import { HUB_BOUNDS, HUB_LAYOUT } from '../world/hub/hubLayout';
-
-function rivalRun(route: (typeof RACE_CALENDAR)[number]) {
-  const race = new Race(route); race.start(); race.update(3, route.start);
-  for (let t = 0; t < 900 && !race.opponent.finished; t += 1 / 30) race.update(1 / 30, route.start);
-  return race;
-}
 
 describe('race calendar', () => {
   it('runs five races, one rival per tier, prizes rising', () => {
@@ -34,16 +28,14 @@ describe('race calendar', () => {
     }
   });
 
-  for (const route of RACE_CALENDAR) it(`rival clears every gate in order in ${route.id}`, () => {
-    const race = rivalRun(route);
-    expect(race.opponent.finished).toBe(true);
-    expect(race.opponentTime).toBeGreaterThan(20);
+  for (const route of RACE_CALENDAR) it(`provides a driveable corridor for ${route.id}`, () => {
+    const road = new RoadCorridor(route.waypoints);
+    expect(road.cumulative.at(-1)).toBeGreaterThan(100);
+    expect(road.segments.every(segment => segment.width > 3)).toBe(true);
   });
 
-  it('makes the same car faster in a higher tier and a built car faster than a donor', () => {
-    const [t1, t5] = [rivalTuning('kent_sleeper', 1), rivalTuning('kent_sleeper', 5)];
-    expect(t5.speedScale).toBeGreaterThan(t1.speedScale);
-    expect(t5.braking).toBeGreaterThan(t1.braking);
-    expect(rivalTuning('sean_evo_tribute', 3).acceleration).toBeGreaterThan(rivalTuning('donor_daily', 3).acceleration);
+  it('separates driver skill from the car build', () => {
+    expect(DRIVER_SKILLS[3].brakingSkill).toBeGreaterThan(DRIVER_SKILLS[0].brakingSkill);
+    expect(rivalBuildStats('sean_evo_tribute').powerHp).toBeGreaterThan(rivalBuildStats('donor_daily').powerHp);
   });
 });

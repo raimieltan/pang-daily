@@ -68,7 +68,7 @@ export function roadsideDrop(width:number,offset:number){
 export const OVERLOOK=roadAt(OVERLOOK_S,17);
 /** Right-hand traffic; reverse lanes use the opposite side of the same road. */
 export function laneWaypoints(direction:1|-1,offset=1.5): (Waypoint & {s:number})[] {
-  const points=ROAD.map(p=>({...roadAt(p.s,offset*direction),speed:p.speed}));
+  const points=ROAD.map(p=>({...roadAt(p.s,offset*direction),speed:p.speed,roadOffset:offset}));
   return direction===1?points:points.reverse();
 }
 /** A run between two distances along the road; gates at `gates` (fractions of the whole road) name their sector. */

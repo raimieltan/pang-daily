@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WaypointRival } from '../races/Race';
+import { TrafficFollower } from './TrafficFlow';
 import { HUB_LAYOUT } from '../world/hub/hubLayout';
 import { TRAFFIC_LANES } from './trafficRoutes';
 
@@ -7,7 +7,7 @@ describe('connected traffic routes', () => {
   it('takes downhill drivers through town and back uphill without stopping at the entrance', () => {
     const points = TRAFFIC_LANES[1];
     const entrance = points.findIndex(p => p.x <= 250 && p.y === 0);
-    const driver = new WaypointRival(points);
+    const driver = new TrafficFollower(points);
     driver.position = { ...points[entrance] };
     driver.segment = entrance + 1;
     let visitedTown = false, returned = false;

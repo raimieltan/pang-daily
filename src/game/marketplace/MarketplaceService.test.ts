@@ -38,7 +38,7 @@ it('inspects only where a scene lends a workshop that accepts the visit', () => 
   const partId = views.at(-1)!.parts[0].id;
   commands.inspectPart(partId);
   expect(rejected.at(-1)).toMatch(/talyer/);
-  let blocked: string | null = 'Park at the talyer and get out to talk to Mang Boy.';
+  let blocked: string | null = 'Park at the talyer and get out to talk to Tito Jun.';
   const release = service.useWorkshop({ rejection: () => blocked });
   commands.inspectPart(partId);
   expect(rejected.at(-1)).toBe(blocked);

@@ -26,7 +26,7 @@ Source: `src/game/world/hub/hubLayout.ts` (data), `src/game/scenes/hubScene.ts` 
 | Id | In-game name | Chunk | Walk-safe area | Spawn |
 |---|---|---|---|---|
 | `home` | Home | home | yard and gate | driveway, facing the street |
-| `talyer` | Talyer ni Mang Boy | talyer | waiting bench beside the bays | in the bay apron |
+| `talyer` | Talyer ni Tito Jun | talyer | waiting bench beside the bays | in the bay apron |
 | `coffee_shop` | Kyo Coffee | coffee_shop | terrace in front of the glass | concrete apron in front |
 | `gas_station` | Bahandi Fuels | gas_station | kiosk front | forecourt, between the pump islands |
 | `convenience_store` | Suki 24 | convenience_store | store front | store parking |

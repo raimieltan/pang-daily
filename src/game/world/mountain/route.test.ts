@@ -1,6 +1,7 @@
 import { describe,it,expect } from 'vitest';
 import { ROAD,ROUTE_LENGTH,MOUNTAIN_RACES,laneWaypoints,roadAt } from './route';
-import { Race, WaypointRival } from '../../races/Race';
+import { CheckpointProgress } from '../../races/Race';
+import { TrafficFollower } from '../../traffic/TrafficFlow';
 import { MOUNTAIN_CHUNKS } from './environment';
 describe('Alimodian–Maasin road',()=>{
  it('is continuous, narrow and graded without abrupt steps',()=>{
@@ -11,14 +12,14 @@ describe('Alimodian–Maasin road',()=>{
    if(b.s>160)expect(b.width).toBe(6.2);
   }
  });
- for(const route of MOUNTAIN_RACES)it(`rival completes ordered gates in ${route.id}`,()=>{
-  const race=new Race(route);race.start();race.update(3,route.start);
-  for(let t=0;t<600&&!race.opponent.finished;t+=1/30)race.update(1/30,route.start);
-  expect(race.opponent.finished).toBe(true);expect(race.opponentTime).toBeGreaterThan(300);expect(race.opponentTime).toBeLessThan(480);
+ for(const route of MOUNTAIN_RACES)it(`road samples cross ordered gates in ${route.id}`,()=>{
+  const progress=new CheckpointProgress(route);
+  for(let i=1;i<route.waypoints.length;i++)progress.advance(route.waypoints[i-1],route.waypoints[i]);
+  expect(progress.finished).toBe(true);
  });
  it('both traffic lanes traverse the road without crossing the centreline',()=>{
   for(const direction of [1,-1] as const){
-   const points=laneWaypoints(direction);const follower=new WaypointRival(points);
+   const points=laneWaypoints(direction);const follower=new TrafficFollower(points);
    for(const p of points){const c=roadAt(p.s);expect(Math.hypot(p.x-c.x,p.z-c.z)).toBeCloseTo(1.5,3);}
    for(let t=0;t<600&&!follower.departed;t+=.1)follower.update(.1);
    expect(follower.departed).toBe(true);

@@ -5,7 +5,7 @@ export type Point = { x: number; y: number; z: number };
 // private backing fields instead, so always snapshot coordinates explicitly.
 const copyPoint = (p: Point): Point => ({ x: p.x, y: p.y, z: p.z });
 export type Gate = { id: string; center: Point; halfSize: Point };
-export type Waypoint = Point & { speed: number };
+export type Waypoint = Point & { speed: number; width?: number; roadOffset?: number };
 export type RaceDefinition = {
   id: string; name: string; mode: "point-to-point" | "touge" | "drag";
   start: Point; heading: number; checkpoints: readonly Gate[]; finish: Gate;
@@ -55,84 +55,51 @@ export class CheckpointProgress {
   }
 }
 
-export const RIVAL_TUNING = { speedScale: 1, acceleration: 4, braking: 7 };
-/** Kinematic route follower. Fixed steps, no randomness or player physics. Brakes before slower segments. */
-export class WaypointRival {
-  position: Point;
-  speed = 0;
-  heading = 0;
-  segment = 1;
-  constructor(readonly points: readonly Waypoint[], readonly tuning = RIVAL_TUNING) {
-    if (points.length < 2) throw new Error("Rival requires at least two waypoints");
-    this.position = { ...points[0] };
-    this.heading = Math.atan2(points[1].x - points[0].x, points[1].z - points[0].z);
-  }
-  reset() { this.position = { ...this.points[0] }; this.speed = 0; this.segment = 1; this.heading = Math.atan2(this.points[1].x - this.points[0].x, this.points[1].z - this.points[0].z); }
-  get departed() { return this.segment >= this.points.length; }
-  update(dt: number) {
-    const target = this.points[this.segment];
-    if (!target) { this.speed = 0; return; }
-    const distance = Math.hypot(target.x - this.position.x, target.y - this.position.y, target.z - this.position.z);
-    const limit = Math.min(this.points[this.segment - 1].speed * this.tuning.speedScale,
-      Math.sqrt((target.speed * this.tuning.speedScale) ** 2 + 2 * this.tuning.braking * distance));
-    this.speed += Math.max(-this.tuning.braking * dt, Math.min(this.tuning.acceleration * dt, limit - this.speed));
-    let remaining = this.speed * dt;
-    while (this.segment < this.points.length) {
-      const p = this.points[this.segment];
-      const d = Math.hypot(p.x - this.position.x, p.y - this.position.y, p.z - this.position.z);
-      this.heading = Math.atan2(p.x - this.position.x, p.z - this.position.z);
-      if (remaining < d) {
-        for (const axis of ["x", "y", "z"] as const) this.position[axis] += (p[axis] - this.position[axis]) * remaining / d;
-        break;
-      }
-      this.position = { ...p }; remaining -= d; this.segment++;
-    }
-  }
-}
-
 export class Race {
   phase: RacePhase = "READY";
   countdown = 3;
   elapsed = 0;
   player: CheckpointProgress;
   opponent: CheckpointProgress;
-  rival: WaypointRival;
+  /** Measured rigid-body pose, updated by RaceSystem after each physics frame. */
+  rival: { position: Point; speed: number; heading: number; departed: boolean };
   playerTime: number | null = null;
   opponentTime: number | null = null;
-  private accumulator = 0;
   private previous: Point;
+  private previousOpponent: Point;
   constructor(readonly route: RaceDefinition) {
     this.player = new CheckpointProgress(route); this.opponent = new CheckpointProgress(route);
-    this.rival = new WaypointRival(route.waypoints, route.rival?.tuning); this.previous = copyPoint(route.start);
+    const first = route.waypoints[0], second = route.waypoints[1];
+    this.rival = { position: copyPoint(first), speed: 0, heading: Math.atan2(second.x-first.x, second.z-first.z), departed: false };
+    this.previous = copyPoint(route.start); this.previousOpponent = copyPoint(first);
   }
   reset() {
-    this.phase = "RESET"; this.player.reset(); this.opponent.reset(); this.rival.reset();
-    this.countdown = 3; this.elapsed = 0; this.accumulator = 0;
-    this.playerTime = this.opponentTime = null; this.previous = copyPoint(this.route.start);
+    this.phase = "RESET"; this.player.reset(); this.opponent.reset();
+    const first = this.route.waypoints[0], second = this.route.waypoints[1];
+    this.rival.position = copyPoint(first); this.rival.speed = 0;
+    this.rival.heading = Math.atan2(second.x-first.x, second.z-first.z); this.rival.departed = false;
+    this.countdown = 3; this.elapsed = 0;
+    this.playerTime = this.opponentTime = null; this.previous = copyPoint(this.route.start); this.previousOpponent = copyPoint(first);
   }
   start() { this.reset(); this.phase = "COUNTDOWN"; }
-  update(dt: number, position: Point) {
+  update(dt: number, position: Point, opponentPosition: Point = this.rival.position) {
     if (this.phase === "RESET") { this.phase = "READY"; return; }
     if (this.phase === "COUNTDOWN") {
       this.countdown = Math.max(0, this.countdown - dt);
       this.previous = copyPoint(position);
+      this.previousOpponent = copyPoint(opponentPosition);
       if (this.countdown <= 1e-9) this.phase = "RUNNING";
       return;
     }
     if ((this.phase !== "RUNNING" && this.phase !== "FINISHED") || dt <= 0) return;
     const before = this.elapsed;
-    this.accumulator += dt;
-    const step = 1 / 120;
-    while (this.accumulator + 1e-9 >= step) {
-      const a = { ...this.rival.position };
-      this.rival.update(step);
-      if (this.phase === "RUNNING") {
-        const hit = this.opponent.advance(a, this.rival.position);
-        if (hit !== null) this.opponentTime = this.elapsed + hit * step;
-        this.elapsed += step;
-      }
-      this.accumulator -= step;
+    this.rival.position = copyPoint(opponentPosition);
+    if (this.phase === "RUNNING") {
+      const opponentHit = this.opponent.advance(this.previousOpponent, opponentPosition);
+      if (opponentHit !== null) this.opponentTime = this.elapsed + opponentHit * dt;
+      this.elapsed += dt;
     }
+    this.previousOpponent = copyPoint(opponentPosition);
     // Keep driving after results without changing the race clock or standings.
     if (this.phase === "FINISHED") return;
     const hit = this.player.advance(this.previous, position);

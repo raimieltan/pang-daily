@@ -21,6 +21,8 @@ export const handlingConfigSchema = z.strictObject({
     frontWeight: z.number().min(0.3).max(0.75),
     /** Only scales how much load moves between axles; not used for rollover. */
     cgHeightM: positive,
+    /** Average tire-centre spacing across the car, used for side-to-side load transfer. */
+    trackWidthM: positive,
     /** Multiplies the default yaw inertia (m·a·b). Higher = lazier, heavier-feeling rotation. */
     yawInertiaScale: positive,
   }),
@@ -71,6 +73,9 @@ export const handlingConfigSchema = z.strictObject({
     /** Slip angle where each axle peaks. Lower = sharper, more immediate response. */
     frontPeakSlipDeg: positive,
     rearPeakSlipDeg: positive,
+    /** Grip lost when cornering moves load from the inside to the outside tire. */
+    frontLoadSensitivity: unit,
+    rearLoadSensitivity: unit,
   }),
 
   balance: z.strictObject({
@@ -104,26 +109,18 @@ export const handlingConfigSchema = z.strictObject({
     stabilityThresholdDeg: positive,
   }),
 
-  /**
-   * Arcade rotation tool for hairpins and U-turns, not a parking brake or a drift button.
-   * Held, it loosens the rear, feeds yaw toward the steering, and bleeds speed. Released,
-   * rear grip fades back so the front can pull the car straight under throttle.
-   */
+  /** Rear-wheel brake. Its longitudinal demand leaves less rear grip for cornering. */
   handbrake: z.strictObject({
     enabled: z.boolean(),
     /** No effect below this speed (parked, crawling in traffic). */
     minEffectiveSpeedKmh: nonNegative,
-    /** Full effect from here; above it the effect fades as fullEffect / speed. */
+    /** Full effect from here upward; high-speed use remains dangerous. */
     fullEffectSpeedKmh: positive,
     /** Axle grip at full effect. Keep the front near 1 so the driven wheels can still recover. */
     rearGripMultiplier: unit,
     frontGripMultiplier: unit,
-    /** How hard yaw is fed toward the steered direction (0 = grip loss only). */
-    yawAssistStrength: nonNegative,
-    /** Extra yaw rate (rad/s) the assist may add on top of what the steering asks for at full lock. */
-    maxYawRateBonus: nonNegative,
-    /** Share of current speed lost per second at full effect. */
-    speedBleedPerSecond: unit,
+    /** Rear-only braking request at full effect, before the tire grip limit. */
+    rearBrakeMps2: nonNegative,
     /** Per-second exponential rates the effect fades in and out at. */
     engageSmoothing: positive,
     releaseSmoothing: positive,

@@ -18,6 +18,19 @@ import type { VehicleSession } from "@/game-core/maintenance/VehicleSession";
 import { NPC_CAR_BUILDS, npcCarId } from "@/game-core/exterior/npcBuilds";
 import { Race, type RaceProgress, type RaceDefinition } from "./Race";
 import { LOCAL_ROUTE } from "./localRoute";
+import { AIDriver, DRIVER_SKILLS, type NearbyVehicle } from './AIDriver';
+import { RaceLineVisual } from './RaceLineVisual';
+import { raceLineEnabled } from './raceLineSettings';
+import { VehicleBody } from '../vehicles/VehicleBody';
+import { VehicleController } from '../vehicles/VehicleController';
+import { playerCar } from '../vehicles/VehicleDefinition';
+import { resolveHandlingPreset } from '../vehicles/handling/HandlingConfig';
+import { HANDLING_PRESETS } from '../vehicles/handling/presets';
+import type { PhysicsWorld } from '../physics/PhysicsWorld';
+import type { TrafficSystem } from '../traffic/TrafficSystem';
+import { performanceHandling } from '../maintenance/conditionHandling';
+import { rivalBuildStats } from './rivals';
+import { calculateVehiclePerformance } from '@/game-core/performance/calculator';
 
 export class RaceSystem implements GameSystem {
   readonly name = "race";
@@ -40,9 +53,16 @@ export class RaceSystem implements GameSystem {
   private starting = false;
   introRemaining = 0;
   private scene: Scene;
+  private rivalBody?: VehicleBody;
+  private rivalController?: VehicleController;
+  private driver?: AIDriver;
+  private raceLine?: RaceLineVisual;
+  private traffic?: TrafficSystem;
+  setTraffic(traffic: TrafficSystem) { this.traffic = traffic; }
   constructor(scene: Scene, private bridge: RuntimePort, private player: PlayerVehicle,
     private controls: DriverControls, private modes: PlayerModes, private routes: readonly RaceDefinition[] = [LOCAL_ROUTE],
-    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn" | "snapshot"> & Partial<Pick<VehicleSession, "persistent" | "execute">>; access?: (raceId: string) => string | null } = {}) {
+    private garage: { models?: NpcCarModels; wallet?: Pick<VehicleSession, "earn" | "snapshot"> & Partial<Pick<VehicleSession, "persistent" | "execute">>; access?: (raceId: string) => string | null } = {},
+    private world?: PhysicsWorld) {
     this.publisher = new SummaryPublisher((progress) => bridge.emit("raceProgress", progress));
     this.root = new TransformNode("local-rival", scene);
     this.root.setEnabled(false);
@@ -116,8 +136,10 @@ export class RaceSystem implements GameSystem {
     this.beginRace(route, attemptId);
   }
   private beginRace(route: RaceDefinition, attemptId: string) {
+    this.raceLine?.dispose(); this.raceLine = undefined;
     this.attemptId = attemptId; this.checkpointSent = 0;
     this.selected=route; this.race=new Race(route);
+    this.createRival(route);
     if (route.rival?.npcId && route.rival.vehicleId) this.bridge.emit('raceAttemptStarted', { raceId: route.id, attemptId: this.attemptId, npcId: route.rival.npcId, vehicleId: route.rival.vehicleId, totalCheckpoints: route.checkpoints.length });
     this.gates.forEach(g=>g.setEnabled(g.metadata.routeId===route.id));
     this.race.reset(); this.bridge.emit("raceProgress", this.race.snapshot());
@@ -129,31 +151,43 @@ export class RaceSystem implements GameSystem {
   }
   private reset() {
     this.abortAttempt();
+    this.raceLine?.dispose(); this.raceLine = undefined;
     this.introRemaining = 0;
     this.bridge.emit("raceIntro", null);
     this.race.reset(); this.controls.enabled = this.modes.mode === "driving";
     this.gates.forEach(gate => gate.setEnabled(false));
     this.root.setEnabled(false); this.resultSent = false;
+    this.disposeRival();
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
   update(dt: number) {
+    if (this.active && raceLineEnabled()) this.raceLine ??= new RaceLineVisual(this.scene, this.selected.waypoints);
+    else { this.raceLine?.dispose(); this.raceLine = undefined; }
     if (this.introRemaining > 0) {
       this.introRemaining = Math.max(0, this.introRemaining - dt);
-      const p = this.race.rival.position;
-      this.root.position.set(p.x, p.y + 0.1, p.z);
-      this.root.rotation.y = this.race.rival.heading;
+      this.syncRivalVisual();
       if (this.introRemaining === 0) this.bridge.emit("raceIntro", null);
       return;
     }
     const phase = this.race.phase;
-    this.race.update(dt, this.player.position);
+    const body = this.rivalBody;
+    const rivalPosition = body?.position ?? this.race.rival.position;
+    this.race.update(dt, this.player.position, rivalPosition);
     if (phase === "COUNTDOWN" && this.race.phase === "RUNNING") {
       this.controls.enabled = true;
       this.bridge.emit("raceStarted", this.standing());
     }
-    const p = this.race.rival.position;
-    this.root.position.set(p.x, p.y + 0.1, p.z); this.root.rotation.y = this.race.rival.heading;
-    if (this.race.rival.departed) this.root.setEnabled(false);
+    this.syncRivalVisual();
+    if (body) {
+      const state = this.rivalController!.model.state;
+      this.race.rival.speed = Math.max(0, state.vx);
+      this.race.rival.heading = Math.atan2(body.forward.x, body.forward.z);
+      const road = this.driver!.road;
+      const remaining = road.cumulative[road.cumulative.length - 1] -
+        road.progress(body.position, road.nearest(body.position));
+      this.race.rival.departed = this.race.opponent.finished && remaining < 3 && state.vx < .5;
+    }
+    if (this.race.rival.departed) { this.root.setEnabled(false); this.disposeRival(); }
     (this.current ?? this.visual)?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
     this.gates.filter(g=>g.metadata.routeId===this.selected.id).forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
@@ -169,6 +203,7 @@ export class RaceSystem implements GameSystem {
   }
   private abortAttempt() {
     if (!this.race.abort()) return;
+    this.raceLine?.dispose(); this.raceLine = undefined;
     this.introRemaining = 0;
     this.bridge.emit('raceIntro', null);
     this.controls.enabled = this.modes.mode === 'driving';
@@ -184,7 +219,9 @@ export class RaceSystem implements GameSystem {
     const result = { ...this.standing(), attemptId: this.attemptId, npcId: this.selected.rival?.npcId, vehicleId: this.selected.rival?.vehicleId,
       outcome, timeMs: Math.round((this.race.playerTime ?? this.race.elapsed) * 1000), validation: this.race.validation() };
     if (this.garage.wallet?.persistent && this.garage.wallet.execute) {
-      void this.garage.wallet.execute({ type: 'race_complete', attemptId: result.attemptId, elapsedMs: result.timeMs, finish: outcome !== 'dnf' && result.validation.finishValidated && !result.validation.invalidFinish }).then(receipt => {
+      void this.garage.wallet.execute({ type: 'race_complete', attemptId: result.attemptId, elapsedMs: result.timeMs,
+        finish: outcome !== 'dnf' && result.validation.finishValidated && !result.validation.invalidFinish,
+        opponentElapsedMs: this.race.opponentTime === null ? null : Math.round(this.race.opponentTime * 1000) }).then(receipt => {
         this.bridge.emit('raceFinished', { ...result, outcome: receipt.details.outcome as 'win' | 'loss' | 'dnf', position: Number(receipt.details.position), prizePhp: Number(receipt.details.prizePhp) });
       }, error => this.bridge.emit('persistenceError', `Race result was not saved: ${error instanceof Error ? error.message : String(error)}. Retry the save before leaving.`));
       return;
@@ -207,12 +244,73 @@ export class RaceSystem implements GameSystem {
     this.visual?.model.root.setEnabled(!dressed);
     this.current = dressed ? dressed.visual : this.visual;
   }
+  private createRival(route: RaceDefinition) {
+    this.disposeRival();
+    if (!this.world) return;
+    const definition = playerCar(route.rival ? npcCarId(NPC_CAR_BUILDS[route.rival.build]) : null);
+    const base = resolveHandlingPreset(HANDLING_PRESETS, definition.handlingPreset);
+    const config = route.rival ? performanceHandling(base, calculateVehiclePerformance(definition.spec).stats,
+      rivalBuildStats(route.rival.build)) : base;
+    const tier = route.rival?.tier ?? 2;
+    const skill = DRIVER_SKILLS[Math.min(3, Math.max(0, tier - 1))];
+    const seed = (route.rival?.name ?? route.id).split('').reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 1);
+    const temperament = (seed % 101) / 100;
+    const preference = (['inside', 'balanced', 'outside'] as const)[seed % 3];
+    const personality = { aggression: .25 + temperament * .65, patience: .85 - temperament * .65,
+      overtakingPreference: preference, defensiveTendency: .25 + temperament * .7,
+      riskTolerance: .2 + temperament * .65, trafficRiskTolerance: .15 + temperament * .4,
+      mistakeFrequency: .15 + temperament * .55 };
+    const body = new VehicleBody(this.world, definition.collision, config.chassis.massKg, `rival-${route.id}`);
+    const first = route.waypoints[0];
+    const offset = Math.hypot(first.x - route.start.x, first.z - route.start.z) < 3 ? -2.8 : 0;
+    const pose = { position: new Vector3(first.x + Math.cos(route.heading) * offset, first.y,
+      first.z - Math.sin(route.heading) * offset), headingRad: route.heading };
+    if (!body.place(pose)) { body.dispose(); return; }
+    const driver = new AIDriver(route.waypoints, skill, personality, config.brakes.decelerationMps2,
+      config.chassis.wheelbaseM, seed);
+    const source = { read: () => {
+      if (this.race.phase !== 'RUNNING' && this.race.phase !== 'FINISHED') return { throttle: 0, brake: 0, steer: 0 };
+      const model = this.rivalController!.model;
+      model.surfaceGrip = this.player.controller.model.surfaceGrip;
+      body.updateAxes();
+      const nearby: NearbyVehicle[] = [{ position: this.player.position, velocity: {
+        x: this.player.forward.x * this.player.speed, y: 0, z: this.player.forward.z * this.player.speed },
+        kind: 'opponent', width: this.player.definition.collision.body.width, length: this.player.definition.collision.body.length }];
+      for (const actor of this.traffic?.flow.actors ?? []) if (actor.active) nearby.push({
+        position: actor.follower.position,
+        velocity: { x: Math.sin(actor.follower.heading) * actor.follower.speed, y: 0,
+          z: Math.cos(actor.follower.heading) * actor.follower.speed },
+        kind: 'traffic', width: actor.kind.width, length: actor.kind.length,
+      });
+      return driver.update(this.world!.fixedStep, {
+        position: body.position, heading: Math.atan2(body.forward.x, body.forward.z), speed: model.state.vx,
+        yawRate: model.state.yawRate, lateralSlip: model.diagnostics.bodySlip,
+        frontGripUsage: model.diagnostics.frontGripUse, rearGripUsage: model.diagnostics.rearGripUse,
+        grip: model.surfaceGrip,
+      }, nearby);
+    } };
+    this.rivalBody = body;
+    this.driver = driver;
+    this.rivalController = new VehicleController(this.world, body, config, source);
+  }
+  private syncRivalVisual() {
+    if (!this.rivalBody) return;
+    this.root.position.copyFrom(this.rivalBody.position);
+    this.root.rotationQuaternion ??= this.rivalBody.node.rotationQuaternion!.clone();
+    this.root.rotationQuaternion.copyFrom(this.rivalBody.node.rotationQuaternion!);
+  }
+  private disposeRival() {
+    this.rivalController?.dispose(); this.rivalBody?.dispose();
+    this.rivalController = undefined; this.rivalBody = undefined; this.driver = undefined;
+  }
   private standing() { return { raceId: this.selected.id, position: this.race.position, racers: 2 }; }
   dispose() {
     this.abortAttempt();
+    this.raceLine?.dispose(); this.raceLine = undefined;
     this.disposed = true; this.releases.forEach((release) => release());
     this.player.canReposition = undefined; this.modes.canExit = undefined;
     this.controls.enabled = this.modes.mode === "driving";
     this.visual?.dispose(); this.dressed.forEach(d => d.car.dispose()); this.root.dispose(); this.gates.forEach((gate) => gate.dispose()); this.materials.forEach((m) => m.dispose());
+    this.disposeRival();
   }
 }

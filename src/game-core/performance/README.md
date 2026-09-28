@@ -49,7 +49,7 @@ Factory-new equivalents are always available at Banwa Auto Supply beside the tal
 supporting-part requirements via `satisfiesParts`. See `../shops/README.md`.
 
 The hub's existing inspection panel now includes **Performance**. Buy a used part in Marketplace,
-park in Mang Boy's service bay, get out and interact. Unknown condition requires the existing ₱150
+park in Tito Jun's service bay, get out and interact. Unknown condition requires the existing ₱150
 inspection before previewing work. The panel lists owned parts and missing supports, previews all
 final stats and full-throttle risk warnings, then quotes labor separately from the owned part.
 Previewed wheel/body modifiers are recalculated from each proposed inventory, including displaced
@@ -62,7 +62,7 @@ entry. Quotes clear on inventory/condition changes, leaving the bay, tab dismiss
 Installed parts and the wallet use their existing save adapters. As with other current session actions,
 there is no backend database transaction across those separate storage snapshots.
 
-Labor rates live in `PERFORMANCE_LABOR_PHP`. Mang Boy currently uses mechanic level 2 and reputation
+Labor rates live in `PERFORMANCE_LABOR_PHP`. Tito Jun currently uses mechanic level 2 and reputation
 0 from `TALYER_PERFORMANCE`; reputation progression is not implemented here, so rare parts requiring
 higher reputation remain gated with a visible reason. The inspection and quote are previews, not
 guarantees that a worn build will be reliable.

@@ -43,6 +43,8 @@ export type VehicleTelemetry = {
   liftOff: number;
   /** Share of weight moved onto the front axle (negative = rearward). */
   loadShift: number;
+  /** Share of each axle's weight moved onto the left tires (negative = right). */
+  lateralLoadShift: number;
   /** Share of requested drive the traction limit/assist removed. */
   tractionCut: number;
   /** Counter-yaw from the stability assist, rad/s². */

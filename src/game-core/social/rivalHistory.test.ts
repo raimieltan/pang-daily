@@ -7,7 +7,6 @@ import { raceValidation } from '../../../tests/fixtures/raceValidation';
 import { resolveConversation } from './conversation';
 import { VehicleSession } from '../maintenance/VehicleSession';
 import { LOCAL_ROUTE } from '@/game/races/localRoute';
-import { RIVAL_TUNING } from '@/game/races/Race';
 import { PAHUWAY_DESCENT, RACE_CALENDAR } from '@/game/races/raceCalendar';
 import { SOCIAL_RACE_CHECKPOINTS } from './raceOutcomes';
 
@@ -17,7 +16,6 @@ const result = (attemptId: string, outcome: RivalOutcome) => ({ type: 'race' as 
  validation: outcome === 'dnf' ? { ...raceValidation('barangay_sprint'), completedCheckpoints: 1, finishValidated: false } : raceValidation('barangay_sprint') });
 describe('persistent rival', () => {
  it('keeps one NPC and vehicle identity in both races; checkpoint requirements match actual routes', () => {
-  expect(LOCAL_ROUTE.rival!.tuning).toBe(RIVAL_TUNING);
   expect(LOCAL_ROUTE.rival).toMatchObject({ npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, build: FIRST_RIVAL.vehicleBuildId });
   expect(PAHUWAY_DESCENT.rival).toMatchObject({ npcId: FIRST_RIVAL.npcId, vehicleId: FIRST_RIVAL.vehicleId, build: FIRST_RIVAL.vehicleBuildId });
   for (const route of [LOCAL_ROUTE, ...RACE_CALENDAR]) expect(SOCIAL_RACE_CHECKPOINTS[route.id]).toBe(route.checkpoints.length);

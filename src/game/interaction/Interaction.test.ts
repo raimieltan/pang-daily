@@ -75,7 +75,7 @@ describe("world interactions", () => {
     expect(resolveInteraction(zones, 137.5, 105.5, "walking")?.action).toBe("hang_out");
   });
 
-  it("offers Mang Boy's errands and hatid requests from their boards", () => {
+  it("offers Tito Jun's errands and hatid requests from their boards", () => {
     const zones = interactablesFromZones(HUB_LAYOUT.chunks.flatMap((c) => c.zones));
     expect(resolveInteraction(zones, 41.6, 154, "walking")?.id).toBe("talyer_job_board");
     expect(resolveInteraction(zones, 45, 158, "walking")?.action).toBe("hang_out");
