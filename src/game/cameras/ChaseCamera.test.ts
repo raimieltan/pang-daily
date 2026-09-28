@@ -60,7 +60,7 @@ describe("ChaseCamera", () => {
     // Monotonic pull-back, no overshoot.
     for (let i = 1; i < samples.length; i++) expect(samples[i]).toBeGreaterThanOrEqual(samples[i - 1] - 1e-9);
     expect(samples.at(-1)).toBeCloseTo(C.distance.fast, 2);
-    expect(cam.fov).toBeCloseTo(C.fovDeg.fast * DEG, 2);
+    expect(cam.fov).toBeCloseTo((C.fovDeg.fast + 10) * DEG, 2);
     // Two seconds in (~30 km/h) it has hardly moved: no lurch on launch.
     expect(samples[119] - C.distance.slow).toBeLessThan((C.distance.fast - C.distance.slow) * 0.1);
   });
@@ -69,6 +69,15 @@ describe("ChaseCamera", () => {
     const { cam, rig, target } = setup({ speed: 3 });
     for (let i = 0; i < 300; i++) rig.update(1 / 60);
     expect(measure(cam, target).distance - C.distance.slow).toBeLessThan(0.02);
+  });
+
+  it("punches the FOV near top speed and suppresses that punch with reduced motion", () => {
+    const { cam, rig, target } = setup({ speed: 160 / 3.6 });
+    for (let i = 0; i < 120; i++) rig.update(1 / 60);
+    const boosted = cam.fov;
+    rig.reducedMotion = true;
+    for (let i = 0; i < 120; i++) rig.update(1 / 60);
+    expect(boosted - cam.fov).toBeGreaterThan(8 * DEG);
   });
 
   it("trails a turn by a bounded lag and settles behind the car", () => {

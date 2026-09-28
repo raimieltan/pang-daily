@@ -96,6 +96,7 @@ export class VehicleModel {
   private rideHeightM: number;
   private paintHex: string;
   private stockSpoilerVisible = true;
+  private trunkHinge: TransformNode | null | undefined;
   /** Mean hub rise over stock across the four sockets; the body sits on it. */
   private tireLiftM = 0;
   private readonly jackOffset = new Vector3();
@@ -190,6 +191,8 @@ export class VehicleModel {
     }
     const model = new VehicleModel(this.definition, container, root, copyOf(this.chassis), wheels, attachments, paint, this.stats, []);
     model.setHoodOpen(false);
+    model.trunkHinge = this.trunkHinge ? copyOf(this.trunkHinge) : this.trunkHinge;
+    model.setTrunkOpen(0);
     return model;
   }
 
@@ -252,6 +255,31 @@ export class VehicleModel {
   setHoodOpen(open: boolean): void {
     const hood = this.attachments.get("hood");
     if (hood) hood.anchor.rotation.x = open ? -Math.PI / 3 : 0;
+  }
+
+  /** Lift the authored trunk lid or hatch about its forward upper edge. */
+  setTrunkOpen(amount: number): void {
+    if (this.trunkHinge === undefined) {
+      const hinge = this.root.getDescendants(false).find(node =>
+        node.name.endsWith("attach_trunk") || node.name.endsWith("attach_hatch")) as TransformNode | undefined;
+      this.trunkHinge = hinge ?? null;
+      if (hinge) {
+        hinge.computeWorldMatrix(true);
+        const inverse = hinge.getWorldMatrix().clone().invert();
+        let top = -Infinity, front = -Infinity;
+        for (const mesh of hinge.getChildMeshes()) {
+          mesh.computeWorldMatrix(true);
+          for (const corner of mesh.getBoundingInfo().boundingBox.vectorsWorld) {
+            const local = Vector3.TransformCoordinates(corner, inverse);
+            top = Math.max(top, local.y);
+            front = Math.max(front, local.z);
+          }
+        }
+        if (Number.isFinite(top) && Number.isFinite(front))
+          hinge.setPivotPoint(new Vector3(0, top, front));
+      }
+    }
+    if (this.trunkHinge) this.trunkHinge.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), Math.max(0, Math.min(1, amount)) * 1.15);
   }
 
   /** Recolours the paint material. `hex` is sRGB `#rrggbb`. */

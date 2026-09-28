@@ -2,6 +2,7 @@ import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { GameSystem } from "../engine/types";
+import { VelocityEnvelope } from "../rendering/VelocityEffect";
 import { DEFAULT_CHASE_CAMERA, type ChaseCameraConfig, type SpeedRange } from "./ChaseCameraConfig";
 
 const DEG = Math.PI / 180;
@@ -44,6 +45,7 @@ export class ChaseCamera implements GameSystem {
   private focusY = 0;
   private speedBlend = 0;
   private look = 0;
+  private readonly velocity = new VelocityEnvelope();
   private readonly aim = new Vector3();
 
   constructor(
@@ -79,13 +81,14 @@ export class ChaseCamera implements GameSystem {
   }
 
   update(dt: number): void {
-    if (!this.active) return;
+    if (!this.active) { this.velocity.reset(); return; }
     this.recordingTime += dt;
     this.enginePhase = (this.enginePhase + (this.target.recordingMotion?.rpm ?? 0) / 60 * 0.12 * Math.PI * 2 * dt) % (Math.PI * 2);
     const c = this.config;
     const p = this.target.position;
 
     this.speedBlend += (this.targetSpeedBlend() - this.speedBlend) * follow(c.speedFollow, dt);
+    this.velocity.step(dt, this.target.speed * 3.6, !this.reducedMotion);
     const s = this.speedBlend;
 
     const maxLag = c.maxHeadingLagDeg * DEG;
@@ -138,9 +141,13 @@ export class ChaseCamera implements GameSystem {
       this.camera.position.y += (Math.sin(t * 0.93) * 0.004 + Math.cos(this.enginePhase * 1.7) * 0.003 * s
         + Math.max(-1, Math.min(1, this.target.recordingMotion.suspension)) * 0.012) * this.analogIntensity;
     }
+    if (!this.reducedMotion && this.velocity.value > 0.01) {
+      const vibration = this.velocity.value * 0.012;
+      this.camera.position.y += Math.sin(this.recordingTime * 43) * vibration;
+    }
     this.camera.setTarget(this.aim);
 
-    this.camera.fov = blend(c.fovDeg, s) * DEG;
+    this.camera.fov = (blend(c.fovDeg, s) + this.velocity.value * 10) * DEG;
     this.camera.minZ = c.nearClip;
     this.camera.maxZ = c.farClip;
   }

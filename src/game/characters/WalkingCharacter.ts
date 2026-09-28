@@ -54,7 +54,7 @@ export class WalkingCharacter implements GameSystem {
   private readonly releaseStep: () => void;
   private readonly velocity = new Vector3();
   private readonly beforeMove = new Vector3();
-  private readonly visual: CharacterVisual;
+  readonly visual: CharacterVisual;
   private travelSpeed = 0;
   private readonly surface: CharacterSurfaceInfo = {
     isSurfaceDynamic: false,

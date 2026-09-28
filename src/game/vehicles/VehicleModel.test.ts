@@ -155,6 +155,31 @@ describe("VehicleModel import", () => {
     expect(hood.anchor.rotation.x).toBe(0);
   });
 
+  it("lifts the sedan trunk lid and returns it to its closed position", async () => {
+    const model = await VehicleModel.load(scene, BANWA_DALAGAN_1996, GLB);
+    const lid = scene.getNodeByName("trunk_stock") as TransformNode;
+    const closed = lid.getHierarchyBoundingVectors().max.y;
+
+    model.setTrunkOpen(1);
+    expect(lid.getHierarchyBoundingVectors().max.y).toBeGreaterThan(closed + 0.1);
+    const npc = model.clone("trunk-closed-npc");
+    const npcLid = npc.root.getDescendants(false).find(node => node.name.endsWith("trunk_stock")) as TransformNode;
+    expect(npcLid.getHierarchyBoundingVectors().max.y).toBeCloseTo(closed, 4);
+    model.setTrunkOpen(0);
+    expect(lid.getHierarchyBoundingVectors().max.y).toBeCloseTo(closed, 4);
+  });
+
+  it("lifts the hatch with its glass and closes it again", async () => {
+    const model = await VehicleModel.load(scene, HIRAYA_KIDLAT_1997, HATCH_GLB);
+    const hatch = scene.getNodeByName("attach_hatch") as TransformNode;
+    const closed = hatch.getHierarchyBoundingVectors().max.y;
+
+    model.setTrunkOpen(1);
+    expect(hatch.getHierarchyBoundingVectors().max.y).toBeGreaterThan(closed + 0.1);
+    model.setTrunkOpen(0);
+    expect(hatch.getHierarchyBoundingVectors().max.y).toBeCloseTo(closed, 4);
+  });
+
   it("recolours only the paint material", async () => {
     const model = await VehicleModel.load(scene, BANWA_DALAGAN_1996, GLB);
     const paint = scene.getMaterialByName("paint") as PBRMaterial;

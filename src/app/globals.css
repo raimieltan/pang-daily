@@ -54,6 +54,14 @@ body {
 .tape-loading { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #080b0f; }
 .speed-number { font-size: clamp(52px, 7vw, 92px); font-weight: 200; line-height: 1; letter-spacing: -0.06em; }
 .speed-readout { padding-top: 15px; }
+.driving-minimap { position: absolute; left: clamp(18px, 3vw, 42px); bottom: clamp(18px, 3vw, 42px); z-index: 2; width: clamp(156px, 17vw, 210px); padding: 8px; background: #08110fe8; border: 1px solid #dfc9909e; box-shadow: 0 0 0 2px #061012, 0 6px 25px #000a, inset 0 0 18px #6c8a7540; color: #eadfb9; font: 9px/1.2 monospace; letter-spacing: .12em; text-shadow: 0 0 7px #f1dbaa80; }
+.driving-minimap-head, .driving-minimap-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; }
+.driving-minimap-head { padding: 1px 1px 7px; border-bottom: 1px solid #d7c58d54; }
+.driving-minimap-head span:last-child { color: #eaa47e; }
+.driving-minimap svg { display: block; width: 100%; aspect-ratio: 1; margin: 6px 0; border: 1px solid #9aab8a68; background: #0a1a19; }
+.driving-minimap-foot { padding: 1px; color: #a9bea8; }
+@media (prefers-reduced-motion: reduce) { .driving-speed-lines { display: none; } }
+@media (max-width: 600px) { .driving-minimap { width: 134px; bottom: 12px; left: 12px; padding: 6px; font-size: 7px; } }
 .race-readout { max-width: 350px; border-right: 1px solid #ffffff50; padding: 10px 16px; font-size: 11px; line-height: 1.8; background: linear-gradient(90deg, transparent, #05070965); }
 .tape-settings { text-shadow: none; letter-spacing: 0.025em; }
 .tape-settings summary, .tape-settings label { line-height: 1.5; }

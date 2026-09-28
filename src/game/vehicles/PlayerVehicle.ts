@@ -378,8 +378,9 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private summarize(): VehicleSummary {
     const { state } = this.controller.model;
     const speedKmh = Math.round(Math.abs(state.vx) * 3.6);
-    if (state.reversing) return { speedKmh, gear: -1 };
-    return { speedKmh, gear: this.options.definition.gearThresholdsKmh.filter((kmh) => speedKmh >= kmh).length };
+    const pose = { x: this.body.position.x, z: this.body.position.z, headingRad: Math.atan2(this.body.forward.x, this.body.forward.z) };
+    if (state.reversing) return { speedKmh, gear: -1, ...pose };
+    return { speedKmh, gear: this.options.definition.gearThresholdsKmh.filter((kmh) => speedKmh >= kmh).length, ...pose };
   }
 
   private sample(): VehicleTelemetry {

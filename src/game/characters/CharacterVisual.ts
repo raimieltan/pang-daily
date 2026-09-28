@@ -47,6 +47,7 @@ export class CharacterVisual {
   private phase = 0;
   private time = 0;
   private weight = 0;
+  private wheelWork: 'carry' | 'pump' | null = null;
   private readonly head: Mesh;
   private readonly cup: Mesh | null;
   private readonly vape: Mesh | null;
@@ -249,6 +250,30 @@ export class CharacterVisual {
     });
   }
 
+  /** Keep the hands on a carried wheel or moving jack handle while the walking gait runs. */
+  setWheelWork(work: 'carry' | 'pump' | null): void {
+    this.wheelWork = work;
+    this.applyWheelWork();
+  }
+
+  private applyWheelWork(): void {
+    if (this.wheelWork === 'carry') {
+      this.arms.forEach(({ shoulder, elbow }, i) => {
+        shoulder.rotation.x = -0.75;
+        shoulder.rotation.z = i === 0 ? -0.22 : 0.22;
+        elbow.rotation.x = -0.85;
+      });
+    } else if (this.wheelWork === 'pump') {
+      const stroke = Math.sin(this.time * 13) * 0.28;
+      this.arms.forEach(({ shoulder, elbow }, i) => {
+        shoulder.rotation.x = -0.8 + stroke;
+        shoulder.rotation.z = i === 0 ? -0.12 : 0.12;
+        elbow.rotation.x = -0.55 - stroke;
+      });
+      this.torso.rotation.x = 0.15 + stroke * 0.25;
+    }
+  }
+
   update(dt: number, speed: number, grounded: boolean): void {
     this.time += dt;
     const moving = grounded && speed > 0.08;
@@ -272,5 +297,6 @@ export class CharacterVisual {
       shoulder.rotation.z = (i === 0 ? -1 : 1) * 0.08;
       elbow.rotation.x = -0.13 - (0.12 + 0.08 * Math.cos(this.phase + i * Math.PI)) * this.weight;
     });
+    this.applyWheelWork();
   }
 }

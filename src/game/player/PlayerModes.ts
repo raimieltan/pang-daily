@@ -88,6 +88,10 @@ export class PlayerModes implements GameSystem {
     return this.current;
   }
 
+  get characterVisual() {
+    return this.parts.character.visual;
+  }
+
   get position(): Vector3 {
     return this.current === "driving" ? this.parts.vehicle.position : this.parts.character.position;
   }

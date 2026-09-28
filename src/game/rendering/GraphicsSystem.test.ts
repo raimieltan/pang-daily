@@ -16,7 +16,7 @@ afterEach(() => {
   engine = null;
 });
 
-function setup(baseScaling = 1) {
+function setup(baseScaling = 1, source?: { speedKmh: number; gear: number; impactSerial: number; impactStrength: number }) {
   engine = new NullEngine();
   // NullEngine always reports 1; stand in for a real engine's level.
   let level = baseScaling;
@@ -32,7 +32,7 @@ function setup(baseScaling = 1) {
   for (const name of ["graphicsState", "timeOfDay", "renderStats", "graphicsBenchmark", "commandRejected"] as const) {
     bridge.ui.events.on(name, (payload) => events.push({ name, payload }));
   }
-  const graphics = new GraphicsSystem(scene, engine, camera, bridge.runtime, lighting, chunk.pools ? [chunk.pools] : [], "high");
+  const graphics = new GraphicsSystem(scene, engine, camera, bridge.runtime, lighting, chunk.pools ? [chunk.pools] : [], "high", source);
   const frames = (seconds: number) => {
     for (let t = 0; t < seconds; t += 1 / 60) {
       lighting.update(1 / 60);
@@ -40,10 +40,20 @@ function setup(baseScaling = 1) {
       scene.render();
     }
   };
-  return { scene, graphics, lighting, commands: bridge.ui.commands, events, frames, pools: chunk.pools! };
+  return { scene, camera, graphics, lighting, commands: bridge.ui.commands, events, frames, pools: chunk.pools! };
 }
 
 describe("GraphicsSystem", () => {
+  it("keeps velocity after the analog pass and removes it for reduced motion", () => {
+    const source = { speedKmh: 155, gear: 5, impactSerial: 0, impactStrength: 0 };
+    const { camera, graphics, commands } = setup(1, source);
+    expect(camera._postProcesses.filter(Boolean).at(-1)).toBe(graphics.velocity.pass);
+    commands.setGraphics({ analog: false });
+    expect(camera._postProcesses.filter(Boolean).at(-1)).toBe(graphics.velocity.pass);
+    commands.setGraphics({ reducedMotion: true });
+    expect(camera._postProcesses).not.toContain(graphics.velocity.pass);
+  });
+
   it("applies a preset, then single-effect overrides on top of it", () => {
     const { graphics, lighting, commands, pools } = setup();
     commands.setGraphics({ quality: "low" });

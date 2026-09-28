@@ -3,6 +3,7 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { RuntimePort } from "../bridge";
 import type { GameSystem } from "../engine/types";
 import type { Interactable } from "../interaction/Interaction";
@@ -79,6 +80,12 @@ export class TireSystem implements GameSystem {
   private readonly releases: (() => void)[] = [];
   private readonly tmp = new Vector3();
   private jackMesh?: Mesh;
+  private jackHandle?: Mesh;
+  private pumpPhase = 0;
+  private carriedWheel?: TransformNode;
+  private carriedId: string | null = null;
+  private trunkProgress = 0;
+  private trunkHold = 0;
   /** 0 = down, 1 = fully raised; animates toward the saved jack state. */
   private jackProgress = 0;
   private jackCorner: number | null = null;
@@ -172,8 +179,10 @@ export class TireSystem implements GameSystem {
         speedKmh: this.player.speedKmh, softGround: corner ? SOFT.includes(this.surfaces[CORNER_IDS.indexOf(corner)]) : false,
       });
       if (outcome) return outcome;
+      if (step === "stow" || step === "take_spare") this.trunkHold = 1.1;
       this.bridge.emit("tireEvent", { corner, kind: "service", text: stepLabel(step, corner) });
       this.apply();
+      this.animateWheelWork(0);
     }));
     this.releases.push(interactions.handle("inspect_tire", (target) => {
       const corner = target.target as CornerId;
@@ -188,6 +197,7 @@ export class TireSystem implements GameSystem {
     this.dirty ||= this.player.speedKmh > 0.2 || CORNER_IDS.some((c) => (this.session.mounted(this.player.id, c)?.leakKpaPerMin ?? 0) > 0);
     this.apply();
     this.animateJack(dt);
+    this.animateWheelWork(dt);
     this.saveAge += dt;
     if (changed || (this.dirty && this.saveAge >= SAVE_INTERVAL)) { this.session.save({ urgent: changed }); this.saveAge = 0; this.dirty = false; }
     this.publishStatus();
@@ -199,6 +209,36 @@ export class TireSystem implements GameSystem {
   private apply() {
     this.sim.apply();
     this.sim.showWheels(this.player.visual.model.wheels);
+  }
+
+  private animateWheelWork(dt: number): void {
+    const model = this.player.visual.model;
+    const character = this.modes?.characterVisual;
+    const held = this.modes?.mode === "walking" ? this.car.held : null;
+    if (held !== this.carriedId) {
+      this.carriedWheel?.dispose();
+      this.carriedWheel = undefined;
+      this.carriedId = held;
+      if (held && character) {
+        const source = model.wheels.find(w => w.socket.isEnabled()) ?? model.wheels[0];
+        this.carriedWheel = source?.socket.clone("tire-carried-wheel", character.root) ?? undefined;
+        if (this.carriedWheel) {
+          this.carriedWheel.position.set(0, 0.98, 0.42);
+          this.carriedWheel.rotationQuaternion = null;
+          this.carriedWheel.rotation.set(0, Math.PI / 2, 0);
+          const scale = this.session.assembly(held)?.spec === "donut" ? 0.55 : 0.9;
+          this.carriedWheel.scaling.setAll(scale);
+          this.carriedWheel.setEnabled(true);
+          for (const mesh of this.carriedWheel.getChildMeshes()) mesh.isPickable = false;
+        }
+      }
+    }
+    const pumping = this.modes?.mode === "walking" && this.jackProgress > 0 && this.jackProgress < 1;
+    character?.setWheelWork(held ? "carry" : pumping ? "pump" : null);
+    this.trunkHold = Math.max(0, this.trunkHold - dt);
+    const target = this.modes?.mode === "walking" && this.trunkHold > 0 ? 1 : 0;
+    this.trunkProgress += (target - this.trunkProgress) * Math.min(1, dt * 5);
+    model.setTrunkOpen(this.trunkProgress);
   }
 
   /**
@@ -223,12 +263,12 @@ export class TireSystem implements GameSystem {
     if (pose) model.setJackPose(eased > 0 ? pose.rotation : null, pose.offset);
     const socket = model.wheels.find((w) => w.id === this.player.body.wheels[i].id)?.socket;
     if (socket) socket.position.y = WHEEL_CLEAR_M * eased;
-    this.placeJack(i, eased);
+    this.placeJack(i, eased, dt);
     if (this.jackProgress === 0 && target === 0) { this.jackCorner = null; model.setJackPose(null); }
   }
 
-  private placeJack(i: number, eased: number) {
-    if (eased <= 0) { this.jackMesh?.setEnabled(false); return; }
+  private placeJack(i: number, eased: number, dt: number) {
+    if (eased <= 0) { this.jackMesh?.setEnabled(false); this.jackHandle?.setEnabled(false); return; }
     const scene = this.player.visual.model.root.getScene();
     if (!this.jackMesh) {
       this.jackMesh = MeshBuilder.CreateBox("tire-jack", { width: 0.18, height: 1, depth: 0.28 }, scene);
@@ -236,6 +276,9 @@ export class TireSystem implements GameSystem {
       material.diffuseColor = new Color3(0.75, 0.12, 0.08);
       this.jackMesh.material = material;
       this.jackMesh.isPickable = false;
+      this.jackHandle = MeshBuilder.CreateBox("tire-jack-handle", { width: 0.035, height: 0.035, depth: 0.44 }, scene);
+      this.jackHandle.material = material;
+      this.jackHandle.isPickable = false;
     }
     const height = 0.12 + JACK_LIFT_M * eased;
     const local = this.player.body.wheels[i].local;
@@ -244,6 +287,17 @@ export class TireSystem implements GameSystem {
     this.jackMesh.position.set(this.tmp.x, this.tmp.y - this.player.definition.collision.wheels.radius + height / 2, this.tmp.z);
     this.jackMesh.rotationQuaternion = this.player.body.node.rotationQuaternion?.clone() ?? null;
     this.jackMesh.setEnabled(true);
+    if (this.jackHandle) {
+      const pumping = this.jackProgress > 0 && this.jackProgress < 1;
+      if (pumping) this.pumpPhase += dt * 12;
+      this.jackHandle.position.copyFrom(this.jackMesh.position)
+        .addInPlace(this.player.body.forward.scale(-0.17))
+        .addInPlaceFromFloats(0, height / 2, 0);
+      const stroke = pumping ? Math.sin(this.pumpPhase) * 0.48 : 0;
+      this.jackHandle.rotationQuaternion = (this.player.body.node.rotationQuaternion ?? Quaternion.Identity())
+        .multiply(Quaternion.RotationAxis(Vector3.Right(), stroke));
+      this.jackHandle.setEnabled(true);
+    }
   }
 
   private report(corner: CornerId, tire: TireAssembly, events: TireEvent[]): boolean {
@@ -361,6 +415,10 @@ export class TireSystem implements GameSystem {
     this.session.save();
     void this.session.flush().catch(() => { /* ServerPersistence reports it. */ });
     this.releases.forEach((release) => release());
+    this.player.visual.model.setTrunkOpen(0);
+    this.modes?.characterVisual.setWheelWork(null);
+    this.carriedWheel?.dispose();
+    this.jackHandle?.dispose();
     this.jackMesh?.material?.dispose();
     this.jackMesh?.dispose();
   }

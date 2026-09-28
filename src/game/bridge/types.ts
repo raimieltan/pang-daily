@@ -16,6 +16,10 @@ export type VehicleSummary = {
   speedKmh: number;
   /** -1 reverse, 0 neutral, 1+ forward gears. */
   gear: number;
+  /** Coarse world pose for the driving minimap. Kept flat for summary change detection. */
+  x?: number;
+  z?: number;
+  headingRad?: number;
 };
 
 /**

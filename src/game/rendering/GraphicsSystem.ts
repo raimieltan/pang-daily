@@ -21,6 +21,7 @@ import {
 } from "./LightingConfig";
 import type { SceneLighting } from "./SceneLighting";
 import { AnalogPostProcess, type AnalogSource } from "./AnalogPostProcess";
+import { VelocityPostProcess } from "./VelocityPostProcess";
 import { ANALOG_KEYS, ANALOG_LIMITS, ANALOG_PRESET_NAMES } from "./AnalogConfig";
 
 const STATS_INTERVAL_SECONDS = 1;
@@ -53,6 +54,7 @@ export class GraphicsSystem implements GameSystem {
   /** Null while no pipeline effect is on. */
   pipeline: DefaultRenderingPipeline | null = null;
   analog!: AnalogPostProcess;
+  velocity!: VelocityPostProcess;
   private settings: GraphicsSettings;
   private readonly sceneStats: SceneInstrumentation;
   private readonly engineStats: EngineInstrumentation;
@@ -81,6 +83,8 @@ export class GraphicsSystem implements GameSystem {
     this.settings = { ...GRAPHICS_PRESETS[quality] };
     this.apply(this.settings);
     this.analog = new AnalogPostProcess(scene, camera, this.settings, source);
+    this.velocity = new VelocityPostProcess(scene, camera, source);
+    this.velocity.configure(this.settings);
 
     bridge.handle("setGraphics", (patch) => {
       if (patch.quality && !(patch.quality in GRAPHICS_PRESETS)) return { rejected: `Unknown quality "${patch.quality}"` };
@@ -128,6 +132,7 @@ export class GraphicsSystem implements GameSystem {
 
   dispose(): void {
     this.analog.dispose();
+    this.velocity.dispose();
     this.setPipeline(false);
     this.sceneStats.dispose();
     this.engineStats.dispose();
@@ -179,6 +184,7 @@ export class GraphicsSystem implements GameSystem {
     if (level !== this.engine.getHardwareScalingLevel()) this.engine.setHardwareScalingLevel(level);
     this.settings = settings;
     this.analog?.configure(settings);
+    this.velocity?.configure(settings);
     if (publish) this.bridge.emit("graphicsState", { ...settings });
   }
 
