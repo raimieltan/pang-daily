@@ -51,7 +51,7 @@ void main(void) {
   float cell = floor(sector);
   float selected = hash(cell + 1.0);
   float density = mix(0.18, 0.68, strength);
-  float active = 1.0 - step(density, selected);
+  float rayEnabled = 1.0 - step(density, selected);
   float centre = hash(cell + 19.0);
   float angularDistance = abs(fract(sector) - centre);
   float width = mix(0.025, 0.13, clamp(radius / 0.9, 0.0, 1.0));
@@ -69,7 +69,7 @@ void main(void) {
   float segment = smoothstep(start, start + 0.025, radius) * (1.0 - smoothstep(end - 0.04, end, radius));
   float taper = smoothstep(start, end + 0.001, radius);
   float brightness = mix(0.35, 1.0, hash(cell + 109.0));
-  float streak = active * segment * taper * periphery * brightness * strength;
+  float streak = rayEnabled * segment * taper * periphery * brightness * strength;
   colour += vec3(0.8, 0.9, 1.0) * streak * (core * 0.72 + glow * 0.14);
   colour *= 1.0 + 0.065 * strength * periphery;
   gl_FragColor = vec4(colour, 1.0);
