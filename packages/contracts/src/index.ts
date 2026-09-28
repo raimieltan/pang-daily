@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { SocialState } from '@pang-daily/game-core/social/contract';
+import { vehicleTireStateSchema } from '@pang-daily/game-core/tires/TireSession';
 
 export const SAVE_VERSION = 2;
 export const CONTENT_VERSION = 'm3-content-1';
@@ -20,7 +21,9 @@ export const bootstrapSchema = z.object({
   economy: z.object({ balanceCentavos: exactInteger, revision: exactInteger, towCount: z.number().int().nonnegative().optional() }),
   vehicles: z.array(z.object({ id: z.string().uuid(), definitionId: z.string(), condition: vehicleCondition,
     conditionRevision: exactInteger, fuelLiters: z.number().nonnegative(), paint: z.string().regex(/^#[0-9a-f]{6}$/i),
-    rideHeightM: z.number().min(-.15).max(.15), stockSpoilerRemoved: z.boolean() })).min(1),
+    rideHeightM: z.number().min(-.15).max(.15), stockSpoilerRemoved: z.boolean(),
+    /** Simulated wheel assemblies; `state` null = never saved (a stock set). */
+    tires: z.object({ revision: exactInteger, state: vehicleTireStateSchema.nullable() }).optional() })).min(1),
   inventory: z.object({ revision: exactInteger,
     parts: z.array(z.object({ id: z.string().uuid(), definitionId: z.string(), acquisitionKey: z.string(), condition: fraction.nullable(),
       revealedBy: z.enum(['mechanic','known']).nullable(), finish: z.enum(['body_color','primer','mismatched','bare_plastic','fake_carbon','damaged']).nullable(),
@@ -66,6 +69,9 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('vehicle_appearance'), vehicleId: id, paint: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), rideHeightM: z.number().min(-.15).max(.15).optional(), spoilerMode: z.enum(['none','stock']).optional() }),
     z.strictObject({ type: z.literal('vehicle_select'), vehicleId: id }),
     z.strictObject({ type: z.literal('vehicle_checkpoint'), vehicleId: id, revision: exactInteger, conditionLoss: vehicleCondition, fuelConsumedMilliliters: z.number().int().min(0).max(45000), odometerDeltaMeters: z.number().int().min(0).max(100000) }),
+    // Driving and roadside wheel work: validated against the saved tires so nothing heals or appears.
+    z.strictObject({ type: z.literal('vehicle_tires'), vehicleId: id, revision: exactInteger, state: vehicleTireStateSchema }),
+    z.strictObject({ type: z.literal('tire_service'), vehicleId: id, lineId: z.string().min(1).max(120) }),
     z.strictObject({ type: z.literal('job_start'), definitionId: contentId }),
     z.strictObject({ type: z.literal('job_begin'), runId: contentId }),
     z.strictObject({ type: z.literal('job_objective'), runId: contentId, objectiveId: contentId, elapsedMs: millisecond, cargoDamage: fraction }),

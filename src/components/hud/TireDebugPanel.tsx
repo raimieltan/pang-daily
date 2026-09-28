@@ -19,7 +19,7 @@ export function TireDebugPanel() {
         {tires.corners.map((c) => (
           <div key={c.corner} className="flex flex-col gap-0.5">
             <span className="font-bold">{c.corner} · {c.spec} · {c.failure}{c.raised ? " · JACKED" : ""}</span>
-            <Row label="Pressure / health / rim" value={`${Math.round(c.pressureKpa)} kPa / ${Math.round(c.health * 100)}% / ${Math.round(c.rimDamage * 100)}%`} />
+            <Row label="Pressure / tread / carcass / rim" value={`${Math.round(c.pressureKpa)} kPa / ${Math.round(c.tread * 100)}% / ${Math.round(c.health * 100)}% / ${Math.round(c.rimDamage * 100)}%`} />
             <Row label="Surface / grip / slip×" value={`${c.surface} / ${c.grip.toFixed(2)} / ${c.slipScale.toFixed(2)}`} />
             <Row label="Load / Fx / Fy (kN)" value={`${kN(c.normalLoadN)} / ${kN(c.fx)} / ${kN(c.fy)}`} />
             <Row label="Slip angle / ratio" value={`${c.slipAngleDeg.toFixed(1)}° / ${c.slipRatio.toFixed(2)}`} />

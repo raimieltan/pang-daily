@@ -42,7 +42,7 @@ export class SceneManager<Id extends string> {
     private readonly market: SceneContext["market"] = { useWorkshop: () => () => {} },
   private readonly inventory = new InventorySession(),
     private readonly socialStorage: SceneContext['socialStorage'] = { getItem: () => null, setItem: () => {} },
-    private readonly playerContext?: Pick<SceneContext, 'ownedVehicleDefinitionIds' | 'garageStorage'>,
+    private readonly playerContext?: Partial<Pick<SceneContext, 'ownedVehicleDefinitionIds' | 'garageStorage' | 'tires'>>,
   ) {}
 
   setPaused(paused: boolean): void {

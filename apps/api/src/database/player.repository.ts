@@ -4,6 +4,7 @@ import { BOOTSTRAP_VERSION, type PlayerBootstrap } from '@pang-daily/contracts';
 import { chapterBeatStates, CHAPTER_ONE } from '@pang-daily/game-core/progression/chapter';
 import { resolvePlayer } from './player-context';
 import { loadSocialState } from './social-state';
+import type { VehicleTireState } from '@pang-daily/game-core/tires/TireSession';
 import { DatabaseService } from './database.service';
 import type { StarterState } from '../player/starter-state';
 
@@ -45,7 +46,7 @@ export class PlayerRepository {
           const actor = await resolvePlayer(tx, userId);
           // Repeatable snapshot covers every include/query in this transaction.
           const player = await tx.playerProfile.findUnique({ where: { id: actor.id }, include: {
-            saveVersion: true, wallet: true, vehicles: { where: { retiredAt: null }, include: { condition: true, installations: { include: { slots: true } } } },
+            saveVersion: true, wallet: true, vehicles: { where: { retiredAt: null }, include: { condition: true, tireState: true, installations: { include: { slots: true } } } },
             inventory: { include: { parts: { include: { transaction: { select: { sequence: true } } } } } },
             npcs: { include: { flags: true, milestones: true, favors: { include: { job: true } }, rival: true } },
             reputation: true, reputationSources: true, crews: { include: { membership: true } },
@@ -75,7 +76,9 @@ export class PlayerRepository {
             vehicles: player.vehicles.map(vehicle => ({ id: vehicle.id, definitionId: vehicle.definitionId, condition: Object.fromEntries(
               Object.keys(starter.vehicle.condition).map(key => [key, Number(vehicle.condition![key as keyof typeof starter.vehicle.condition])])) as PlayerBootstrap['vehicles'][number]['condition'],
               conditionRevision: vehicle.condition!.revision.toString(), fuelLiters: Number(vehicle.condition!.fuelLiters), paint: vehicle.paint,
-              rideHeightM: Number(vehicle.rideHeightM), stockSpoilerRemoved: vehicle.stockSpoilerRemoved })),
+              rideHeightM: Number(vehicle.rideHeightM), stockSpoilerRemoved: vehicle.stockSpoilerRemoved,
+              tires: { revision: vehicle.tireState?.revision.toString() ?? '0',
+                state: (vehicle.tireState?.state ?? null) as VehicleTireState | null } })),
             inventory: { revision: player.inventory.revision.toString(), parts: player.inventory.parts.map(part => ({ id: part.id, definitionId: part.partDefinitionId,
               acquisitionKey: part.acquisitionKey, condition: part.condition === null ? null : Number(part.condition), revealedBy: part.revealedBy, finish: part.finish,
               origin: part.origin, sourceReference: part.sourceReference, sellerId: part.sellerId, paidCentavos: part.paidCentavos?.toString() ?? null, purchaseSequence: part.transaction?.sequence.toString() ?? null,

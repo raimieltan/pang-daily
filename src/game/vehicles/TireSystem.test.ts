@@ -12,7 +12,7 @@ import { resolveHandlingPreset } from "./handling/HandlingConfig";
 import { HANDLING_PRESETS } from "./handling/presets";
 import type { PlayerVehicle } from "./PlayerVehicle";
 import { TireSystem, jackPose, type TireShopWallet } from "./TireSystem";
-import type { TireSurface } from "@/game-core/tires";
+import { STOCK_SETUP, type TireSurface } from "@/game-core/tires";
 
 /**
  * TireSystem wiring against a headless scene and a stand-in car: a real handling model, real
@@ -46,7 +46,7 @@ function rig(options: { surfaceAt?: (x: number, z: number) => TireSurface; stora
   });
   let impact: (strength: number, point: Vector3 | null) => void = () => {};
   const player = {
-    id: "car", body, controller: { model }, speedKmh: 0,
+    id: "car", body, controller: { model }, speedKmh: 0, tireSetup: STOCK_SETUP,
     visual: { model: { wheels: visualWheels, root, setJackPose: (q: Quaternion | null) => { jackPoses.push(q); } } },
     onImpact: (listener: typeof impact) => { impact = listener; return () => {}; },
     definition: { spec: { id: "car" }, collision: { body: { length: 4.2 }, wheels: { radius: 0.3 } } },

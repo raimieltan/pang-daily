@@ -43,7 +43,7 @@ export type TireEventPayload = {
 };
 export type TireTelemetry = {
   corners: {
-    corner: CornerId; spec: string; failure: FailureState; pressureKpa: number; health: number; rimDamage: number;
+    corner: CornerId; spec: string; failure: FailureState; pressureKpa: number; health: number; /** Tread left (maintenance `tires` condition); donuts are always 1. */ tread: number; rimDamage: number;
     surface: TireSurface; grip: number; slipScale: number; rollingResistance: number; installed: boolean; raised: boolean;
     grounded: boolean; normalLoadN: number; fx: number; fy: number; slipAngleDeg: number; slipRatio: number;
     wheelSpeed: number; driveN: number; brakeN: number; rollingN: number;
@@ -135,14 +135,24 @@ export class TireSystem implements GameSystem {
   /** Opens tire service at the talyer. `rejection` says why it isn't available here (null = at the bench). */
   useShop(wallet: TireShopWallet, rejection: () => string | null): void {
     const publish = (receipt: string | null = null) => {
-      const blocked = rejection() ?? (wallet.persistent ? "Tire service isn't on synced saves yet" : null);
+      const blocked = rejection();
       this.bridge.emit("tireShopState", { lines: blocked ? [] : tireServiceLines(this.session, this.player.id),
         walletPhp: wallet.summary(this.player.definition.spec).walletPhp, rejection: blocked, receipt });
     };
     this.releases.push(this.bridge.handle("quoteTireService", () => publish()));
     this.releases.push(this.bridge.handle("buyTireService", ({ lineId }) => {
-      const blocked = rejection() ?? (wallet.persistent ? "Tire service isn't on synced saves yet" : null);
+      const blocked = rejection();
       if (blocked) return { rejected: blocked };
+      if (this.session.persistent) {
+        // Server saves: the talyer prices and charges on the server; the confirmed tires come back.
+        const line = tireServiceLines(this.session, this.player.id).find((l) => l.id === lineId);
+        if (!line) { publish(); return { rejected: "That service is no longer needed" }; }
+        return this.session.service(this.player.id, lineId).then(() => {
+          this.apply();
+          this.bridge.emit("tireEvent", { corner: null, kind: "service", text: line.label });
+          publish(`Paid ₱${line.costPhp.toLocaleString("en-PH")}: ${line.label}`);
+        }, (error: unknown) => { publish(); return { rejected: error instanceof Error ? error.message : String(error) }; });
+      }
       const result = applyTireService(this.session, this.player.id, lineId, (line) => {
         const paid = wallet.spend(line.costPhp, { kind: "tire_service", source: "talyer", description: line.label, relatedEntityId: this.player.id });
         return "rejected" in paid ? { rejected: String(paid.rejected) } : undefined;
@@ -179,7 +189,7 @@ export class TireSystem implements GameSystem {
     this.apply();
     this.animateJack(dt);
     this.saveAge += dt;
-    if (changed || (this.dirty && this.saveAge >= SAVE_INTERVAL)) { this.session.save(); this.saveAge = 0; this.dirty = false; }
+    if (changed || (this.dirty && this.saveAge >= SAVE_INTERVAL)) { this.session.save({ urgent: changed }); this.saveAge = 0; this.dirty = false; }
     this.publishStatus();
     this.telemetryAge += dt;
     if (this.telemetryAge >= TELEMETRY_INTERVAL) { this.telemetryAge = 0; this.bridge.emit("tireTelemetry", this.telemetry()); }
@@ -269,7 +279,7 @@ export class TireSystem implements GameSystem {
     const tire = this.session.mounted(this.player.id, corner);
     if (!tire) return { rejected: "No wheel on that corner" };
     const events = puncture(tire, failure);
-    if (events.length) { this.report(corner, tire, events); this.session.save(); }
+    if (events.length) { this.report(corner, tire, events); this.session.save({ urgent: true }); }
     this.apply();
   }
 
@@ -301,7 +311,9 @@ export class TireSystem implements GameSystem {
       HEALTHY: "holding air", SLOW_LEAK: "hissing slowly", RAPID_LEAK: "losing air fast", FLAT: "flat",
       BLOWOUT: "blown out", DESTROYED: "shredded",
     };
-    const tread = tire.health > 0.7 ? "good tread" : tire.health > 0.3 ? "worn and scuffed" : "torn sidewall";
+    // Tread is the road set's wear (maintenance condition); health is the carcass (flats, blowouts).
+    const treadLeft = tire.spec === "standard" ? this.player.tireSetup.tread : 1;
+    const tread = tire.health <= 0.3 ? "torn sidewall" : treadLeft < 0.25 ? "nearly bald" : treadLeft < 0.6 ? "worn tread" : "good tread";
     const rim = tire.rimDamage > 0.5 ? " The rim is badly bent." : tire.rimDamage > 0 ? " The rim is scraped." : "";
     const advisory = spec.recommendedMaxKph ? ` Sidewall says max ${spec.recommendedMaxKph} km/h.` : "";
     return `${spec.label}, ${Math.round(tire.pressureKpa)} of ${spec.nominalKpa} kPa, ${state[tire.failure]}, ${tread}.${rim}${advisory}`;
@@ -336,7 +348,7 @@ export class TireSystem implements GameSystem {
         const input = model.tires[i], out = model.corners[i];
         return {
           corner, spec: tire?.spec ?? "none", failure: tire?.failure ?? "DESTROYED", pressureKpa: tire?.pressureKpa ?? 0,
-          health: tire?.health ?? 0, rimDamage: tire?.rimDamage ?? 0, surface: this.surfaces[i], grip: input.grip,
+          health: tire?.health ?? 0, tread: tire?.spec === "standard" ? this.player.tireSetup.tread : 1, rimDamage: tire?.rimDamage ?? 0, surface: this.surfaces[i], grip: input.grip,
           slipScale: input.slipScale, rollingResistance: input.rollingResistance, installed: input.installed, raised: input.raised,
           grounded: out.grounded, normalLoadN: out.normalLoadN, fx: out.fx, fy: out.fy, slipAngleDeg: out.slipAngle * 180 / Math.PI,
           slipRatio: out.slipRatio, wheelSpeed: out.wheelSpeed, driveN: out.driveN, brakeN: out.brakeN, rollingN: out.rollingN,
@@ -347,6 +359,7 @@ export class TireSystem implements GameSystem {
 
   dispose(): void {
     this.session.save();
+    void this.session.flush().catch(() => { /* ServerPersistence reports it. */ });
     this.releases.forEach((release) => release());
     this.jackMesh?.material?.dispose();
     this.jackMesh?.dispose();

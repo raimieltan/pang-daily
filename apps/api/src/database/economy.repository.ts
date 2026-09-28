@@ -24,6 +24,8 @@ import type { Prisma } from '../generated/prisma/client';
 import { DatabaseService } from './database.service';
 import { loadSocialState } from './social-state';
 import { towCostPhp } from '@pang-daily/game-core/maintenance/towing';
+import { TireSession, stockVehicleTires, tireCheckpointRejection, vehicleTireStateSchema, type VehicleTireState } from '@pang-daily/game-core/tires/TireSession';
+import { applyTireService } from '@pang-daily/game-core/tires/tireShop';
 import { progressSocial } from './social-progression';
 import { CHAPTER_ONE, STARTER_ORIGINS } from '@pang-daily/game-core/progression/chapter';
 import { advanceChapter } from './chapter-state';
@@ -42,6 +44,20 @@ export class EconomyRepository {
     const row = await tx.vehicle.findFirst({ where: { id, playerId, retiredAt: null }, include: { condition: true } });
     if (!row || !row.condition) missing();
     return row;
+  }
+  /** The car's confirmed tires; a car never checkpointed has its stock set. */
+  private async tires(tx: Tx, vehicleId: string, definitionId: string): Promise<{ revision: bigint; state: VehicleTireState }> {
+    const row = await tx.vehicleTireState.findUnique({ where: { vehicleId } });
+    if (!row) return { revision: 0n, state: stockVehicleTires(definitionId) };
+    const parsed = vehicleTireStateSchema.safeParse(row.state);
+    if (!parsed.success) refuse('PLAYER_STATE_INCOMPLETE', 'The saved tires are unreadable. Progress has not been reset.');
+    return { revision: row.revision, state: parsed.data };
+  }
+  private async saveTires(tx: Tx, vehicleId: string, revision: bigint, state: VehicleTireState) {
+    const json = state as unknown as Prisma.InputJsonValue;
+    await tx.vehicleTireState.upsert({ where: { vehicleId }, create: { vehicleId, revision: revision + 1n, state: json },
+      update: { revision: revision + 1n, state: json } });
+    return (revision + 1n).toString();
   }
   private async part(tx: Tx, playerId: string, id: string) {
     const row = await tx.ownedPart.findFirst({ where: { id, playerId, retiredAt: null }, include: { installation: true } });
@@ -282,6 +298,31 @@ export class EconomyRepository {
             fuelLiters: (Math.round(Number(current.fuelLiters) * 1000) - a.fuelConsumedMilliliters) / 1000,
             mileageMeters: { increment: BigInt(a.odometerDeltaMeters) }, revision: { increment: 1 } } });
           receipt.resourceId = vehicle.id; break;
+        }
+        case 'vehicle_tires': {
+          const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
+          const saved = await this.tires(tx, vehicle.id, vehicle.definitionId);
+          if (saved.revision.toString() !== a.revision) refuse('TIRE_REVISION_CONFLICT', 'These tires changed in another session. Reload the latest state.');
+          const rejection = tireCheckpointRejection(saved.state, a.state);
+          if (rejection) refuse('INVALID_TIRE_CHECKPOINT', rejection);
+          receipt.resourceId = vehicle.id;
+          receipt.details = { tireRevision: await this.saveTires(tx, vehicle.id, saved.revision, a.state) };
+          break;
+        }
+        case 'tire_service': {
+          const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
+          const saved = await this.tires(tx, vehicle.id, vehicle.definitionId);
+          // Price and apply against the server's own copy; the client only names the line.
+          const session = new TireSession();
+          session.importVehicle(vehicle.definitionId, saved.state);
+          let cost = 0;
+          const result = applyTireService(session, vehicle.definitionId, a.lineId, line => { cost = line.costPhp; });
+          if ('rejected' in result) refuse('TIRE_SERVICE_UNAVAILABLE', result.rejected);
+          await pay(-php(cost), 'TIRE_SERVICE', 'talyer', command.key, result.line.label, vehicle.id);
+          const state = session.exportVehicle(vehicle.definitionId);
+          receipt.resourceId = vehicle.id;
+          receipt.details = { costPhp: cost, tireRevision: await this.saveTires(tx, vehicle.id, saved.revision, state), tires: JSON.stringify(state) };
+          break;
         }
         case 'job_start': {
           const job = HUB_JOBS.find(j => j.id === a.definitionId); if (!job) refuse('UNKNOWN_JOB', 'Unknown job definition.');

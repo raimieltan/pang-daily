@@ -15,6 +15,7 @@ import { MarketplaceService } from "../marketplace/MarketplaceService";
 import { grantCustomizationTestKit } from '../vehicles/developmentParts';
 import { VehicleSession } from '../../game-core/maintenance/VehicleSession';
 import { InventorySession } from '../../game-core/inventory/InventorySession';
+import { TireSession, loadTireSession } from '../../game-core/tires';
 import { JobSession } from '../../game-core/jobs/JobSession';
 import { SOCIAL_SESSION_KEY } from '../social/socialStorage';
 import { saveActiveCar } from '../vehicles/garageStorage';
@@ -60,6 +61,7 @@ export class GameRuntime {
   private started = false;
   private disposed = false;
   private persistence?: RuntimePersistence;
+  private tires: TireSession;
   private saveElapsed = 0;
 
   constructor(canvas: HTMLCanvasElement, options: GameRuntimeOptions = {}) {
@@ -83,6 +85,9 @@ export class GameRuntime {
     // The phone outlives scenes, so the marketplace is runtime-wide like pause.
     const inventory = options.bootstrap ? new InventorySession(options.bootstrap.inventory) : loadInventorySession(storage);
     if (!options.bootstrap && process.env.NODE_ENV === 'development') grantCustomizationTestKit(inventory);
+    // Signed in: tires come from the bootstrap and checkpoint to the server (see useServer below).
+    const tires = options.bootstrap ? new TireSession() : loadTireSession(storage);
+    this.tires = tires;
     const socialFallback = new Map<string, string>();
     let loadedSocial = options.bootstrap?.social;
     const baseSocialStorage = storage ?? {
@@ -106,6 +111,7 @@ export class GameRuntime {
       this.persistence = options.persistence({ initial: options.bootstrap, wallet: session, inventory, jobs, report: message => emit('persistenceError', message), refresh: fresh => { loadedSocial = fresh.social; loadedChapters = fresh.chapters; } });
       socialStorage.executeSocial = intent => this.persistence!.execute(intent);
       session.usePersistence(this.persistence); inventory.usePersistence(this.persistence);
+      tires.useServer(this.persistence, options.bootstrap.tires ?? {});
       for (const race of options.bootstrap.interruptedRaces ?? []) void this.persistence.execute({ type: 'race_complete', ...race, finish: false }).catch(error => emit('persistenceError', `Interrupted race could not be saved: ${error instanceof Error ? error.message : String(error)}`));
     }
     if (process.env.NODE_ENV === 'development') handle('devGrantCash', () => {
@@ -130,7 +136,7 @@ export class GameRuntime {
         emit("error", { message: `Scene "${sceneId}" failed: ${reason}` });
       },
     }, session, jobs,
-      this.market, inventory, socialStorage, options.bootstrap ? { ownedVehicleDefinitionIds: options.bootstrap.ownedDefinitionIds, garageStorage: socialStorage } : undefined);
+      this.market, inventory, socialStorage, { tires, ...(options.bootstrap ? { ownedVehicleDefinitionIds: options.bootstrap.ownedDefinitionIds, garageStorage: socialStorage } : {}) });
 
     this.resizeObserver = new ResizeObserver(() => this.engine.resize());
     this.resizeObserver.observe(canvas);
@@ -170,6 +176,7 @@ export class GameRuntime {
     if (this.disposed) return;
     this.disposed = true;
     this.resizeObserver.disconnect();
+    void this.tires.flush().catch(() => { /* Reported through persistenceError. */ });
     this.persistence?.dispose();
     this.audio.dispose();
     this.market.dispose();

@@ -20,7 +20,14 @@ separate. That module picks the look and small stat modifiers; this one decides 
   and repair prices still show them.
 - **Donut.** Less grip, softer response, more drag. `recommendedMaxKph` is advisory only: above it the tire
   wears fast, but nothing caps the car.
-- **Session (`TireSession`, save key `pang-daily.tires.v1`).** Per vehicle it stores the corners, spare,
+- **Server saves.** Signed in, `useServer` loads each car's confirmed `VehicleTireState` from the bootstrap.
+  From then on the session sends `vehicle_tires` checkpoints: failures and wheel work go immediately, and
+  routine leaks at most every 30 s. The server keeps one `VehicleTireState` row per car. It runs
+  `tireCheckpointRejection` on every checkpoint: nothing heals, and no assembly or tool appears. Wheels
+  can move freely between corners, spare well, trunk and hands. Talyer work is `tire_service`, which the
+  server prices and applies to its own copy before returning the result. Stock sets use deterministic
+  ids (`stockVehicleTires`), so a car that was never saved matches on both sides.
+- **Session (`TireSession`, dev save key `pang-daily.tires.v1`).** Per vehicle it stores the corners, spare,
   jack, wrench, trunk, and any wheel change in progress (`jacked`, `loosened`, `held`). The first use
   creates a stock set. Loading restores damage exactly as it was saved.
 - **Wheel change (`wheelChange.ts`).** `performStep` runs one step: `loosen`, `raise`, `remove`,
@@ -39,14 +46,11 @@ slip and drag. No path writes yaw or the global `surfaceGrip`.
   plug for a leak on a tire with enough life left, new rubber (which keeps the rim damage), straightening or
   replacing the rim, a road tire over a fitted donut (the donut goes back in the well), and a spare, jack or
   wrench when one is missing. `applyTireService` validates the line and charges through `pay` before it
-  changes anything. It refuses while a roadside change is in progress. It lives in the talyer's Tires tab
-  and uses the wallet in `VehicleSession`. It is off on server-synced saves until there is a server action
-  for it.
+  changes anything. It refuses while a roadside change is in progress. It lives in the talyer's Tires tab.
+  Dev saves pay from the `VehicleSession` wallet; server saves go through `tire_service`.
 
 Jack: the saved jack state animates the visual. The chassis pivots about the opposite wheel (`jackPose`),
 the jacked wheel hangs clear and the jack grows under the sill. The physics body stays level, and the
 handling model already treats that corner as ungrounded.
 
 Race rivals run the same `CarTires` simulation on a fresh unsaved set each race: per-wheel ground, impact punctures and flat wear. Their driver plans speed from `usableGrip()`, and their dressed car shows flats. Rival tire states appear in the Race AI debug panel.
-
-Not yet: tire service on server-synced saves.

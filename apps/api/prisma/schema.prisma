@@ -196,6 +196,7 @@ model Vehicle {
   updatedAt           DateTime          @updatedAt @db.Timestamptz(3)
   player              PlayerProfile     @relation("OwnedVehicles", fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   condition           VehicleCondition?
+  tireState           VehicleTireState?
   installations       InstalledPart[]
   transactions        Transaction[]
   races               RaceResult[]
@@ -222,6 +223,15 @@ model VehicleCondition {
   fuelLiters   Decimal  @db.Decimal(9, 3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
   vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+/// Simulated wheel assemblies (game-core `VehicleTireState`), validated on every checkpoint so they never heal.
+model VehicleTireState {
+  vehicleId String   @id @db.Uuid
+  revision  BigInt   @default(0)
+  state     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 }
 
 model Inventory {

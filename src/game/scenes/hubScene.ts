@@ -81,7 +81,7 @@ import { buildChunk, WorldKit } from "../world/WorldChunk";
  * `?time=morning|afternoon|night` the time of day, `?handling=<presetId>` the handling preset.
  */
 export const hubScene: SceneDefinition = {
-  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory, socialStorage, garageStorage, ownedVehicleDefinitionIds, restart }) {
+  async setup({ scene, engine, addSystem, bridge, signal, session, jobs, market, inventory, socialStorage, tires: tireSession, garageStorage, ownedVehicleDefinitionIds, restart }) {
     const params = new URLSearchParams(window.location.search);
     const havok = await loadHavok();
     if (signal.aborted) return;
@@ -184,7 +184,7 @@ export const hubScene: SceneDefinition = {
     });
     const surfaceAt = surfaceResolver(CONNECTED_LAYOUT);
     race.setSurfaces(surfaceAt);
-    const tires = new TireSystem(bridge, maintainedCar, modes, surfaceAt, socialStorage);
+    const tires = new TireSystem(bridge, maintainedCar, modes, surfaceAt, tireSession ?? socialStorage);
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions, tires.interactions]));
     tires.connect(interactions);
     addSystem(tires);

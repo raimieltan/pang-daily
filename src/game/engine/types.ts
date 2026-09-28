@@ -37,6 +37,8 @@ export interface SceneContext {
   /** Owned parts and what is installed on which car (wheels read their install from here). */
   readonly inventory: InventorySession;
   readonly socialStorage: SocialStoragePort;
+  /** Runtime-wide wheel/tire state (server-synced when signed in). Absent in bare test contexts. */
+  readonly tires?: import("../../game-core/tires").TireSession;
   /** Lend the scene's talyer to the phone marketplace for part inspections; release on teardown. */
   readonly market: { useWorkshop(workshop: Workshop): () => void };
   addSystem<T extends GameSystem>(system: T): T;

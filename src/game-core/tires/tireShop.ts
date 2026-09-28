@@ -93,12 +93,12 @@ export function applyTireService(tires: TireSession, vehicleId: string, lineId: 
     if (op === 'fit') {
       const corner = ref as CornerId;
       const donut = c.corners[corner]!;
-      const road = newAssembly(tires.nextAssemblyId(), 'standard');
+      const road = newAssembly(tires.nextAssemblyId(vehicleId), 'standard');
       tires.adopt(road);
       c.corners[corner] = road.id;
       if (!c.spare) c.spare = donut; else c.trunk.push(donut);
     }
-    if (op === 'spare') { const donut = newAssembly(tires.nextAssemblyId(), 'donut'); tires.adopt(donut); c.spare = donut.id; }
+    if (op === 'spare') { const donut = newAssembly(tires.nextAssemblyId(vehicleId), 'donut'); tires.adopt(donut); c.spare = donut.id; }
     if (op === 'jack') c.jack = true;
     if (op === 'wrench') c.wrench = true;
   });

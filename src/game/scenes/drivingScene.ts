@@ -30,7 +30,7 @@ import { MaintenanceSystem } from "../maintenance/MaintenanceSystem";
  * Palette follows ART_DIRECTION §5: charcoal night, asphalt, sodium-orange fill.
  */
 export const drivingScene: SceneDefinition = {
-  async setup({ scene, addSystem, bridge, signal, session, inventory, socialStorage, garageStorage, ownedVehicleDefinitionIds }) {
+  async setup({ scene, addSystem, bridge, signal, session, inventory, socialStorage, tires, garageStorage, ownedVehicleDefinitionIds }) {
     scene.clearColor = new Color4(0.06, 0.06, 0.07, 1);
     scene.fogMode = Scene.FOGMODE_EXP2;
     scene.fogDensity = 0.004;
@@ -82,7 +82,7 @@ export const drivingScene: SceneDefinition = {
     addSystem(new MaintenanceSystem(bridge, session, player, () => controls.enabled));
     addSystem(new CustomizationSystem(bridge, inventory, player, () => 'Visit Tito Jun’s talyer for paint and suspension.'));
     addSystem(new WheelSystem(bridge, inventory, player));
-    addSystem(new TireSystem(bridge, player, undefined, () => 'asphalt', socialStorage));
+    addSystem(new TireSystem(bridge, player, undefined, () => 'asphalt', tires ?? socialStorage));
   addSystem(new PerformanceSystem(inventory, player));
     addSystem(new ExteriorSystem(bridge, inventory, player, () => 'Visit Tito Jun’s talyer to fit exterior parts.'));
     addSystem(chase);

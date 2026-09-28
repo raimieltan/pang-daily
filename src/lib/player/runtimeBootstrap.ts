@@ -69,6 +69,7 @@ export function runtimeBootstrap(dto: PlayerBootstrap): RuntimeBootstrap {
     jobs: { version: 1, serial: jobSerial, history, current: current ? { runId: current.runId, jobId: current.definitionId,
       status: current.status, objectiveIndex: current.objectiveIndex, elapsedSeconds: safeInteger(current.elapsedMs) / 1000,
       cargoLoaded: current.cargoLoaded, cargoDamage: current.cargoDamage, ...(current.reason ? { reason: current.reason } : {}) } : null },
+    tires: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, vehicle.tires ?? { revision: '0', state: null }])),
     social: dto.social.state, interruptedRaces: dto.progression.recentRaces.filter(race => race.outcome === 'started').map(race => ({ attemptId: race.attemptId, elapsedMs: safeInteger(race.lastCheckpointElapsedMs ?? '0') })), chapters: dto.progression.chapters, activeDefinitionId, ownedDefinitionIds: Object.keys(instanceIdByDefinition), instanceIdByDefinition,
   };
 }
