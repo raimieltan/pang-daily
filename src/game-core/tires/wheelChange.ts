@@ -85,7 +85,8 @@ export function nextCornerStep(tires: TireSession, vehicleId: string, corner: Co
   const car = tires.vehicle(vehicleId);
   const mounted = car.corners[corner];
   if (car.jacked === corner) {
-    if (mounted) return car.held ? 'lower' : 'remove';
+    // A bad wheel comes off; a good one (just mounted) goes back down.
+    if (mounted) return needsChange(tires, vehicleId, corner) && !car.held ? 'remove' : 'lower';
     return car.held ? 'install' : null;
   }
   if (car.loosened.includes(corner)) return mounted && !car.jacked ? (needsChange(tires, vehicleId, corner) || car.held ? 'raise' : 'tighten') : null;

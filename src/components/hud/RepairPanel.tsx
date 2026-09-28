@@ -8,6 +8,7 @@ import { useGameUiStore } from '@/state/gameUiStore';
 import { TalyerExteriorPanel } from './TalyerExteriorPanel';
 import { TalyerSetupPanel } from './TalyerSetupPanel';
 import { TalyerPerformancePanel } from './TalyerPerformancePanel';
+import { TalyerTirePanel } from './TalyerTirePanel';
 
 const pesos = (value: number) => `₱${value.toLocaleString('en-PH')}`;
 const healthClass = (value: number) => value <= .35 ? 'text-red-300' : value < .7 ? 'text-amber-200' : 'text-emerald-200';
@@ -36,7 +37,7 @@ export function RepairPanel() {
 }
 
 function QuoteForm({ quote }: { quote: RepairQuote }) {
-  const [section, setSection] = useState<'repairs' | 'exterior' | 'paint' | 'suspension' | 'performance'>('repairs');
+  const [section, setSection] = useState<'repairs' | 'tires' | 'exterior' | 'paint' | 'suspension' | 'performance'>('repairs');
   const [selected, setSelected] = useState<ServiceComponent[]>([]);
   const [pending, setPending] = useState(false);
   const summary = useMaintenanceStore(s => s.summary);
@@ -55,12 +56,13 @@ function QuoteForm({ quote }: { quote: RepairQuote }) {
     </header>
     <nav aria-label="Talyer services" className="mt-4 flex flex-wrap gap-2">
       <button type="button" className="tape-button" aria-pressed={section === 'repairs'} onClick={() => setSection('repairs')}>Repairs</button>
+      <button type="button" className="tape-button" aria-pressed={section === 'tires'} onClick={() => setSection('tires')}>Tires</button>
       <button type="button" className="tape-button" aria-pressed={section === 'performance'} onClick={() => setSection('performance')}>Performance</button>
       <button type="button" className="tape-button" aria-pressed={section === 'exterior'} onClick={() => setSection('exterior')}>Exterior parts</button>
       <button type="button" className="tape-button" aria-pressed={section === 'paint'} onClick={() => setSection('paint')}>Paint booth</button>
       <button type="button" className="tape-button" aria-pressed={section === 'suspension'} onClick={() => setSection('suspension')}>Suspension</button>
     </nav>
-    {section === 'performance' ? <TalyerPerformancePanel /> : section === 'exterior' ? <TalyerExteriorPanel /> : section === 'paint' || section === 'suspension' ? <TalyerSetupPanel section={section} /> : <>
+    {section === 'tires' ? <TalyerTirePanel /> : section === 'performance' ? <TalyerPerformancePanel /> : section === 'exterior' ? <TalyerExteriorPanel /> : section === 'paint' || section === 'suspension' ? <TalyerSetupPanel section={section} /> : <>
     <p className="my-4 text-xs text-white/65">Inspection is free. Parts and labor are included. Pick what your budget can cover.</p>
     {quote.benefitLabel && <p className="mb-3 text-xs text-amber-200">{quote.benefitLabel}</p>}
     <p className="mb-3 flex justify-between"><span className="text-white/60">Cash on hand</span><strong>{pesos(wallet)}</strong></p>

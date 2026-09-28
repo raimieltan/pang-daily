@@ -98,6 +98,7 @@ export class VehicleModel {
   private stockSpoilerVisible = true;
   /** Mean hub rise over stock across the four sockets; the body sits on it. */
   private tireLiftM = 0;
+  private readonly jackOffset = new Vector3();
   private readonly stockHubY: ReadonlyMap<WheelId, number>;
   private readonly stockRadius: ReadonlyMap<WheelId, number>;
 
@@ -196,8 +197,18 @@ export class VehicleModel {
   setRideHeight(offsetM: number): number {
     const { minM, maxM } = this.definition.visual.rideHeight;
     this.rideHeightM = Math.min(maxM, Math.max(minM, offsetM));
-    this.chassis.position.y = this.rideHeightM + this.tireLiftM;
+    this.chassis.position.set(this.jackOffset.x, this.rideHeightM + this.tireLiftM + this.jackOffset.y, this.jackOffset.z);
     return this.rideHeightM;
+  }
+
+  /**
+   * Body tilted on a jack: the chassis turns by `rotation` and shifts by `offset` (car space) while
+   * the wheels stay where they are, like the suspension extending. `null` puts it back level.
+   */
+  setJackPose(rotation: Quaternion | null, offset?: Vector3): void {
+    this.chassis.rotationQuaternion = rotation ? rotation.clone() : null;
+    this.jackOffset.copyFrom(offset ?? Vector3.ZeroReadOnly);
+    this.setRideHeight(this.rideHeightM);
   }
 
   /**

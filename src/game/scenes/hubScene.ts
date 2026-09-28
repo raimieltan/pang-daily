@@ -232,6 +232,7 @@ export const hubScene: SceneDefinition = {
     addSystem(jobSystem);
     addSystem(new CustomizationSystem(bridge, inventory, maintainedCar, talyer));
     addSystem(new WheelSystem(bridge, inventory, maintainedCar));
+    tires.useShop(session, talyer);
   addSystem(new PerformanceSystem(inventory, maintainedCar));
   addSystem(new TalyerPerformanceSystem(bridge, inventory, session, maintainedCar.definition.spec, talyer));
   addSystem(new AutoPartsShopSystem(bridge, session, inventory, interactions,

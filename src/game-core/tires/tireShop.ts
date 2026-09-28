@@ -74,7 +74,8 @@ export function tireServiceLines(tires: TireSession, vehicleId: string): TireSer
  * Does one priced line. `pay` charges the wallet and returns a rejection or nothing; it runs
  * after the line is validated and before anything changes, so a refused payment changes nothing.
  */
-export function applyTireService(tires: TireSession, vehicleId: string, lineId: string, pay: (line: TireServiceLine) => { rejected: string } | void) {
+export function applyTireService(tires: TireSession, vehicleId: string, lineId: string,
+  pay: (line: TireServiceLine) => { rejected: string } | void): { rejected: string } | { line: TireServiceLine } {
   const line = tireServiceLines(tires, vehicleId).find(l => l.id === lineId);
   if (!line) return { rejected: 'That service is no longer needed' };
   const car = tires.vehicle(vehicleId);

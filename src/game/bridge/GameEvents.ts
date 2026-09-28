@@ -74,6 +74,8 @@ export type GameEventMap = {
   tireEvent: import('../vehicles/TireSystem').TireEventPayload;
   /** Per-corner forces and tire state, 5 Hz, for the debug panel. */
   tireTelemetry: import('../vehicles/TireSystem').TireTelemetry;
+  /** Talyer tire service: priced lines, or why it's unavailable. */
+  tireShopState: import('../vehicles/TireSystem').TireShopState;
   /** Result of inspecting a wheel. */
   tireInspection: { corner: import('../../game-core/tires').CornerId; text: string };
   horn: void;

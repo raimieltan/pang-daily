@@ -30,5 +30,16 @@ wheel and jack visuals. Events: `tireStatus`, `tireEvent` (audio and toasts), `t
 `tireTelemetry` (Pause → Development → Tires). Tire effects reach the car only through per-corner grip,
 slip and drag. No path writes yaw or the global `surfaceGrip`.
 
-Not yet: AI cars on simulated tires, buying or repairing tires and rims, and a real jack lift pose (the
-body stays level and the jacked corner is simply ungrounded).
+- **Talyer service (`tireShop.ts`).** `tireServiceLines` prices what the car's assemblies need: air, a
+  plug for a leak on a tire with enough life left, new rubber (which keeps the rim damage), straightening or
+  replacing the rim, a road tire over a fitted donut (the donut goes back in the well), and a spare, jack or
+  wrench when one is missing. `applyTireService` validates the line and charges through `pay` before it
+  changes anything. It refuses while a roadside change is in progress. It lives in the talyer's Tires tab
+  and uses the wallet in `VehicleSession`. It is off on server-synced saves until there is a server action
+  for it.
+
+Jack: the saved jack state animates the visual. The chassis pivots about the opposite wheel (`jackPose`),
+the jacked wheel hangs clear and the jack grows under the sill. The physics body stays level, and the
+handling model already treats that corner as ungrounded.
+
+Not yet: AI cars on simulated tires, and tire service on server-synced saves.

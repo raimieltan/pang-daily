@@ -1,4 +1,4 @@
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -10,7 +10,7 @@ import type { InteractionSystem } from "../interaction/InteractionSystem";
 import type { PlayerModes } from "../player/PlayerModes";
 import type { PlayerVehicle } from "./PlayerVehicle";
 import {
-  CORNER_IDS, CORNER_NAMES, TIRE_SPECS, impactPuncture, isFlat, isLowPressure, loadTireSession, nextCornerStep, performStep,
+  CORNER_IDS, CORNER_NAMES, applyTireService, tireServiceLines, type TireServiceLine, TIRE_SPECS, impactPuncture, isFlat, isLowPressure, loadTireSession, nextCornerStep, performStep,
   pressureRatio, puncture, stepAssembly, stepLabel, tireResponse, type CornerId, type FailureState, type TireAssembly,
   type TireEvent, type TireSession, type TireSurface, type WheelChangeStep,
 } from "@/game-core/tires";
@@ -27,6 +27,13 @@ export type TireStatus = {
   jacked: CornerId | null;
   held: string | null;
   driveBlock: string | null;
+};
+export type TireShopState = { lines: TireServiceLine[]; walletPhp: number; rejection: string | null; receipt: string | null };
+/** Wallet the talyer charges; the same `VehicleSession` the repair bench uses. */
+export type TireShopWallet = {
+  spend(amountPhp: number, source: { kind: string; description: string; source: string; relatedEntityId?: string | null }): { rejected: string } | object;
+  summary(definition: PlayerVehicle["definition"]["spec"]): { walletPhp: number };
+  readonly persistent?: boolean;
 };
 export type TireEventPayload = {
   corner: CornerId | null;
@@ -45,6 +52,11 @@ export type TireTelemetry = {
 const SURFACE_INTERVAL = 0.1;
 const TELEMETRY_INTERVAL = 0.2;
 const SAVE_INTERVAL = 5;
+/** How far the jack raises the body at its corner, and how far that wheel then hangs clear. */
+const JACK_LIFT_M = 0.09;
+const WHEEL_CLEAR_M = 0.045;
+/** Seconds to crank the jack all the way up (or down). */
+const JACK_SECONDS = 1.2;
 /** Soft ground the jack can't stand on. */
 const SOFT: readonly TireSurface[] = ["grass"];
 
@@ -68,6 +80,9 @@ export class TireSystem implements GameSystem {
   private readonly releases: (() => void)[] = [];
   private readonly tmp = new Vector3();
   private jackMesh?: Mesh;
+  /** 0 = down, 1 = fully raised; animates toward the saved jack state. */
+  private jackProgress = 0;
+  private jackCorner: number | null = null;
 
   constructor(
     private readonly bridge: RuntimePort,
@@ -118,6 +133,28 @@ export class TireSystem implements GameSystem {
     return out;
   };
 
+  /** Opens tire service at the talyer. `rejection` says why it isn't available here (null = at the bench). */
+  useShop(wallet: TireShopWallet, rejection: () => string | null): void {
+    const publish = (receipt: string | null = null) => {
+      const blocked = rejection() ?? (wallet.persistent ? "Tire service isn't on synced saves yet" : null);
+      this.bridge.emit("tireShopState", { lines: blocked ? [] : tireServiceLines(this.session, this.player.id),
+        walletPhp: wallet.summary(this.player.definition.spec).walletPhp, rejection: blocked, receipt });
+    };
+    this.releases.push(this.bridge.handle("quoteTireService", () => publish()));
+    this.releases.push(this.bridge.handle("buyTireService", ({ lineId }) => {
+      const blocked = rejection() ?? (wallet.persistent ? "Tire service isn't on synced saves yet" : null);
+      if (blocked) return { rejected: blocked };
+      const result = applyTireService(this.session, this.player.id, lineId, (line) => {
+        const paid = wallet.spend(line.costPhp, { kind: "tire_service", source: "talyer", description: line.label, relatedEntityId: this.player.id });
+        return "rejected" in paid ? { rejected: String(paid.rejected) } : undefined;
+      });
+      if ("rejected" in result) { publish(); return { rejected: result.rejected }; }
+      this.apply();
+      this.bridge.emit("tireEvent", { corner: null, kind: "service", text: result.line.label });
+      publish(`Paid ₱${result.line.costPhp.toLocaleString("en-PH")}: ${result.line.label}`);
+    }));
+  }
+
   connect(interactions: InteractionSystem): void {
     this.releases.push(interactions.handle("wheel_service", (target) => {
       const [where, step] = (target.target ?? "").split(":") as [CornerId | "trunk", WheelChangeStep];
@@ -156,6 +193,7 @@ export class TireSystem implements GameSystem {
       if (events.length) changed = this.report(corner, tire, events) || changed;
     });
     this.apply();
+    this.animateJack(dt);
     this.saveAge += dt;
     if (changed || (this.dirty && this.saveAge >= SAVE_INTERVAL)) { this.session.save(); this.saveAge = 0; this.dirty = false; }
     this.publishStatus();
@@ -173,11 +211,11 @@ export class TireSystem implements GameSystem {
       input.installed = !!tire;
       input.raised = car.jacked === corner;
       if (tire) Object.assign(input, tireResponse(tire, this.surfaces[i]));
-      this.visual(i, tire, input.raised);
+      this.visual(i, tire);
     });
   }
 
-  private visual(i: number, tire: TireAssembly | undefined, raised: boolean) {
+  private visual(i: number, tire: TireAssembly | undefined) {
     const wheel = this.player.visual.model.wheels.find((w) => w.id === this.player.body.wheels[i].id);
     if (wheel) {
       wheel.socket.setEnabled(!!tire);
@@ -185,18 +223,50 @@ export class TireSystem implements GameSystem {
       const donut = tire?.spec === "donut";
       wheel.socket.scaling.set(donut ? 0.6 : 1, squash * (donut ? 0.86 : 1), donut ? 0.86 : 1);
     }
-    if (!raised) { if (this.jackMesh && this.car.jacked === null) this.jackMesh.setEnabled(false); return; }
+  }
+
+  /**
+   * Cranks the body up at the jacked corner: the chassis pivots about the opposite wheel, the
+   * jacked wheel hangs clear, and the jack grows under the sill. Physics stays level; the handling
+   * model already treats that corner as ungrounded.
+   */
+  private animateJack(dt: number) {
+    const jacked = this.car.jacked;
+    const target = jacked ? 1 : 0;
+    if (jacked) {
+      const i = CORNER_IDS.indexOf(jacked);
+      // Moving the jack to another corner lowers the car first.
+      if (this.jackCorner !== null && this.jackCorner !== i && this.jackProgress > 0) this.jackProgress = Math.max(0, this.jackProgress - dt / JACK_SECONDS);
+      else { this.jackCorner = i; this.jackProgress = Math.min(1, this.jackProgress + dt / JACK_SECONDS); }
+    } else this.jackProgress = Math.max(0, this.jackProgress - dt / JACK_SECONDS);
+    if (this.jackCorner === null) return;
+    const model = this.player.visual.model;
+    const hubs = CORNER_IDS.map((_, k) => model.wheels.find((w) => w.id === this.player.body.wheels[k].id)?.hub.position);
+    const i = this.jackCorner, eased = this.jackProgress * this.jackProgress * (3 - 2 * this.jackProgress);
+    const pose = jackPose(hubs, i, JACK_LIFT_M * eased);
+    if (pose) model.setJackPose(eased > 0 ? pose.rotation : null, pose.offset);
+    const socket = model.wheels.find((w) => w.id === this.player.body.wheels[i].id)?.socket;
+    if (socket) socket.position.y = WHEEL_CLEAR_M * eased;
+    this.placeJack(i, eased);
+    if (this.jackProgress === 0 && target === 0) { this.jackCorner = null; model.setJackPose(null); }
+  }
+
+  private placeJack(i: number, eased: number) {
+    if (eased <= 0) { this.jackMesh?.setEnabled(false); return; }
     const scene = this.player.visual.model.root.getScene();
     if (!this.jackMesh) {
-      this.jackMesh = MeshBuilder.CreateBox("tire-jack", { width: 0.18, height: 0.32, depth: 0.28 }, scene);
+      this.jackMesh = MeshBuilder.CreateBox("tire-jack", { width: 0.18, height: 1, depth: 0.28 }, scene);
       const material = new StandardMaterial("tire-jack", scene);
       material.diffuseColor = new Color3(0.75, 0.12, 0.08);
       this.jackMesh.material = material;
       this.jackMesh.isPickable = false;
     }
+    const height = 0.12 + JACK_LIFT_M * eased;
     const local = this.player.body.wheels[i].local;
-    this.player.body.toWorld(new Vector3(local.x * 0.7, 0.16, local.z), this.tmp);
-    this.jackMesh.position.copyFrom(this.tmp);
+    this.player.body.toWorld(new Vector3(local.x * 0.7, 0, local.z * 0.82), this.tmp);
+    this.jackMesh.scaling.y = height;
+    this.jackMesh.position.set(this.tmp.x, this.tmp.y - this.player.definition.collision.wheels.radius + height / 2, this.tmp.z);
+    this.jackMesh.rotationQuaternion = this.player.body.node.rotationQuaternion?.clone() ?? null;
     this.jackMesh.setEnabled(true);
   }
 
@@ -333,4 +403,25 @@ export class TireSystem implements GameSystem {
     this.jackMesh?.material?.dispose();
     this.jackMesh?.dispose();
   }
+}
+
+/**
+ * Chassis tilt that lifts corner `i` by `lift` metres while the diagonally opposite wheel stays
+ * planted: a rotation about the axis through that wheel, parallel to the line between the other
+ * two. The two neighbours rise by half as much, as a sprung body does on a single jack.
+ */
+export function jackPose(hubs: readonly (Vector3 | undefined)[], i: number, lift: number) {
+  const opposite = 3 - i;
+  const [a, b] = [0, 1, 2, 3].filter((k) => k !== i && k !== opposite);
+  const J = hubs[i], O = hubs[opposite], A = hubs[a], B = hubs[b];
+  if (!J || !O || !A || !B) return null;
+  const axis = new Vector3(A.x - B.x, 0, A.z - B.z).normalize();
+  const arm = new Vector3(J.x - O.x, 0, J.z - O.z);
+  const reach = Math.abs(axis.x * arm.z - axis.z * arm.x);
+  if (reach < 1e-3) return null;
+  let rotation = Quaternion.RotationAxis(axis, lift / reach);
+  const rise = (q: Quaternion) => arm.applyRotationQuaternion(q).y;
+  if (rise(rotation) < 0) rotation = Quaternion.RotationAxis(axis, -lift / reach);
+  const pivot = new Vector3(O.x, 0, O.z);
+  return { rotation, offset: pivot.subtract(pivot.applyRotationQuaternion(rotation)) };
 }
