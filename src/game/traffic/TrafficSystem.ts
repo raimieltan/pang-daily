@@ -16,6 +16,7 @@ import { TrafficFlow, TRAFFIC_DRAW_DISTANCE, type RoadUser } from './TrafficFlow
 import type { Waypoint } from '../races/Race';
 import { CharacterVisual } from '../characters/CharacterVisual';
 import { TrafficLights } from './TrafficLights';
+import { trafficEnabled } from './trafficSettings';
 
 const PAINTS = ['#547b89', '#944b43', '#d4cbb2', '#50735b', '#7e8290', '#c49a54'];
 
@@ -31,10 +32,12 @@ export class TrafficSystem implements GameSystem {
  private spins: number[] = [];
  private release: () => void;
  private readonly lights: TrafficLights;
+ private wasEnabled = trafficEnabled();
 
  constructor(scene: Scene, kit: WorldKit, world: PhysicsWorld, model: VehicleModel,
   lanes: readonly (readonly Waypoint[])[], private player: () => RoadUser, night: () => number = () => 0) {
   this.flow = new TrafficFlow(lanes, player(), 24);
+  if (!this.wasEnabled) this.flow.suspend();
   for (const [i, actor] of this.flow.actors.entries()) {
    const root = new TransformNode(`traffic-${i}-${actor.kind.id}`, scene);
    this.nodes.push(root);
@@ -96,6 +99,13 @@ export class TrafficSystem implements GameSystem {
  }
 
  private step(dt: number) {
+  if (!trafficEnabled()) {
+   if (this.wasEnabled) this.flow.suspend();
+   this.wasEnabled = false;
+   this.shapes.forEach(shape => { shape.filterCollideMask = 0; });
+   return;
+  }
+  this.wasEnabled = true;
   this.flow.update(dt, this.player());
   this.flow.actors.forEach((a, i) => {
    const p = a.follower.position, node = this.nodes[i], body = this.bodies[i];
@@ -121,7 +131,7 @@ export class TrafficSystem implements GameSystem {
 
  update() {
   const player = this.player();
-  this.flow.actors.forEach((a, i) => this.nodes[i].setEnabled(a.active &&
+  this.flow.actors.forEach((a, i) => this.nodes[i].setEnabled(trafficEnabled() && a.active &&
    Math.hypot(a.follower.position.x - player.x, a.follower.position.z - player.z) < TRAFFIC_DRAW_DISTANCE));
   this.lights.update();
  }

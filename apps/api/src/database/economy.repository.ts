@@ -93,11 +93,17 @@ export class EconomyRepository {
       };
       const a = command.action;
       const chapter = await tx.chapterProgress.findUniqueOrThrow({ where: { playerId_chapterId: { playerId, chapterId: CHAPTER_ONE.id } }, include: { markers: true } });
-      if (chapter.currentBeatId === 'choose_origin' && a.type !== 'starter_origin' && a.type !== 'chapter_continue') refuse('ORIGIN_REQUIRED', 'Choose how you got your daily first.');
+    if (chapter.currentBeatId === 'choose_origin' && a.type !== 'starter_origin' && a.type !== 'chapter_continue' && a.type !== 'dev_grant') refuse('ORIGIN_REQUIRED', 'Choose how you got your daily first.');
       if (a.type === 'job_start' && a.definitionId === CHAPTER_ONE.firstJobId && !chapter.markers.some(m => m.markerId === 'meet_mang_boy')) refuse('JOB_LOCKED', 'Talk to Tito Jun at the talyer first.');
       if (a.type === 'race_start' && [CHAPTER_ONE.firstRaceId, 'pahuway_descent'].includes(a.definitionId) && !chapter.markers.some(m => m.markerId === 'meet_casey')) refuse('RACE_LOCKED', 'Help the talyer, meet the KYO regulars, and talk to Casey first.');
       if (a.type === 'social_introduce' && a.dialogueId === 'kyo_order' && !chapter.markers.some(m => m.markerId === 'complete_first_job')) refuse('SCENE_LOCKED', 'Help Tito Jun with the oil & coolant errand before joining the KYO scene.');
-      switch (a.type) {
+    switch (a.type) {
+      case 'dev_grant': {
+        if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') refuse('DEV_ONLY', 'Development grants are unavailable here.');
+        await pay(php(50_000), 'DEV_GRANT', 'dev_button', command.key, 'Development cash grant');
+        receipt.resourceId = command.key;
+        break;
+      }
         case 'starter_origin': {
           const existing = chapter.markers.find(m => m.markerId === 'choose_origin');
           if (existing) { if (existing.sourceReference !== a.originId) refuse('ORIGIN_ALREADY_CHOSEN', 'Your starter origin is already saved.'); break; }

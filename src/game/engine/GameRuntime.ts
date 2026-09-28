@@ -108,6 +108,11 @@ export class GameRuntime {
       session.usePersistence(this.persistence); inventory.usePersistence(this.persistence);
       for (const race of options.bootstrap.interruptedRaces ?? []) void this.persistence.execute({ type: 'race_complete', ...race, finish: false }).catch(error => emit('persistenceError', `Interrupted race could not be saved: ${error instanceof Error ? error.message : String(error)}`));
     }
+    if (process.env.NODE_ENV === 'development') handle('devGrantCash', () => {
+      if (session.persistent) return session.execute({ type: 'dev_grant' }).then(() => undefined);
+      const result = session.earn(50_000, { kind: 'dev_grant', description: 'Development cash grant', source: 'dev_button' });
+      if ('rejected' in result) return result;
+    });
     const marketplace = loadMarketplaceSession(session, inventory, storage);
     marketplace.useSocialAccess(access);
     if (this.persistence) marketplace.usePersistence(this.persistence);

@@ -5,6 +5,21 @@ const player = { x: 0, y: 0, z: 0, speed: 0, heading: 0 };
 const lane = [0, 500, 1000, 1500].map(x => ({ x, y: 0, z: 0, speed: 10 }));
 
 describe('traffic lifecycle', () => {
+ it('keeps suspended traffic hidden until it can return out of sight', () => {
+  const observer = { ...player, x: 250 };
+  const flow = new TrafficFlow([lane], observer, 1);
+  const actor = flow.actors[0];
+  actor.active = true;
+  actor.follower.position = { x: 500, y: 0, z: 0 };
+  actor.follower.speed = 10;
+  flow.suspend();
+  expect(actor.active).toBe(false);
+  expect(actor.follower.speed).toBe(0);
+  flow.update(.1, observer);
+  expect(actor.active).toBe(false);
+  flow.update(.1, { ...player, x: -300 });
+  expect(actor.active).toBe(true);
+ });
   it('removes a distant arrival even when its respawn point is occupied by the player', () => {
     const flow = new TrafficFlow([lane, lane], player, 1);
     const actor = flow.actors[0];

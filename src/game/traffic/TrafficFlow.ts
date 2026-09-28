@@ -49,6 +49,7 @@ export class TrafficFlow {
    this.actors.push({follower,kind,direction,active:distance(follower.position,player)>20,stalledSeconds:0});
   }
  }
+ suspend(){for(const actor of this.actors){actor.active=false;actor.follower.speed=0;}}
  update(dt:number,player:RoadUser){
   if(!Number.isFinite(dt)||dt<=0)return;
   let remaining=Math.min(dt,.25);

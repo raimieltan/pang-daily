@@ -38,6 +38,16 @@ test('server economy and garage commands preserve exact ledger and ownership', a
     });
   }
   try {
+    await t.test('development cash grants a fixed amount once per request key', async () => {
+      const a = await account();
+      const before = (await db.wallet.findUniqueOrThrow({ where: { playerId: a.playerId } })).balanceCentavos;
+      const key = randomUUID(), action: PlayerAction = { type: 'dev_grant' };
+      const first = await command(a.cookie, action, key);
+      assert.equal(first.amountCentavos, '5000000');
+      assert.deepEqual(await command(a.cookie, action, key), first);
+      assert.equal((await db.wallet.findUniqueOrThrow({ where: { playerId: a.playerId } })).balanceCentavos, before + 5_000_000n);
+      assert.equal((await call('/player/commands', a.cookie, 'POST', { key: randomUUID(), action: { type: 'dev_grant', amountPhp: 500000 } })).status, 400);
+    });
     await t.test('anonymous and client-assigned balances/prices/rewards are rejected', async () => {
       assert.equal((await call('/player/commands', '', 'POST', { key: randomUUID(), action: { type: 'part_purchase', definitionId: product.partId } })).status, 401);
       const a = await account();

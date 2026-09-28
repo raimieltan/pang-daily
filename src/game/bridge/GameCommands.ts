@@ -15,6 +15,7 @@ import type { ServiceComponent } from "../../game-core/maintenance/condition";
 
 export type GameCommandMap = {
   retryPersistence: void;
+  devGrantCash: void;
   openContacts: void;
   closeContacts: void;
   openAutoPartsShop: void;
@@ -133,6 +134,7 @@ export class CommandBus {
 /** The ergonomic, React-facing form of `GameCommandMap`. */
 export interface GameCommands {
   retryPersistence(): void;
+  devGrantCash(): void;
   openContacts(): void;
   closeContacts(): void;
   openAutoPartsShop(): void;
@@ -187,6 +189,7 @@ type Dispatch = <K extends GameCommandName>(command: K, ...args: CommandArgs<K>)
 export function createGameCommands(dispatch: Dispatch): GameCommands {
   return {
     retryPersistence: () => dispatch('retryPersistence'),
+    devGrantCash: () => dispatch('devGrantCash'),
     openContacts: () => dispatch('openContacts'),
     closeContacts: () => dispatch('closeContacts'),
     openAutoPartsShop: () => dispatch('openAutoPartsShop'),

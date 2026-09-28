@@ -7,6 +7,7 @@ import { SocialFeedback } from './SocialFeedback';
 import { useSocialStore } from '@/state/socialStore';
 import { useState, useSyncExternalStore } from "react";
 import { raceLineEnabled, setRaceLineEnabled, subscribeRaceLine } from '@/game/races/raceLineSettings';
+import { setTrafficEnabled, subscribeTraffic, trafficEnabled } from '@/game/traffic/trafficSettings';
 import { useHudStore } from "@/state/hudStore";
 import { useGraphicsStore } from "@/state/graphicsStore";
 import { RaceIntro } from "./RaceIntro";
@@ -27,6 +28,7 @@ import { JobBoardPanel, JobTracker } from "./JobPanels";
 import { MarketplaceApp } from "./MarketplaceApp";
 import { AutoPartsShopPanel } from './AutoPartsShopPanel';
 import { useMarketStore } from "@/state/marketStore";
+import { useMaintenanceStore } from '@/state/maintenanceStore';
 
 const buttonClass = "tape-button";
 const SCENES: { id: SceneId; label: string }[] = [
@@ -44,6 +46,7 @@ export function HudOverlay() {
   const saved = usePersistenceStore(s => s.saved);
   const [toolsOpen, setToolsOpen] = useState(false);
   const showRaceLine = useSyncExternalStore(subscribeRaceLine, raceLineEnabled, () => false);
+  const showTraffic = useSyncExternalStore(subscribeTraffic, trafficEnabled, () => true);
   const intro = useHudStore(s => s.raceIntro);
   const settings = useGraphicsStore(s => s.settings);
   const time = useGraphicsStore(s => s.timeOfDay);
@@ -56,6 +59,7 @@ export function HudOverlay() {
   const loadingScene = useGameUiStore((s) => s.loadingScene);
   const contactsOpen = useSocialStore(s => s.contactsOpen);
   const marketOpen = useMarketStore((s) => s.view !== null);
+  const walletPhp = useMaintenanceStore(s => s.summary?.walletPhp);
 
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
@@ -102,10 +106,18 @@ export function HudOverlay() {
           <input type="checkbox" checked={showRaceLine} onChange={event => setRaceLineEnabled(event.target.checked)} />
           <span>Racing line and braking zones<span className="mt-1 block text-[10px] text-white/60">Green: drive · amber: lift · red: brake</span></span>
         </label>
+        <label className="flex items-center gap-3 border border-white/15 bg-black/85 p-3 text-xs text-white/85">
+          <input type="checkbox" checked={showTraffic} onChange={event => setTrafficEnabled(event.target.checked)} />
+          Moving traffic
+        </label>
         <GraphicsDebugPanel />
         <AudioPanel />
         <details className="bg-black/80 p-3 text-xs"><summary className="cursor-pointer tracking-widest">DEVELOPMENT / {fps} FPS</summary>
           <HandlingDebugPanel />
+          {process.env.NODE_ENV === 'development' && <div className="mt-3 flex items-center gap-3">
+            <button type="button" className={buttonClass} onClick={() => commands?.devGrantCash()}>+₱50,000 dev cash</button>
+            {walletPhp !== undefined && <span>Wallet: ₱{walletPhp.toLocaleString('en-PH')}</span>}
+          </div>}
           <div className="mt-3 flex flex-wrap gap-3">
             {SCENES.filter(s => s.id !== activeScene).map(s => <button key={s.id} className={buttonClass} onClick={() => commands?.switchScene(s.id)}>{s.label}</button>)}
             {activeScene && <button className={buttonClass} onClick={() => commands?.switchScene(activeScene)}>Reload scene</button>}

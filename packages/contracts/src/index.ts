@@ -79,6 +79,7 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('starter_origin'), originId: z.enum(['family', 'marketplace', 'project']) }),
  z.strictObject({ type: z.literal('chapter_continue'), chapterId: z.literal('chapter_1'), beatId: contentId }),
     z.strictObject({ type: z.literal('refund'), transactionId: id }),
+    z.strictObject({ type: z.literal('dev_grant') }),
   ]),
 });
 export type PlayerCommand = z.infer<typeof playerCommandSchema>;
