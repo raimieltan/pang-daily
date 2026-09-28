@@ -1,15 +1,23 @@
 import { describe,it,expect } from 'vitest';
-import { ROAD,ROUTE_LENGTH,MOUNTAIN_RACES,laneWaypoints,roadAt } from './route';
+import { ROAD,ROUTE_LENGTH,MOUNTAIN_ROAD_WIDTH,MOUNTAIN_RACES,laneWaypoints,roadAt,nearestRoad } from './route';
 import { CheckpointProgress } from '../../races/Race';
 import { TrafficFollower } from '../../traffic/TrafficFlow';
 import { MOUNTAIN_CHUNKS } from './environment';
 describe('Alimodian–Maasin road',()=>{
- it('is continuous, narrow and graded without abrupt steps',()=>{
+ it('is continuous, four lanes wide and graded without abrupt steps',()=>{
   expect(ROUTE_LENGTH).toBeGreaterThan(6000);expect(ROUTE_LENGTH).toBeLessThan(9000);
   for(let i=1;i<ROAD.length;i++){
    const a=ROAD[i-1],b=ROAD[i],d=Math.hypot(b.x-a.x,b.z-a.z);
    expect(d).toBeLessThanOrEqual(5.01);expect(Math.abs(b.y-a.y)/d).toBeLessThan(.15);
-   if(b.s>160)expect(b.width).toBe(6.2);
+   expect(b.width).toBe(MOUNTAIN_ROAD_WIDTH);
+  }
+ });
+ it('keeps utility poles outside every traffic lane',()=>{
+  const poles=MOUNTAIN_CHUNKS.flatMap(chunk=>chunk.props).filter(prop=>prop.prop==='utility_pole'||prop.prop==='utility_pole_transformer');
+  expect(poles.length).toBeGreaterThan(10);
+  for(const pole of poles){
+   const nearest=nearestRoad({x:pole.at[0],z:pole.at[1]});
+   expect(nearest.distance).toBeGreaterThan(MOUNTAIN_ROAD_WIDTH/2+1);
   }
  });
  for(const route of MOUNTAIN_RACES)it(`road samples cross ordered gates in ${route.id}`,()=>{

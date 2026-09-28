@@ -14,9 +14,12 @@ for(let c=0;c<N;c++) {
  const from=c*220,to=Math.min(ROUTE_LENGTH,(c+1)*220);
  const props:PropPlacement[]=[],blocks:BlockData[]=[],lamps:LampData[]=[],wires:WireSpan[]=[],zones:ZoneData[]=[];
  const add=(prop:PropId,s:number,offset:number,scale=1,turn=0)=>{
-  const p=roadAt(s,offset);
+  // Existing roadside positions were authored for a 6.2 m road. Keep them outside
+  // the widened pavement without moving the stopover apron itself.
   const onApron=Math.abs(s-OVERLOOK_S)<20&&offset>=6&&offset<=30;
-  p.y=onApron?OVERLOOK.y:p.y-roadsideDrop(p.width,offset);
+  const widened=onApron||Math.abs(offset)<4?offset:offset+Math.sign(offset)*(roadAt(s).width/2-3.1);
+  const p=roadAt(s,widened);
+  p.y=onApron?OVERLOOK.y:p.y-roadsideDrop(p.width,widened);
   props.push({prop,at:[p.x,p.z],y:p.y,rotDeg:p.heading*180/Math.PI+turn,scale});return p;
  };
  // Continuous roadside fixtures, with poles outside the driving surface.
@@ -44,9 +47,9 @@ for(let c=0;c<N;c++) {
    if(i%4===0)add('sari_store',s+14,side*10,1,side>0?-90:90);
    lamps.push({id:`house-${c}-${i}`,at:[p.x,p.y+2.6,p.z],profile:'porch',strength:.65});
    // Clothesline: two slim posts and a sagging line, a few drying garments.
-   const a=roadAt(s-3,side*15),b=roadAt(s+3,side*15);
+   const a=roadAt(s-3,side*18.1),b=roadAt(s+3,side*18.1);
    wires.push({from:[a.x,a.y+2,a.z],to:[b.x,b.y+2,b.z],sag:.15});
-   for(let j=0;j<3;j++){const q=roadAt(s-1+j,side*15);blocks.push({center:[q.x,q.y+1.5,q.z],size:[.65,.8,.05],color:['#aea385','#6d8588','#af7d65'][j]});}
+   for(let j=0;j<3;j++){const q=roadAt(s-1+j,side*18.1);blocks.push({center:[q.x,q.y+1.5,q.z],size:[.65,.8,.05],color:['#aea385','#6d8588','#af7d65'][j]});}
   }
   // Low foliage defines road edge; bamboo becomes dominant toward Maasin.
   for(const side of [-1,1]) {
@@ -96,11 +99,12 @@ for(let c=0;c<N;c++) {
     size:[width,thickness,Math.hypot(dx,dy,dz)+.08],rotDeg:Math.atan2(dx,dz)*180/Math.PI,
     pitchDeg:-Math.atan2(dy,Math.hypot(dx,dz))*180/Math.PI,color,collide});
   };
-  if(s>160)beam(-3.8,-.12,.6,.3,'#53594e');
-  if(sector==='wall')beam(-4.5,1.35,.6,3,'#77786d',true);
+  const edge=roadAt(s).width/2;
+  if(s>160)beam(-edge-.7,-.12,.6,.3,'#53594e');
+  if(sector==='wall')beam(-edge-1.4,1.35,.6,3,'#77786d',true);
   if(sector==='ridge'||sector==='wall'){
-   beam(3.9,.72,.16,.32,'#a4a79a',true);
-   const p=roadAt(s,3.9);
+   beam(edge+.8,.72,.16,.32,'#a4a79a',true);
+   const p=roadAt(s,edge+.8);
    blocks.push({center:[p.x,p.y+.28,p.z],size:[.18,.9,.18],color:'#85857a'});
   }
  }
@@ -125,7 +129,7 @@ for(let c=0;c<N;c++) {
  MOUNTAIN_CHUNKS.push({id:`upland-${c}`,rect,roads:[],surfaces:[],blocks,props,lamps,wires,zones});
 }
 function sign(blocks:BlockData[],s:number,offset:number,label:string,glow=false){
- const p=roadAt(s,offset),theta=p.heading,scale=.085,text=pixelText(label),width=text.columns*scale+.4;
+ const p=roadAt(s,offset+Math.sign(offset)*(roadAt(s).width/2-3.1)),theta=p.heading,scale=.085,text=pixelText(label),width=text.columns*scale+.4;
  blocks.push({center:[p.x,p.y+2.7,p.z],size:[width,1,.12],rotDeg:theta*180/Math.PI,color:'#294839'});
  blocks.push({center:[p.x,p.y+1.3,p.z],size:[.12,2.6,.12],color:'#9b9b89',collide:true});
  for(const r of text.runs){const x=(r.col+r.length/2-text.columns/2)*scale;blocks.push({center:[p.x+Math.cos(theta)*x+Math.sin(theta)*.08,p.y+3-r.row*scale,p.z-Math.sin(theta)*x+Math.cos(theta)*.08],size:[r.length*scale,scale,.035],rotDeg:theta*180/Math.PI,color:'#f0dfaa',glow});}

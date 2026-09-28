@@ -16,7 +16,8 @@ function townLane(reverse: boolean): Waypoint[] {
   return points;
 }
 const clockwise = townLane(false);
-const uphill = laneWaypoints(1);
+// Civilian cars use the outer lanes, leaving the inner lanes open for passing.
+const uphill = laneWaypoints(1, 4.5);
 // Leave the main road at the west bend, circle town, and merge eastbound.
 // At the east junction continue straight south to the main road before turning east.
 const townReturn = clockwise.filter(p => p.z > 8 || p.x < 0);
@@ -29,7 +30,7 @@ const junction: Waypoint[] = [
 ];
 export const TRAFFIC_LANES: readonly (readonly Waypoint[])[] = [
   uphill,
-  [...laneWaypoints(-1), { x: 0, y: 0, z: 2, speed: 9 }, ...townReturn, ...junction, ...uphill],
+  [...laneWaypoints(-1, 4.5), { x: 0, y: 0, z: 2, speed: 9 }, ...townReturn, ...junction, ...uphill],
   clockwise,
   townLane(true),
 ];

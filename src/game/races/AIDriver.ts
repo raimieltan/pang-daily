@@ -1,5 +1,6 @@
 import type { DriverInput } from '../vehicles/handling/ArcadeHandlingModel';
 import type { Point, Waypoint } from './Race';
+import { steeringLock, type CarLimits } from './racingLine';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -32,6 +33,7 @@ export interface RoadSegment {
 export interface VehicleFeedback {
   position: Point; heading: number; speed: number; yawRate: number; lateralSlip: number;
   frontGripUsage: number; rearGripUsage: number; grip: number;
+  reversing?: boolean;
 }
 export interface NearbyVehicle {
   position: Point; velocity: Point; kind: 'traffic' | 'opponent'; width: number; length: number;
@@ -103,13 +105,32 @@ export class RoadCorridor {
     }
     return bestS;
   }
+  /** Target speed along the route, interpolated between samples. */
+  speedAt(s: number) {
+    const { index, t } = this.locate(s);
+    return mix(this.points[index].speed, this.points[Math.min(this.points.length - 1, index + 1)].speed, t);
+  }
+  curvatureAt(s: number) {
+    const { index, t } = this.locate(s);
+    return mix(this.segments[index].curvature, this.segments[index + 1].curvature, t);
+  }
+  private locate(s: number) {
+    let lo = 0, hi = this.cumulative.length - 1;
+    while (hi - lo > 1) { const mid = (hi + lo) >> 1; if (this.cumulative[mid] < s) lo = mid; else hi = mid; }
+    return { index: lo, t: clamp((s - this.cumulative[lo]) / (this.cumulative[hi] - this.cumulative[lo] || 1), 0, 1) };
+  }
   at(s: number) {
     let lo = 0, hi = this.cumulative.length - 1;
     while (hi - lo > 1) { const mid = (hi + lo) >> 1; if (this.cumulative[mid] < s) lo = mid; else hi = mid; }
     const t = clamp((s - this.cumulative[lo]) / (this.cumulative[hi] - this.cumulative[lo] || 1), 0, 1);
     const a = this.points[lo], b = this.points[hi];
     return { point: { x: mix(a.x, b.x, t), y: mix(a.y, b.y, t), z: mix(a.z, b.z, t) }, index: lo,
-      forward: this.segments[lo].forward, width: mix(this.segments[lo].width, this.segments[hi].width, t),
+    forward: (() => {
+      const x = mix(this.segments[lo].forward.x, this.segments[hi].forward.x, t);
+      const z = mix(this.segments[lo].forward.z, this.segments[hi].forward.z, t);
+      const length = Math.hypot(x, z) || 1;
+      return { x: x / length, z: z / length };
+    })(), width: mix(this.segments[lo].width, this.segments[hi].width, t),
       roadOffset: mix(this.segments[lo].roadOffset, this.segments[hi].roadOffset, t) };
   }
 }
@@ -131,13 +152,17 @@ export class AIDriver {
   private targetOffset = 0;
   private lastPosition?: Point;
   private stuckSeconds = 0;
-  private reverseUntil = 0;
+  private recovery: 'none' | 'reverse' | 'forward' = 'none';
+  private recoveryStarted = 0;
+  private recoveryPosition?: Point;
   private avoidUntilS = 0;
   private recoveryOffset = 0;
   private recoveryAttempts = 0;
   private held: AIDriverInput = { throttle: 0, brake: 0, steering: 0, handbrake: 0 };
   constructor(points: readonly Waypoint[], readonly skill: AIDriverSkill, readonly personality: DriverPersonality,
-    readonly brakeDeceleration: number, readonly wheelbase: number, seed = 1) {
+    readonly brakeDeceleration: number, readonly wheelbase: number, seed = 1,
+    /** With limits, `points` are a racing line whose speeds are targets to drive, not caution. */
+    readonly limits?: CarLimits) {
     this.road = new RoadCorridor(points);
     this.seed = seed >>> 0;
   }
@@ -145,7 +170,8 @@ export class AIDriver {
   private random() { this.seed = (1664525 * this.seed + 1013904223) >>> 0; return this.seed / 4294967296; }
   reset() { this.index = 0; this.clock = this.decisionAt = this.errorAt = 0; this.cornerKey = this.defendedCorner = undefined;
     this.error = this.laneOffset = this.targetOffset = 0; this.phase = 'APPROACH'; this.laneChange = 'NONE';
-    this.lastPosition = undefined; this.stuckSeconds = this.reverseUntil = this.avoidUntilS = this.recoveryOffset = this.recoveryAttempts = 0; }
+    this.lastPosition = this.recoveryPosition = undefined;
+    this.recovery = 'none'; this.stuckSeconds = this.recoveryStarted = this.avoidUntilS = this.recoveryOffset = this.recoveryAttempts = 0; }
   update(dt: number, car: VehicleFeedback, nearby: readonly NearbyVehicle[]): DriverInput {
     this.clock += dt;
     this.index = this.road.nearest(car.position, this.index);
@@ -163,14 +189,19 @@ export class AIDriver {
       this.decisionAt = this.clock + Math.max(.2, this.skill.reactionTime + .2);
       this.chooseLane(car, nearby, s);
     }
-    const here = this.road.at(s), steerTarget = this.road.at(s + (corner ? 3 + speed * .18 : this.lookahead.immediate));
+    // Aiming far into a tightening bend turns in early and clips the inside; a line needs a short aim.
+    const aim = this.limits ? Math.min(this.lookahead.immediate, 2 + speed * .12) :
+      corner ? 3 + speed * .18 : this.lookahead.immediate;
+    const here = this.road.at(s), steerTarget = this.road.at(s + aim);
     const future = this.road.at(s + this.lookahead.tactical);
     const bend = this.road.segments[future.index].curvature;
     // Waypoints may follow a lane rather than the centre of the paved road.
-    const leftEdge = Math.max(-here.width / 2 - here.roadOffset, -steerTarget.width / 2 - steerTarget.roadOffset) + 1.25;
-    const rightEdge = Math.min(here.width / 2 - here.roadOffset, steerTarget.width / 2 - steerTarget.roadOffset) - 1.25;
+    const margin = this.limits ? 1.1 : 1.25;
+    const leftEdge = Math.max(-here.width / 2 - here.roadOffset, -steerTarget.width / 2 - steerTarget.roadOffset) + margin;
+    const rightEdge = Math.min(here.width / 2 - here.roadOffset, steerTarget.width / 2 - steerTarget.roadOffset) - margin;
     let cornerOffset = 0;
-    if (corner) {
+    // A racing line already runs outside, apex, outside; only a road-following route needs shaping.
+    if (corner && !this.limits) {
       const side = corner.direction === 'right' ? 1 : -1;
       const outside = (side > 0 ? leftEdge : rightEdge) * (.25 + .1 * this.skill.corneringSkill);
       const apex = (side > 0 ? rightEdge : leftEdge) * .12;
@@ -188,8 +219,10 @@ export class AIDriver {
     this.targetOffset = clamp(this.recoveryOffset || (this.laneChange === 'MOVING' ? this.laneOffset : cornerOffset + this.error), leftEdge, rightEdge);
     const lateral = (car.position.x - here.point.x) * here.forward.z -
       (car.position.z - here.point.z) * here.forward.x;
-    if (lateral > rightEdge - .2) this.targetOffset = Math.min(this.targetOffset, rightEdge - .8);
-    if (lateral < leftEdge + .2) this.targetOffset = Math.max(this.targetOffset, leftEdge + .8);
+    // The line brushes the edge at every apex, so only pull back once the car is actually past it.
+    const warn = this.limits ? 0 : .2, back = this.limits ? .3 : .8;
+    if (lateral > rightEdge - warn) this.targetOffset = Math.min(this.targetOffset, rightEdge - back);
+    if (lateral < leftEdge + warn) this.targetOffset = Math.max(this.targetOffset, leftEdge + back);
     this.targetOffset = clamp(this.targetOffset, leftEdge, rightEdge);
     const fx = Math.sin(car.heading), fz = Math.cos(car.heading), rx = fz, rz = -fx;
     const target = { x: steerTarget.point.x + steerTarget.forward.z * this.targetOffset,
@@ -201,8 +234,21 @@ export class AIDriver {
     const desiredYaw = clamp(headingError * 2.1 - car.lateralSlip * (1 + this.skill.recoverySkill), -1.5, 1.5);
     const maxAngle = Math.atan(this.wheelbase * 9.81 / Math.max(9, speed * speed));
     let steering = clamp(Math.atan(desiredYaw * this.wheelbase / Math.max(3, speed)) / maxAngle, -1, 1);
+    if (this.limits) {
+      // Path following: the line's own curvature (read a steering-lag ahead) plus heading and
+      // cross-track correction, turned into the wheel angle the car's rack actually gives.
+      const feed = this.road.curvatureAt(s);
+      const forward = this.road.at(s).forward, lineHeading = Math.atan2(forward.x, forward.z);
+      const psi = Math.atan2(Math.sin(car.heading - lineHeading), Math.cos(car.heading - lineHeading));
+      const across = (car.position.x - here.point.x) * here.forward.z - (car.position.z - here.point.z) * here.forward.x;
+      const span = clamp(speed * .3, 4, 18);
+      // Close cross-track error along a bounded approach angle, so a big offset never asks for full lock.
+      const approach = clamp((this.targetOffset - across) / span, -.2, .2);
+      const wanted = feed - 2 * Math.sin(psi - approach) / span;
+      steering = clamp(Math.atan(this.limits.wheelbase * wanted) / steeringLock(this.limits, speed), -1, 1);
+    }
     if (car.rearGripUsage > .93 && Math.abs(car.lateralSlip) > .1) steering = clamp(steering - car.lateralSlip * this.skill.recoverySkill * 2, -1, 1);
-    if (car.frontGripUsage > .94) steering *= .82;
+    if (!this.limits && car.frontGripUsage > .94) steering *= .82;
 
     const grip = clamp(car.grip, .3, 1.3);
     const decel = Math.max(1, this.brakeDeceleration * grip *
@@ -210,8 +256,15 @@ export class AIDriver {
     // Waypoint speeds describe a cautious baseline for the road, not a car's top speed.
     // Grip and curvature below still set the actual corner limit for each driver.
     const pace = 1 + .55 * this.skill.overall;
-    let desiredSpeed = Infinity, dangerDistance = Infinity;
-    for (let i = this.index; i < this.road.points.length && this.road.cumulative[i] - s < this.lookahead.strategic; i++) {
+    let desiredSpeed = Infinity, dangerDistance = Infinity, lineSpeed = Infinity, lineAccel = 0;
+    if (this.limits) {
+      // Read the line slightly ahead to cover pedal and tyre lag; its slope is the acceleration asked for.
+      const lead = s + speed * (.12 + .25 * this.skill.reactionTime), span = Math.max(4, speed * .4);
+      lineSpeed = Math.min(this.road.speedAt(s), this.road.speedAt(lead));
+      const far = this.road.speedAt(lead + span);
+      lineAccel = (far * far - lineSpeed * lineSpeed) / (2 * span);
+      desiredSpeed = lineSpeed;
+    } else for (let i = this.index; i < this.road.points.length && this.road.cumulative[i] - s < this.lookahead.strategic; i++) {
       const q = this.road.segments[i], ahead = Math.max(0, this.road.cumulative[i] - s);
       const lateral = Math.sqrt(Math.max(1, grip * 9.81 * Math.min(1, this.skill.corneringSkill * .72 + .34)) / Math.max(.0001, Math.abs(q.curvature)));
       const cornerSpeed = Math.min((q.speedLimit ?? Infinity) * pace, lateral);
@@ -221,9 +274,12 @@ export class AIDriver {
     if (!Number.isFinite(desiredSpeed)) desiredSpeed = this.road.points[this.index].speed * pace;
     // Only crawl when the wheels are about to leave the pavement. The steering corridor above keeps
     // a wide margin, and on a 6 m mountain lane its edge sits almost on the lane centre.
-    const pavedRight = here.width / 2 - here.roadOffset - 1, pavedLeft = -here.width / 2 - here.roadOffset + 1;
+    // A racing line already runs 1.2 m in from the paving, so it only reacts once the wheels touch the edge.
+    const inset = this.limits ? .6 : 1;
+    const pavedRight = here.width / 2 - here.roadOffset - inset, pavedLeft = -here.width / 2 - here.roadOffset + inset;
+    // Braking mid-corner spends the front grip the car needs to turn back in, so on a line it only lifts.
     if (lateral > pavedRight || lateral < pavedLeft)
-      desiredSpeed = Math.min(desiredSpeed, 12);
+      desiredSpeed = Math.min(desiredSpeed, this.limits ? Math.min(lineSpeed, speed) * .97 : 12);
     const remaining = this.road.cumulative[this.road.cumulative.length - 1] - s;
     desiredSpeed = Math.min(desiredSpeed, Math.sqrt(2 * decel * Math.max(0, remaining - 2)));
     let alongside = false, trafficLimited = false;
@@ -253,16 +309,28 @@ export class AIDriver {
         }
       }
     }
-    if (alongside && corner) desiredSpeed = Math.min(desiredSpeed,
-      corner.recommendedApexSpeed * (.8 + .1 * this.skill.racecraft));
-    const excess = speed - desiredSpeed;
-    let brake = clamp(excess / Math.max(1, decel * (.45 + this.skill.reactionTime)), 0, 1);
-    let throttle = clamp((desiredSpeed - speed) * .45, 0, 1);
-    if (brake > .05) throttle = 0;
-    if (!trafficLimited && corner && s >= corner.entryS && Math.abs(steering) > .2 && brake > 0 && brake < .5)
-      brake = this.skill.brakingSkill > .55 ? Math.min(brake, .1 + .18 * this.skill.brakingSkill) : 0;
-    if (corner && s >= corner.apexS && Math.abs(steering) > .35)
-      throttle *= .4 + .55 * this.skill.throttleControl;
+    if (alongside && corner) desiredSpeed = Math.min(desiredSpeed, this.limits ?
+      lineSpeed * (.88 + .08 * this.skill.racecraft) : corner.recommendedApexSpeed * (.8 + .1 * this.skill.racecraft));
+    let brake: number, throttle: number;
+    if (this.limits) {
+      // Pedals from the acceleration the line asks for plus what drag and the slope take away,
+      // corrected toward its speed. Anything slower than the line (traffic, the edge) overrides it.
+      const limits = this.limits, grade = this.road.segments[this.index].grade;
+      const want = (desiredSpeed < lineSpeed - .01 ? Math.min(0, lineAccel) : lineAccel) + (desiredSpeed - speed) * 1.6;
+      const need = want + limits.drag * speed * speed + limits.rolling + 9.81 * grade;
+      const power = limits.accel * Math.max(.05, 1 - (speed / limits.topSpeed) ** 2);
+      throttle = need > 0 ? clamp(need / power, 0, 1) : 0;
+      brake = need < 0 ? clamp((-need - limits.engineBraking * Math.min(1, speed / 3)) / this.brakeDeceleration, 0, 1) : 0;
+    } else {
+      const excess = speed - desiredSpeed;
+      brake = clamp(excess / Math.max(1, decel * (.45 + this.skill.reactionTime)), 0, 1);
+      throttle = clamp((desiredSpeed - speed) * .45, 0, 1);
+      if (brake > .05) throttle = 0;
+      if (!trafficLimited && corner && s >= corner.entryS && Math.abs(steering) > .2 && brake > 0 && brake < .5)
+        brake = this.skill.brakingSkill > .55 ? Math.min(brake, .1 + .18 * this.skill.brakingSkill) : 0;
+      if (corner && s >= corner.apexS && Math.abs(steering) > .35)
+        throttle *= .4 + .55 * this.skill.throttleControl;
+    }
     if (car.rearGripUsage > .9 || Math.abs(car.lateralSlip) > .16) throttle *= this.skill.throttleControl * .7;
     if (car.frontGripUsage > .95) throttle *= .7;
     const movement = this.lastPosition && dt > 0 ? distance(car.position, this.lastPosition) / dt : Infinity;
@@ -273,11 +341,27 @@ export class AIDriver {
       return dx * fx + dz * fz > -1 && dx * fx + dz * fz < 8 &&
         Math.abs(dx * rx + dz * rz) < (other.width + 1.8) / 2 + .5;
     });
-    if (this.clock < this.reverseUntil) {
-      this.held = { throttle: 0, brake: 1, steering: 0, handbrake: 0 };
-      return { throttle: 0, brake: 1, steer: 0, handbrake: false };
+    if (this.recovery === 'reverse') {
+      const backed = this.recoveryPosition ? distance(car.position, this.recoveryPosition) : 0;
+      if (backed >= 3 || this.clock - this.recoveryStarted > 3.5) {
+        this.recovery = 'forward'; this.recoveryStarted = this.clock;
+      } else {
+        // The arcade gearbox selects reverse after the brake is held at rest; in
+        // reverse that same pedal drives backward. Steer the nose toward the road.
+        const steer = Math.abs(lateral) > .3 ? Math.sign(lateral) * .6 :
+          this.recoveryAttempts % 2 ? -.6 : .6;
+        return { throttle: 0, brake: 1, steer, handbrake: false };
+      }
     }
-    if (remaining > 8 && !vehicleAhead && throttle > .6 && Math.abs(car.speed) < 1 && movement < .4)
+    if (this.recovery === 'forward') {
+      // Throttle reselects drive once stopped. Give the car time to clear the
+      // obstruction before normal line braking can stop it in reverse again.
+      if (this.clock - this.recoveryStarted < 2.5 || car.reversing) {
+        return { throttle: 1, brake: 0, steer: steering, handbrake: false };
+      }
+      this.recovery = 'none';
+    }
+    if (remaining > 8 && !vehicleAhead && throttle > .3 && Math.abs(car.speed) < 1 && movement < .4)
       this.stuckSeconds += dt;
     else this.stuckSeconds = 0;
     if (this.stuckSeconds > 1.2 + (1 - this.skill.recoverySkill) * .8) {
@@ -285,11 +369,11 @@ export class AIDriver {
       this.recoveryOffset = (side > 0 ? rightEdge : leftEdge) * .75;
       this.recoveryAttempts++;
       this.avoidUntilS = s + 16;
-      this.reverseUntil = this.clock + 2;
+      this.recovery = 'reverse'; this.recoveryStarted = this.clock;
+      this.recoveryPosition = { ...car.position };
       this.stuckSeconds = 0;
       this.laneChange = 'NONE'; this.laneOffset = 0;
-      this.held = { throttle: 0, brake: 1, steering: 0, handbrake: 0 };
-      return { throttle: 0, brake: 1, steer: 0, handbrake: false };
+      return { throttle: 0, brake: 1, steer: Math.abs(lateral) > .3 ? Math.sign(lateral) * .6 : .6, handbrake: false };
     }
     if (remaining < 3 && speed < .5) {
       this.phase = 'APPROACH';

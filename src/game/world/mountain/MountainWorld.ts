@@ -8,7 +8,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import type { GameSystem } from '../../engine/types';
 import { CollisionGroup } from '../../physics/PhysicsWorld';
 import { buildChunk, type WorldKit } from '../WorldChunk';
-import { roadAt, nearestRoad, ROUTE_LENGTH, OVERLOOK, OVERLOOK_S, sectorAt } from './route';
+import { roadAt, nearestRoad, ROUTE_LENGTH, OVERLOOK, OVERLOOK_S } from './route';
 import { MOUNTAIN_CHUNKS } from './environment';
 
 /** Indexed, vertex-coloured terrain/road batches; one material, spatially culled chunks. */
@@ -57,7 +57,7 @@ export class MountainWorld implements GameSystem {
    for(let s=start;s<end;s+=4){
     const next=Math.min(end,s+4),p=roadAt(s),q=roadAt(next);
     const edges=(width:number,drop=0)=>[roadAt(s,-width),roadAt(next,-width),roadAt(next,width),roadAt(s,width)].map(v=>({...v,y:v.y+drop}));
-    // 6.2 m pavement, 40 cm gravel edges; no invisible racetrack-wide driving slab.
+    // Four traffic lanes with gravel shoulders; physics and visible pavement share these edges.
     road.quad([roadAt(s,-p.width/2),roadAt(next,-q.width/2),roadAt(next,q.width/2),roadAt(s,p.width/2)],Math.floor(s/90)%9===4?'#686a61':'#a4a394');
     for(const side of [-1,1]){
      const a=roadAt(s,side*p.width/2),b=roadAt(next,side*q.width/2),c=roadAt(next,side*(q.width/2+.55)),d=roadAt(s,side*(p.width/2+.55));
@@ -74,8 +74,12 @@ export class MountainWorld implements GameSystem {
      const a=roadAt(next-.035,-p.width/2),b=roadAt(next+.035,-p.width/2),c=roadAt(next+.035,p.width/2),d=roadAt(next-.035,p.width/2);
      detail.quad([a,b,c,d].map(v=>({...v,y:v.y+.008})),'#777b6d');
     }
-    const sector=sectorAt(s).id;
-    if((sector==='alimodian'||sector==='ridge'||sector==='maasin')&&Math.floor(s/4)%3===0)detail.quad(edges(.045,.012),'#bfb794');
+    detail.quad(edges(.045,.012),'#c5ac67');
+    if(Math.floor(s/4)%3===0)for(const side of [-1,1]){
+     const lane=side*3.1;
+     detail.quad([roadAt(s,lane-.045),roadAt(next,lane-.045),roadAt(next,lane+.045),roadAt(s,lane+.045)]
+      .map(v=>({...v,y:v.y+.012})),'#bfb794');
+    }
     if(Math.floor(s/4)%47===13){const a=roadAt(s,1),b=roadAt(next,1),c=roadAt(next,2.6),d=roadAt(s,2.6);detail.quad([a,b,c,d].map(v=>({...v,y:v.y+.014})),'#7e8077');}
    }
    create(road,`upland-road-${start}`);create(detail,`upland-seams-${start}`,false);

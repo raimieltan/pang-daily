@@ -11,7 +11,8 @@ const anchors = [
   [2400,3250],[2520,3450],[2380,3600],[2540,3780],[2450,3950],
   [2680,4120],[2880,4160],[3040,4320],[3280,4320],
 ] as const;
-const rounded = filletPolyline(anchors.map(([x,z]) => ({x,z,width:6.2})), 48, 24);
+export const MOUNTAIN_ROAD_WIDTH = 12.4;
+const rounded = filletPolyline(anchors.map(([x,z]) => ({x,z,width:MOUNTAIN_ROAD_WIDTH})), 48, 24);
 export type RoadSample = Point & { s: number; heading: number; width: number; speed: number };
 const flat: (Point & {s:number})[] = [{...rounded[0],y:0,s:0}];
 for (let i=1;i<rounded.length;i++) {
@@ -42,7 +43,7 @@ export const ROAD: readonly RoadSample[]=flat.map((p,i)=>{
   const before=Math.atan2(p.x-a.x,p.z-a.z),after=Math.atan2(b.x-p.x,b.z-p.z);
   const angle=Math.abs(Math.atan2(Math.sin(after-before),Math.cos(after-before)));
   const radius=i===0||i===flat.length-1||angle<.0001?10000:Math.hypot(b.x-a.x,b.z-a.z)/(2*Math.sin(angle));
-  return {...p,y:elevationAt(p.s),heading:Math.atan2(b.x-a.x,b.z-a.z),width:p.s<160?12-(p.s/160)*5.8:6.2,
+  return {...p,y:elevationAt(p.s),heading:Math.atan2(b.x-a.x,b.z-a.z),width:MOUNTAIN_ROAD_WIDTH,
     speed:Math.min(sectorAt(p.s).id==='alimodian'?17:23,Math.sqrt(radius*3.6))};
 });
 export function roadAt(s:number,offset=0):RoadSample {

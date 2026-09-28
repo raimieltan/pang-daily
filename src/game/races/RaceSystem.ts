@@ -19,18 +19,14 @@ import { NPC_CAR_BUILDS, npcCarId } from "@/game-core/exterior/npcBuilds";
 import { Race, type RaceProgress, type RaceDefinition } from "./Race";
 import { LOCAL_ROUTE } from "./localRoute";
 import { AIDriver, DRIVER_SKILLS, type NearbyVehicle } from './AIDriver';
+import { rivalCar, rivalLine } from './rivalDriver';
+import { buildRacingLine, carLimits } from './racingLine';
 import { RaceLineVisual } from './RaceLineVisual';
 import { raceLineEnabled } from './raceLineSettings';
 import { VehicleBody } from '../vehicles/VehicleBody';
 import { VehicleController } from '../vehicles/VehicleController';
-import { playerCar } from '../vehicles/VehicleDefinition';
-import { resolveHandlingPreset } from '../vehicles/handling/HandlingConfig';
-import { HANDLING_PRESETS } from '../vehicles/handling/presets';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
 import type { TrafficSystem } from '../traffic/TrafficSystem';
-import { performanceHandling } from '../maintenance/conditionHandling';
-import { rivalBuildStats } from './rivals';
-import { calculateVehiclePerformance } from '@/game-core/performance/calculator';
 
 export class RaceSystem implements GameSystem {
   readonly name = "race";
@@ -161,7 +157,13 @@ export class RaceSystem implements GameSystem {
     this.bridge.emit("raceProgress", this.race.snapshot());
   }
   update(dt: number) {
-    if (this.active && raceLineEnabled()) this.raceLine ??= new RaceLineVisual(this.scene, this.selected.waypoints);
+    if (this.active && raceLineEnabled()) {
+      if (!this.raceLine) {
+        const limits = carLimits(this.player.controller.model.config);
+        const points = buildRacingLine(this.selected.waypoints, limits, { level: .9, margin: 1.8 });
+        this.raceLine = new RaceLineVisual(this.scene, points, limits.brake);
+      }
+    }
     else { this.raceLine?.dispose(); this.raceLine = undefined; }
     if (this.introRemaining > 0) {
       this.introRemaining = Math.max(0, this.introRemaining - dt);
@@ -247,10 +249,7 @@ export class RaceSystem implements GameSystem {
   private createRival(route: RaceDefinition) {
     this.disposeRival();
     if (!this.world) return;
-    const definition = playerCar(route.rival ? npcCarId(NPC_CAR_BUILDS[route.rival.build]) : null);
-    const base = resolveHandlingPreset(HANDLING_PRESETS, definition.handlingPreset);
-    const config = route.rival ? performanceHandling(base, calculateVehiclePerformance(definition.spec).stats,
-      rivalBuildStats(route.rival.build)) : base;
+    const { definition, config } = rivalCar(route);
     const tier = route.rival?.tier ?? 2;
     const skill = DRIVER_SKILLS[Math.min(3, Math.max(0, tier - 1))];
     const seed = (route.rival?.name ?? route.id).split('').reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 1);
@@ -266,12 +265,12 @@ export class RaceSystem implements GameSystem {
     const pose = { position: new Vector3(first.x + Math.cos(route.heading) * offset, first.y,
       first.z - Math.sin(route.heading) * offset), headingRad: route.heading };
     if (!body.place(pose)) { body.dispose(); return; }
-    const driver = new AIDriver(route.waypoints, skill, personality, config.brakes.decelerationMps2,
-      config.chassis.wheelbaseM, seed);
+    const line = rivalLine(route, config);
+    const driver = new AIDriver(line.points, skill, personality, config.brakes.decelerationMps2,
+      config.chassis.wheelbaseM, seed, line.limits);
     const source = { read: () => {
       if (this.race.phase !== 'RUNNING' && this.race.phase !== 'FINISHED') return { throttle: 0, brake: 0, steer: 0 };
       const model = this.rivalController!.model;
-      model.surfaceGrip = this.player.controller.model.surfaceGrip;
       body.updateAxes();
       const nearby: NearbyVehicle[] = [{ position: this.player.position, velocity: {
         x: this.player.forward.x * this.player.speed, y: 0, z: this.player.forward.z * this.player.speed },
@@ -286,7 +285,7 @@ export class RaceSystem implements GameSystem {
         position: body.position, heading: Math.atan2(body.forward.x, body.forward.z), speed: model.state.vx,
         yawRate: model.state.yawRate, lateralSlip: model.diagnostics.bodySlip,
         frontGripUsage: model.diagnostics.frontGripUse, rearGripUsage: model.diagnostics.rearGripUse,
-        grip: model.surfaceGrip,
+        grip: model.surfaceGrip, reversing: model.state.reversing,
       }, nearby);
     } };
     this.rivalBody = body;

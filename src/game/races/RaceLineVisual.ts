@@ -7,31 +7,33 @@ import type { Waypoint } from './Race';
 
 export type RaceLineZone = 'drive' | 'caution' | 'brake';
 
-/** Braking begins far enough before a slower waypoint to shed speed on ordinary tires. */
-export function raceLineZones(points: readonly Waypoint[]): RaceLineZone[] {
-  const zones: RaceLineZone[] = [];
-  for (let i = 0; i < points.length; i++) {
+/** Colors the speed plan at the point where the car must change pedals. */
+export function raceLineZones(points: readonly Waypoint[], brakeLimit = 8): RaceLineZone[] {
+  const zones: RaceLineZone[] = points.map(() => 'drive');
+  for (let i = 0; i < points.length - 1; i++) {
+    const length = Math.hypot(points[i + 1].x - points[i].x, points[i + 1].z - points[i].z);
+    const deceleration = (points[i].speed ** 2 - points[i + 1].speed ** 2) / (2 * Math.max(.1, length));
+    if (deceleration > brakeLimit * .3) zones[i] = 'brake';
+    else if (deceleration > brakeLimit * .07) zones[i] = 'caution';
+  }
+  for (let i = 1; i < points.length; i++) {
+    if (zones[i] !== 'brake' || zones[i - 1] === 'brake') continue;
     let distance = 0;
-    let zone: RaceLineZone = 'drive';
-    for (let j = i + 1; j < points.length && distance < 100; j++) {
-      distance += Math.hypot(points[j].x - points[j - 1].x, points[j].z - points[j - 1].z);
-      const start = points[i].speed * 1.3, target = points[j].speed * 1.3;
-      if (start - target < 3) continue;
-      const brakingDistance = (start * start - target * target) / 12 + start * .4;
-      if (distance <= brakingDistance + 6) { zone = 'brake'; break; }
-      if (distance <= brakingDistance + 18) zone = 'caution';
+    for (let j = i - 1; j >= 0 && zones[j] !== 'brake'; j--) {
+      distance += Math.hypot(points[j + 1].x - points[j].x, points[j + 1].z - points[j].z);
+      if (distance > Math.max(12, points[j].speed * .5)) break;
+      zones[j] = 'caution';
     }
-    zones.push(zone);
   }
   return zones;
 }
 
-/** A single noncolliding, vertex-coloured strip on the authored route. */
+/** A single noncolliding, vertex-coloured strip on the planned line. */
 export class RaceLineVisual {
   private readonly mesh: Mesh;
   private readonly material: StandardMaterial;
 
-  constructor(scene: Scene, points: readonly Waypoint[]) {
+  constructor(scene: Scene, points: readonly Waypoint[], brakeLimit = 8) {
     this.mesh = new Mesh('race-line', scene);
     this.mesh.isPickable = false;
     this.mesh.renderingGroupId = 1;
@@ -41,7 +43,7 @@ export class RaceLineVisual {
     this.material.backFaceCulling = false;
     this.material.alpha = .88;
     this.mesh.material = this.material;
-    const zones = raceLineZones(points);
+    const zones = raceLineZones(points, brakeLimit);
     const palette = {
       drive: new Color4(.2, .95, .6, 1),
       caution: new Color4(1, .7, .12, 1),
