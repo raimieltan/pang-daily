@@ -32,10 +32,13 @@ for(let c=0;c<N;c++) {
   const settled=sector==='alimodian'||sector==='maasin'||Math.abs(s-OVERLOOK_S)<70;
   if(settled&&i%2===0||sector==='climb'&&i%7===0) {
    const p=add(i%3?'rural_house':'timber_house',s,side*11,1,side>0?-90:90);
-   // Level house apron and narrow driveway entering directly onto the road.
-   const d=roadAt(s,side*7.2);
-   MOUNTAIN_HOMES.push({ s, side, x: d.x, y: d.y - .005, z: d.z, heading: d.heading });
-   blocks.push({center:[d.x,d.y-.18,d.z],size:[9,.35,5],rotDeg:d.heading*180/Math.PI,color:'#887d65',collide:true});
+   // House apron starts past the pavement and drain, flush with the shoulder and pitched with
+   // the road, so its collider can never present an edge to a car on the lane.
+   const inner=roadAt(s).width/2+.9,across=7,d=roadAt(s,side*(inner+across/2));
+   const top=d.y-roadsideDrop(d.width,inner),back=roadAt(s-2.5),fore=roadAt(s+2.5);
+   MOUNTAIN_HOMES.push({ s, side, x: d.x, y: top, z: d.z, heading: d.heading });
+   blocks.push({center:[d.x,top-.175,d.z],size:[across,.35,5],rotDeg:d.heading*180/Math.PI,
+    pitchDeg:-Math.atan2(fore.y-back.y,Math.hypot(fore.x-back.x,fore.z-back.z))*180/Math.PI,color:'#887d65',collide:true});
    add('motorcycle_parked',s+4,side*7,1,55);add('water_tank',s-4,side*12);
    add('dog_sleeping',s-3,side*6.2);
    if(i%4===0)add('sari_store',s+14,side*10,1,side>0?-90:90);

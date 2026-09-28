@@ -219,7 +219,10 @@ export class AIDriver {
       if (reachable < desiredSpeed) { desiredSpeed = reachable; dangerDistance = ahead; }
     }
     if (!Number.isFinite(desiredSpeed)) desiredSpeed = this.road.points[this.index].speed * pace;
-    if (lateral > rightEdge - .35 || lateral < leftEdge + .35)
+    // Only crawl when the wheels are about to leave the pavement. The steering corridor above keeps
+    // a wide margin, and on a 6 m mountain lane its edge sits almost on the lane centre.
+    const pavedRight = here.width / 2 - here.roadOffset - 1, pavedLeft = -here.width / 2 - here.roadOffset + 1;
+    if (lateral > pavedRight || lateral < pavedLeft)
       desiredSpeed = Math.min(desiredSpeed, 12);
     const remaining = this.road.cumulative[this.road.cumulative.length - 1] - s;
     desiredSpeed = Math.min(desiredSpeed, Math.sqrt(2 * decel * Math.max(0, remaining - 2)));
