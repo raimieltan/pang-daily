@@ -82,11 +82,11 @@ export const BANWA_DALAGAN_1996: VehicleDefinition = parseVehicleDefinition({
   },
   condition: {
     effects: [
-      { component: "engine", stat: "power", maxLoss: 0.35 },
+      { component: "engine", stat: "power", maxLoss: 1 },
       { component: "transmission", stat: "power", maxLoss: 0.1 },
-      { component: "tires", stat: "grip", maxLoss: 0.3 },
-      { component: "suspension", stat: "grip", maxLoss: 0.15 },
-      { component: "brakes", stat: "braking", maxLoss: 0.4 },
+      { component: "tires", stat: "grip", maxLoss: 0.8 },
+      { component: "suspension", stat: "grip", maxLoss: 0.5 },
+      { component: "brakes", stat: "braking", maxLoss: 1 },
       { component: "engine", stat: "reliability", maxLoss: 0.5 },
       { component: "electrical", stat: "reliability", maxLoss: 0.3 },
       { component: "transmission", stat: "reliability", maxLoss: 0.2 },
@@ -181,11 +181,11 @@ export const HIRAYA_KIDLAT_1997: VehicleDefinition = parseVehicleDefinition({
   },
   condition: {
     effects: [
-      { component: "engine", stat: "power", maxLoss: 0.35 },
+      { component: "engine", stat: "power", maxLoss: 1 },
       { component: "transmission", stat: "power", maxLoss: 0.1 },
-      { component: "tires", stat: "grip", maxLoss: 0.3 },
-      { component: "suspension", stat: "grip", maxLoss: 0.15 },
-      { component: "brakes", stat: "braking", maxLoss: 0.4 },
+      { component: "tires", stat: "grip", maxLoss: 0.8 },
+      { component: "suspension", stat: "grip", maxLoss: 0.5 },
+      { component: "brakes", stat: "braking", maxLoss: 1 },
       { component: "engine", stat: "reliability", maxLoss: 0.5 },
       { component: "electrical", stat: "reliability", maxLoss: 0.3 },
       { component: "transmission", stat: "reliability", maxLoss: 0.2 },

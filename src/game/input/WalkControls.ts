@@ -15,6 +15,7 @@ export class WalkControls implements GameSystem, WalkCameraInput {
   moveY = 0;
   lookX = 0;
   interactPressed = false;
+  interactHeld = false;
   enabled = false;
 
   constructor(private readonly input: InputManager) {}
@@ -24,11 +25,13 @@ export class WalkControls implements GameSystem, WalkCameraInput {
     if (!this.enabled) {
       this.moveX = this.moveY = this.lookX = 0;
       this.interactPressed = false;
+      this.interactHeld = false;
       return;
     }
     this.moveX = input.axis("moveX");
     this.moveY = input.axis("moveY");
     this.lookX = input.axis("lookX");
     this.interactPressed = input.pressed("interact");
+    this.interactHeld = input.held("interact");
   }
 }

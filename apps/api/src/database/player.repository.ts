@@ -68,9 +68,10 @@ export class PlayerRepository {
           const best = await tx.raceResult.groupBy({ by: ['raceDefinitionId'], where: { playerId: player.id, outcome: { in: ['win', 'loss'] } }, _min: { elapsedMs: true }, _count: { _all: true } });
           const wins = await tx.raceResult.groupBy({ by: ['raceDefinitionId'], where: { playerId: player.id, outcome: 'win' }, _count: { _all: true } });
           const social = await loadSocialState(tx, player.id);
+          const towCount = await tx.transaction.count({ where: { playerId: player.id, source: 'tow' } });
           return { bootstrapVersion: BOOTSTRAP_VERSION, saveVersion: starter.saveVersion, contentVersion: starter.contentVersion,
             revision: player.saveVersion.revision.toString(), profile: { id: player.id, displayName: player.displayName, activeVehicleId: player.activeVehicleId },
-            economy: { balanceCentavos: player.wallet.balanceCentavos.toString(), revision: player.wallet.revision.toString() },
+            economy: { balanceCentavos: player.wallet.balanceCentavos.toString(), revision: player.wallet.revision.toString(), towCount },
             vehicles: player.vehicles.map(vehicle => ({ id: vehicle.id, definitionId: vehicle.definitionId, condition: Object.fromEntries(
               Object.keys(starter.vehicle.condition).map(key => [key, Number(vehicle.condition![key as keyof typeof starter.vehicle.condition])])) as PlayerBootstrap['vehicles'][number]['condition'],
               conditionRevision: vehicle.condition!.revision.toString(), fuelLiters: Number(vehicle.condition!.fuelLiters), paint: vehicle.paint,

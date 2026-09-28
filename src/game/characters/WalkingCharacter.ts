@@ -46,6 +46,8 @@ export class WalkingCharacter implements GameSystem {
   /** Feet, on the ground. Valid while spawned; the last position otherwise. */
   readonly position = new Vector3();
   readonly forward = new Vector3(0, 0, 1);
+  /** Walk alongside the rear bumper while pushing. */
+  pushDirection: Vector3 | null = null;
   private controller: PhysicsCharacterController | null = null;
   private heading = 0;
   private config: WalkConfig;
@@ -147,6 +149,7 @@ export class WalkingCharacter implements GameSystem {
     if (this.controller) {
       this.sync();
       this.visual.update(dt, this.travelSpeed, this.surface.supportedState !== CharacterSupportedState.UNSUPPORTED);
+      if (this.pushDirection) this.visual.pushPose();
     }
   }
 
@@ -168,10 +171,10 @@ export class WalkingCharacter implements GameSystem {
     if (length > 1) [mx, my] = [mx / length, my / length];
     const sin = Math.sin(this.view.yaw);
     const cos = Math.cos(this.view.yaw);
-    const wantX = (sin * my + cos * mx) * walkSpeed;
-    const wantZ = (cos * my - sin * mx) * walkSpeed;
+    const wantX = this.pushDirection ? this.pushDirection.x * 1.1 : (sin * my + cos * mx) * walkSpeed;
+    const wantZ = this.pushDirection ? this.pushDirection.z * 1.1 : (cos * my - sin * mx) * walkSpeed;
 
-    if (length < 0.001) {
+    if (length < 0.001 && !this.pushDirection) {
       // Neutral input means stop, including the solver's previous horizontal momentum.
       // Exponential deceleration alone leaves a long tail of unwanted movement.
       this.velocity.x = this.velocity.z = 0;

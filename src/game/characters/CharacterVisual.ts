@@ -239,6 +239,16 @@ export class CharacterVisual {
   }
 
   /** Gait follows actual travel so pushing against a wall doesn't run in place. */
+  /** Both hands brace against the rear of the car while the legs keep walking. */
+  pushPose(): void {
+    this.torso.rotation.x = 0.25;
+    this.arms.forEach(({ shoulder, elbow }, index) => {
+      shoulder.rotation.x = -1.05;
+      shoulder.rotation.z = index === 0 ? -0.12 : 0.12;
+      elbow.rotation.x = -0.25;
+    });
+  }
+
   update(dt: number, speed: number, grounded: boolean): void {
     this.time += dt;
     const moving = grounded && speed > 0.08;

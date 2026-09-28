@@ -1,5 +1,8 @@
 'use client';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { towCostPhp } from '@/game-core/maintenance/towing';
+import { useMaintenanceStore } from '@/state/maintenanceStore';
+import { useGameEvent } from '@/components/game/useGameEvent';
 import { useSocialStore } from '@/state/socialStore';
 import { useGameUiStore } from '@/state/gameUiStore';
 import { useModalFocus } from './useModalFocus';
@@ -7,12 +10,16 @@ import './socialUi.css';
 
 /** Presentation only: runtime pauses gameplay and supplies the complete public projection. */
 export function ContactsApp() {
+ const [confirmTow, setConfirmTow] = useState(false);
+ const maintenance = useMaintenanceStore(state => state.summary);
  const open = useSocialStore(state => state.contactsOpen);
  const view = useSocialStore(state => state.view);
  const commands = useGameUiStore(state => state.commands);
  const status = useGameUiStore(state => state.status);
  const panel = useRef<HTMLDivElement>(null);
  const close = useCallback(() => commands?.closeContacts(), [commands]);
+ useGameEvent('vehicleTowed', () => { setConfirmTow(false); close(); });
+ useEffect(() => { if (!open) setConfirmTow(false); }, [open]);
  useModalFocus(panel, open, close);
  useEffect(() => {
   const key = (event: KeyboardEvent) => {
@@ -50,12 +57,21 @@ export function ContactsApp() {
  }, [commands, status, open, close]);
  if (!open) return null;
  const rep = view.reputation;
+ const mangJun = view.contacts.find(contact => contact.id === 'mang_boy');
+ const towPrice = towCostPhp(maintenance?.towCount ?? 0, mangJun?.trust ?? 0);
  return <><div className="social-backdrop" aria-hidden="true" /><div ref={panel} className="social-panel" role="dialog" aria-modal="true" aria-labelledby="contacts-title" tabIndex={-1}>
   <header><h2 id="contacts-title">Phone · Contacts</h2><button onClick={close}>Close contacts</button></header>
   <div className="social-scroll" tabIndex={0} aria-label="Contacts and social progress">
    <small>People remember the runs, the help, and the conversations. Meet them in person to follow up.</small>
    <section aria-label="Scene reputation"><h3>Iloilo car scene</h3><p>{rep.tier} · {rep.points} recognition</p><progress aria-label="Scene reputation to next tier" max={100} value={Math.round(rep.progress * 100)} /><p>{rep.nextTier ? `${rep.pointsToNext} points to ${rep.nextTier}` : 'Local Legend — highest scene tier'}</p></section>
    <section aria-label="Contacts"><h3>People you know</h3>{!view.contacts.length && <p>No contacts yet. Talk to people at Kyo or the talyer to get introduced.</p>}
+    {maintenance && <article className="social-card"><h3>Roadside tow · Tito Jun’s talyer</h3>
+      <p>Moves your car and you to the talyer. Repairs and fuel cost extra.</p>
+      <p>{towPrice === 0 ? 'First tow is on Tito Jun.' : `Tow fee: ₱${towPrice.toLocaleString('en-PH')}`} · Wallet ₱{maintenance.walletPhp.toLocaleString('en-PH')}</p>
+      {confirmTow ? <><button type="button" onClick={() => { setConfirmTow(false); commands?.towVehicle(); }}>Confirm tow {towPrice === 0 ? '· free' : `· ₱${towPrice.toLocaleString('en-PH')}`}</button>
+        <button type="button" onClick={() => setConfirmTow(false)}>Cancel</button></>
+        : <button type="button" onClick={() => setConfirmTow(true)}>Call tow</button>}
+    </article>}
     {view.contacts.map(contact => <article className="social-card" key={contact.id}><h3>{contact.name}</h3><small>{contact.roles.join(' · ')} · {contact.location}</small><p>{contact.summary}</p><p>Trust {contact.trust} / 100 · Respect {contact.respect} / 100</p><p>Last shared event: {contact.lastEvent}</p>
      {contact.favors.length ? contact.favors.map(favor => <p key={favor.id}>Favor: {favor.name} · {favor.status}. {favor.nextStep}</p>) : <p>No outstanding favors.</p>}
      {!!contact.history.length && <details><summary>Recent shared history</summary><ul>{contact.history.map((event, index) => <li key={index}>{event}</li>)}</ul></details>}

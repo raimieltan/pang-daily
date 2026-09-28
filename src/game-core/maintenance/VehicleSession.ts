@@ -1,4 +1,5 @@
 import { EARLY_ECONOMY } from '../economy/balance';
+import { towCostPhp } from './towing';
 import type { PersistencePort, PersistentIntent } from '../persistence/PersistencePort';
 import { discountedPrice, type SocialAccess } from '../social/eligibility';
 import { opportunity } from '../social/opportunities';
@@ -10,6 +11,7 @@ import { applyConditionLoss, repairLines, SERVICE_COMPONENTS, type ConditionLoss
 export const STARTING_WALLET_PHP = EARLY_ECONOMY.startingCashPhp;
 const ownedSchema = z.object({ condition: vehicleConditionSchema, revision: z.number().int().nonnegative(), fuelLiters: z.number().min(0).max(FUEL_CAPACITY_LITERS) });
 const sessionSchema = z.object({ version: z.literal(2), walletPhp: moneySchema,
+  towCount: z.number().int().nonnegative().default(0),
   checkpoint: z.object({ balancePhp: moneySchema, sequence: z.number().int().nonnegative() }).optional(),
   vehicles: z.record(z.string(), ownedSchema), transactions: z.array(transactionSchema) }).refine(state => {
     try {
@@ -36,7 +38,7 @@ function migrateSession(saved: unknown): unknown {
 
 export type SessionSnapshot = z.infer<typeof sessionSchema>;
 export type RepairQuote = { id: string; vehicleId: string; vehicleName: string; revision: number; benefitId?: string; benefitLabel?: string; lines: RepairLine[]; totalPhp: number };
-export type MaintenanceSummary = { vehicleId: string; vehicleName: string; condition: VehicleCondition; walletPhp: number; fuelLiters?: number; fuelCapacityLiters?: number };
+export type MaintenanceSummary = { vehicleId: string; vehicleName: string; condition: VehicleCondition; walletPhp: number; towCount: number; fuelLiters?: number; fuelCapacityLiters?: number };
 export type RepairReceipt = { vehicleId: string; components: ServiceComponent[]; costPhp: number; walletPhp: number; transactionId: number };
 
 /** Session authority: economy and owned-car data outlive every Babylon scene. */
@@ -53,7 +55,7 @@ export class VehicleSession {
   private readonly listeners = new Set<() => void>();
   constructor(saved?: unknown, private readonly persist?: (snapshot: SessionSnapshot) => void) {
     const parsed = sessionSchema.safeParse(migrateSession(saved));
-    this.state = parsed.success ? parsed.data : { version: 2, walletPhp: STARTING_WALLET_PHP, vehicles: {},
+    this.state = parsed.success ? parsed.data : { version: 2, walletPhp: STARTING_WALLET_PHP, towCount: 0, vehicles: {},
       transactions: [{ id: 1, kind: 'starting_cash', timestamp: new Date().toISOString(), description: 'Starting cash', source: 'new_game', balanceBeforePhp: 0, amountPhp: STARTING_WALLET_PHP, balancePhp: STARTING_WALLET_PHP, vehicleId: null, components: [] }] };
   }
   snapshot(): SessionSnapshot { return structuredClone(this.state); }
@@ -67,7 +69,7 @@ export class VehicleSession {
   summary(definition: VehicleDefinition): MaintenanceSummary {
     this.ensureVehicle(definition);
     return { vehicleId: definition.id, vehicleName: `${definition.identity.make} ${definition.identity.model}`,
-      condition: { ...this.state.vehicles[definition.id].condition }, fuelLiters: this.state.vehicles[definition.id].fuelLiters, fuelCapacityLiters: FUEL_CAPACITY_LITERS, walletPhp: this.state.walletPhp };
+      condition: { ...this.state.vehicles[definition.id].condition }, fuelLiters: this.state.vehicles[definition.id].fuelLiters, fuelCapacityLiters: FUEL_CAPACITY_LITERS, walletPhp: this.state.walletPhp, towCount: this.state.towCount };
   }
   wear(definition: VehicleDefinition, loss: ConditionLoss) {
     this.ensureVehicle(definition);
@@ -108,6 +110,17 @@ export class VehicleSession {
   }
   earn(amountPhp: number, source: MoneySource) { return this.transfer(amountPhp, source, false); }
   spend(amountPhp: number, source: MoneySource) { return this.transfer(amountPhp, source, true); }
+  tow(definition: VehicleDefinition, mangJunTrust: number) {
+    this.ensureVehicle(definition);
+    const costPhp = towCostPhp(this.state.towCount, mangJunTrust);
+    if (costPhp) {
+      const payment = this.payment(-costPhp, { kind: 'tow', description: 'Tow to Tito Jun’s talyer', source: 'tow', relatedEntityId: definition.id }, definition.id);
+      if ('rejected' in payment) return payment;
+    } else if (this.remote) return { rejected: 'Tows require a server-confirmed action.' };
+    this.state.towCount++;
+    this.changed();
+    return { costPhp, towCount: this.state.towCount, walletPhp: this.state.walletPhp };
+  }
   private transfer(amountPhp: number, source: MoneySource, debit: boolean) {
     if (!(amountPhp > 0)) return { rejected: 'Amount must be positive.' };
     const result = this.payment(debit ? -amountPhp : amountPhp, source);

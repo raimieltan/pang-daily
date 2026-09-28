@@ -38,6 +38,22 @@ test('server economy and garage commands preserve exact ledger and ownership', a
     });
   }
   try {
+    await t.test('tow is free once for a trusted Mang Jun relationship, then charges the full fee', async () => {
+      const a = await account();
+      await db.npcRelationship.update({ where: { playerId_npcId: { playerId: a.playerId, npcId: 'mang_boy' } }, data: { trust: 60 } });
+      const action: PlayerAction = { type: 'vehicle_tow', vehicleId: a.car };
+      const key = randomUUID();
+      const first = await command(a.cookie, action, key);
+      assert.equal(first.details.costPhp, 0);
+      assert.deepEqual(await command(a.cookie, action, key), first);
+      assert.equal((await command(a.cookie, action)).details.costPhp, 3500);
+      assert.equal((await command(a.cookie, action, randomUUID(), 409)).code, 'INSUFFICIENT_FUNDS');
+      const saved = bootstrapSchema.parse(await (await call('/player/bootstrap', a.cookie)).json());
+      assert.equal(saved.economy.towCount, 2);
+      assert.equal(await db.transaction.count({ where: { playerId: a.playerId, source: 'tow' } }), 2);
+      const b = await account();
+      assert.equal((await command(b.cookie, { type: 'vehicle_tow', vehicleId: b.car })).details.costPhp, 3500);
+    });
     await t.test('development cash grants a fixed amount once per request key', async () => {
       const a = await account();
       const before = (await db.wallet.findUniqueOrThrow({ where: { playerId: a.playerId } })).balanceCentavos;

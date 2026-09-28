@@ -13,6 +13,7 @@ import type { LocationId, Rect, ZoneData } from "../world/WorldLayout";
  */
 export const INTERACTION_ACTIONS = [
   "enter_vehicle",
+  "push_vehicle",
   "switch_vehicle",
   "start_race",
   "order_coffee",

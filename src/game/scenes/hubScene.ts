@@ -63,7 +63,8 @@ import { PLAYER_CARS, STARTER_SEDAN, playerCar } from "../vehicles/VehicleDefini
 import { VehicleModel } from "../vehicles/VehicleModel";
 import { HomeGarage } from "../vehicles/HomeGarage";
 import { loadActiveCar, saveActiveCar } from "../vehicles/garageStorage";
-import { HOME_SECOND_BAY, HUB_LAYOUT } from "../world/hub/hubLayout";
+import { loadSocialSession } from '../social/socialStorage';
+import { HOME_SECOND_BAY, HUB_LAYOUT, HUB_LOCATIONS } from "../world/hub/hubLayout";
 import { HubLocations, toVehiclePose } from "../world/hub/HubLocations";
 import { buildChunk, WorldKit } from "../world/WorldChunk";
 
@@ -197,6 +198,26 @@ export const hubScene: SceneDefinition = {
     });
     talyerSystem = addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
       () => race.race.phase === 'RUNNING', { interactions, rejection: talyer, onTalk: () => dialogue.open('talyer_mang_boy') }));
+    let towing = false;
+    const releaseTow = bridge.handle('towVehicle', async () => {
+      if (towing) return { rejected: 'A tow is already on its way.' };
+      if (race.active || jobs.current) return { rejected: 'Finish or abandon your current run before calling a tow.' };
+      const definition = maintainedCar.definition.spec;
+      const trust = loadSocialSession(socialStorage).snapshot().npcs.mang_boy.trust;
+      towing = true;
+      try {
+        const result = session.persistent
+          ? await session.execute({ type: 'vehicle_tow', operationTag: `tow:${definition.id}:${session.summary(definition).towCount}`, vehicleId: definition.id })
+          : session.tow(definition, trust);
+        if ('rejected' in result) return result;
+        const destination = HUB_LOCATIONS.find(location => location.id === 'talyer')!;
+        if (!maintainedCar.placeAt(toVehiclePose(destination.spawn))) return { rejected: 'The talyer bay is blocked. Try the tow again.' };
+        modes.exit();
+        const costPhp = Number('details' in result ? result.details.costPhp : result.costPhp);
+        bridge.emit('vehicleTowed', { costPhp, walletPhp: session.summary(definition).walletPhp });
+      } finally { towing = false; }
+    });
+    addSystem({ name: 'towing', dispose: releaseTow });
     // Marketplace parts ride in the trunk: bring the car to Tito Jun to have one inspected.
     market.useWorkshop({ rejection: talyer });
     addSystem(new FuelSystem(bridge, session, maintainedCar.definition.spec, {

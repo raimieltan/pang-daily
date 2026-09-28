@@ -112,13 +112,13 @@ describe('calculated driving stats', () => {
 });
 
 describe('warnings and future talyer flow', () => {
-  it('reports all six consequence hooks without changing condition', () => {
+  it('reports applicable consequence hooks without changing condition', () => {
     const worn = { ...pristine, engine: .2, transmission: .2, clutch: .1, cooling: .2 };
     const before = { ...worn };
     const stats = build([...turboIds, 'unknown_ecu'], worn);
     const warnings = performanceFailureRisks(stats, worn, { throttle: 1, speedMps: 0 }, 60);
-    expect(new Set(warnings.map(w => w.kind)).size).toBe(6);
-    expect(samplePerformanceFailures(warnings, () => 0)).toHaveLength(6);
+    expect(new Set(warnings.map(w => w.kind)).size).toBe(5);
+    expect(samplePerformanceFailures(warnings, () => 0)).toHaveLength(5);
     expect(samplePerformanceFailures(warnings, () => .99999)).toHaveLength(0);
     expect(worn).toEqual(before);
   });

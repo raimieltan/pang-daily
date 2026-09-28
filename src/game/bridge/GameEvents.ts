@@ -61,6 +61,7 @@ export type GameEventMap = {
   exteriorInventory: import('../vehicles/ExteriorSystem').ExteriorInventoryView;
   customizationState: import('../vehicles/CustomizationSystem').CustomizationView;
   maintenanceState: import('../../game-core/maintenance/VehicleSession').MaintenanceSummary;
+  vehicleTowed: { costPhp: number; walletPhp: number };
   repairQuote: import('../../game-core/maintenance/VehicleSession').RepairQuote | null;
   repairCompleted: import('../../game-core/maintenance/VehicleSession').RepairReceipt;
   /** Ground distance travelled on foot, sampled at 10 Hz for footsteps. */

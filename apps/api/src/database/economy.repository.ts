@@ -23,6 +23,7 @@ import { SOCIAL_OPPORTUNITIES, opportunity } from '@pang-daily/game-core/social/
 import type { Prisma } from '../generated/prisma/client';
 import { DatabaseService } from './database.service';
 import { loadSocialState } from './social-state';
+import { towCostPhp } from '@pang-daily/game-core/maintenance/towing';
 import { progressSocial } from './social-progression';
 import { CHAPTER_ONE, STARTER_ORIGINS } from '@pang-daily/game-core/progression/chapter';
 import { advanceChapter } from './chapter-state';
@@ -195,6 +196,27 @@ export class EconomyRepository {
           if (paid) await tx.transactionComponent.createMany({ data: components.map(componentId => ({ transactionId: paid.id, componentId })) });
           await tx.vehicleCondition.update({ where: { vehicleId: vehicle.id }, data: { ...Object.fromEntries(components.map(c => [c, 1])), revision: { increment: 1 } } });
           receipt.resourceId = vehicle.id; receipt.details = { costPhp: Number(cost) / 100 }; break;
+        }
+        case 'vehicle_tow': {
+          const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
+          const towCount = await tx.transaction.count({ where: { playerId, source: 'tow' } });
+          const social = await loadSocialState(tx, playerId);
+          const costPhp = towCostPhp(towCount, social.npcs.mang_boy.trust);
+          if (costPhp) {
+            await pay(-php(costPhp), 'TOW_COST', 'tow', command.key, 'Tow to Tito Jun’s talyer', vehicle.id);
+          } else {
+            // A zero-cost ledger entry consumes the one free tow across sessions.
+            const transaction = await tx.transaction.create({ data: { playerId, sequence: wallet.revision + 1n,
+              amountCentavos: 0n, balanceBeforeCentavos: wallet.balanceCentavos, balanceAfterCentavos: wallet.balanceCentavos,
+              kind: 'TOW_GIFT', source: 'tow', sourceReference: command.key, description: 'First tow from Tito Jun',
+              requestId, vehicleId: vehicle.id } });
+            await tx.wallet.update({ where: { playerId }, data: { revision: transaction.sequence } });
+            wallet.revision = transaction.sequence;
+            receipt = { ...receipt, transactionId: transaction.id, sequence: transaction.sequence.toString() };
+          }
+          receipt.resourceId = vehicle.id;
+          receipt.details = { costPhp, towCount: towCount + 1 };
+          break;
         }
         case 'fuel_purchase': {
           const vehicle = await this.vehicle(tx, playerId, a.vehicleId);

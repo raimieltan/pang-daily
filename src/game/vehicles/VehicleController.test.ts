@@ -65,6 +65,32 @@ function setup(spawn = "start") {
 }
 
 describe("vehicle physics body", () => {
+  it("lets a person push an unpowered car forward and stops when released", () => {
+    const { controller, run, planarSpeed, vehicle } = setup();
+    controller.engineOperational = false;
+    const start = vehicle.position.clone();
+    controller.pushSpeedMps = 1.1;
+    run(2);
+    expect(planarSpeed()).toBeGreaterThan(0.8);
+    expect(Vector3.Distance(start, vehicle.position)).toBeGreaterThan(1);
+    controller.pushSpeedMps = 0;
+    run(2);
+    expect(planarSpeed()).toBeLessThan(0.5);
+  });
+
+  it("stops engine drive at zero condition while allowing braking", () => {
+    const { controller, run, planarSpeed } = setup();
+    controller.engineOperational = false;
+    run(2, { throttle: 1, brake: 0, steer: 0 });
+    expect(planarSpeed()).toBeLessThan(0.1);
+    controller.engineOperational = true;
+    run(2, { throttle: 1, brake: 0, steer: 0 });
+    expect(planarSpeed()).toBeGreaterThan(1);
+    controller.engineOperational = false;
+    run(2, { throttle: 0, brake: 1, steer: 0 });
+    expect(planarSpeed()).toBeLessThan(0.5);
+  });
+
   it("settles on flat ground without bouncing and reports all four wheels in contact", () => {
     const { vehicle, run, velocity } = setup();
     let peakRebound = 0;

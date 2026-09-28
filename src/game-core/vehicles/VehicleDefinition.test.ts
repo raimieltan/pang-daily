@@ -55,6 +55,19 @@ describe("vehicle definition schema", () => {
 
 describe("resolveVehicleStats", () => {
   const stock = BANWA_DALAGAN_1996;
+  it("degrades each mechanical stat steadily as its component wears", () => {
+    const cases = [
+      { component: 'engine', stat: 'powerHp' },
+      { component: 'tires', stat: 'tireGrip' },
+      { component: 'suspension', stat: 'tireGrip' },
+      { component: 'brakes', stat: 'brakeDecelerationMps2' },
+    ] as const;
+    for (const { component, stat } of cases) {
+      const at = (health: number) => resolveVehicleStats(stock, { ...PRISTINE_CONDITION, [component]: health })[stat];
+      expect(at(0.5)).toBeCloseTo((at(0) + at(1)) / 2);
+      expect(at(0)).toBeLessThan(at(0.5));
+    }
+  });
 
   it("returns the definition's numbers for a pristine car", () => {
     expect(resolveVehicleStats(stock, PRISTINE_CONDITION)).toEqual({
@@ -70,9 +83,9 @@ describe("resolveVehicleStats", () => {
 
   it("scales each stat by its components and multiplies effects on the same stat", () => {
     const stats = resolveVehicleStats(stock, { ...PRISTINE_CONDITION, engine: 0.5, transmission: 0 });
-    // power: (1 - 0.35 * 0.5) * (1 - 0.1 * 1)
-    expect(stats.powerHp).toBeCloseTo(98 * 0.825 * 0.9);
-    expect(stats.torqueNm).toBeCloseTo(130 * 0.825 * 0.9);
+    // power: (1 - 1 * 0.5) * (1 - 0.1 * 1)
+    expect(stats.powerHp).toBeCloseTo(98 * 0.5 * 0.9);
+    expect(stats.torqueNm).toBeCloseTo(130 * 0.5 * 0.9);
     // reliability: (1 - 0.5 * 0.5) * (1 - 0.2 * 1)
     expect(stats.reliability).toBeCloseTo(0.8 * 0.75 * 0.8);
     expect(stats.tireGrip).toBe(1);

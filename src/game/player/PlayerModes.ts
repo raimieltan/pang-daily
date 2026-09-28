@@ -59,6 +59,7 @@ export class PlayerModes implements GameSystem {
   canExit?: () => boolean;
   private current: PlayerMode = "driving";
   private interactions: InteractionSystem | null = null;
+  private pushing = false;
   private readonly releases: (() => void)[] = [];
   private readonly enterInteraction: { -readonly [K in keyof Interactable]: Interactable[K] };
 
@@ -101,17 +102,24 @@ export class PlayerModes implements GameSystem {
   /** The car's "Get in" prompt, while on foot. Pass to `InteractionSystem` as a source. */
   readonly vehicleInteractables = (): Interactable[] => {
     if (this.current !== "walking") return [];
-    return this.doors().filter((door) => this.doorReachable(door)).map((door, index) => ({
+    const doors: Interactable[] = this.doors().filter((door) => this.doorReachable(door)).map((door, index) => ({
       ...this.enterInteraction,
       id: `${this.enterInteraction.id}:door:${index}`,
-      area: { kind: "circle", x: door.x, z: door.z, radius: this.config.enterRadius },
+      area: { kind: "circle" as const, x: door.x, z: door.z, radius: this.config.enterRadius },
     }));
+    const rear = this.rearPushSpot();
+    return [...doors, ...(this.safeSpeed() ? [{
+      id: `vehicle:${this.parts.vehicle.id}:push`, action: 'push_vehicle' as const,
+      label: 'Hold F to push car', priority: ENTER_PRIORITY + 2,
+      area: { kind: 'circle' as const, x: rear.x, z: rear.z, radius: 1.1 },
+    }] : [])];
   };
 
   /** Connects the interaction system: its `enter_vehicle` action gets you in. */
   useInteractions(interactions: InteractionSystem): void {
     this.interactions = interactions;
     this.releases.push(interactions.handle("enter_vehicle", (target) => this.enter(target.target ?? "")));
+    this.releases.push(interactions.handle('push_vehicle', () => this.beginPush()));
   }
 
   /**
@@ -119,12 +127,21 @@ export class PlayerModes implements GameSystem {
    * foot is put back behind the wheel; the chase camera jumps with the car either way.
    */
   vehiclePlaced(): void {
+    this.stopPush();
     if (this.current === "walking") this.toDriving();
     else this.parts.chaseCamera.snap();
   }
 
   update(): void {
     const { driverControls, walkControls } = this.parts;
+    if (this.pushing) {
+      if (this.current !== 'walking' || !walkControls.interactHeld ||
+        Vector3.Distance(this.parts.character.position, this.rearPushSpot()) > 2) this.stopPush();
+      else {
+        this.parts.vehicle.controller.pushSpeedMps = 1.1;
+        this.parts.character.pushDirection = this.parts.vehicle.forward;
+      }
+    }
     if (this.current === "driving" && driverControls.enterExitPressed) {
       // Only driving-mode interactions resolve here (race starts, job stops); otherwise F gets out.
       if (this.interactions?.current) this.report("interact", this.interactions.trigger());
@@ -156,18 +173,38 @@ export class PlayerModes implements GameSystem {
   }
 
   private toDriving(): void {
+    this.stopPush();
     this.parts.character.despawn();
     this.apply("driving");
     this.parts.chaseCamera.snap();
   }
 
   dispose(): void {
+    this.stopPush();
     this.releases.forEach((release) => release());
     this.interactions = null;
   }
 
   private safeSpeed(): boolean {
     return this.parts.vehicle.body.body.getLinearVelocity().length() * 3.6 <= this.config.maxExitSpeedKmh;
+  }
+  private rearPushSpot(): Vector3 {
+    const { vehicle } = this.parts;
+    const { length, centerZ } = vehicle.definition.collision.body;
+    return vehicle.body.toWorld(new Vector3(0, 0, centerZ - length / 2 - 0.75), new Vector3());
+  }
+  private beginPush(): CommandOutcome {
+    if (this.current !== 'walking' || !this.safeSpeed() ||
+      Vector3.Distance(this.parts.character.position, this.rearPushSpot()) > 1.1)
+      return { rejected: 'Stand behind the stopped car to push it.' };
+    this.pushing = true;
+    this.parts.vehicle.controller.pushSpeedMps = 1.1;
+    this.parts.character.pushDirection = this.parts.vehicle.forward;
+  }
+  private stopPush(): void {
+    this.pushing = false;
+    this.parts.vehicle.controller.pushSpeedMps = 0;
+    this.parts.character.pushDirection = null;
   }
 
   private doors(): Vector3[] {

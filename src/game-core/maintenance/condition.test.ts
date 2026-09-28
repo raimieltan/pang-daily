@@ -2,9 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { BANWA_DALAGAN_1996 as car, PRISTINE_CONDITION } from '../vehicles';
 import { applyConditionLoss, drivingWear, impactWear, repairLines, SERVICE_COMPONENTS, type WearSample } from './condition';
 import { VehicleSession } from './VehicleSession';
+import { towCostPhp, TOW_COST_PHP } from './towing';
 
 const cruise: WearSample = { speedMps: 20, throttle: .5, brake: 0, slip: 0, handbrake: 0, grounded: true, racing: false };
 describe('lightweight wear and repairs', () => {
+  it('charges for a tow, waives only the first one for a trusted friend, and saves tow use', () => {
+    expect(towCostPhp(0, 59)).toBe(TOW_COST_PHP);
+    expect(towCostPhp(0, 60)).toBe(0);
+    const session = new VehicleSession();
+    const before = session.summary(car);
+    expect(session.tow(car, 60)).toMatchObject({ costPhp: 0, towCount: 1, walletPhp: before.walletPhp });
+    const restored = new VehicleSession(session.snapshot());
+    expect(restored.summary(car).towCount).toBe(1);
+    expect(restored.tow(car, 100)).toMatchObject({ costPhp: TOW_COST_PHP, towCount: 2, walletPhp: before.walletPhp - TOW_COST_PHP });
+    const empty = new VehicleSession();
+    empty.spend(5000, { kind: 'fee', description: 'Test expense', source: 'test' });
+    expect(empty.tow(car, 50)).toHaveProperty('rejected');
+    expect(empty.summary(car).towCount).toBe(0);
+  });
   it('wears all five systems with distance; hard use and racing cost more', () => {
     const normal = drivingWear(cruise, 60);
     const hard = drivingWear({ ...cruise, throttle: 1, brake: 1, slip: 1, handbrake: 1, racing: true }, 60);

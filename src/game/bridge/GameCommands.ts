@@ -18,6 +18,7 @@ export type GameCommandMap = {
   devGrantCash: void;
   openContacts: void;
   closeContacts: void;
+  towVehicle: void;
   openAutoPartsShop: void;
   closeAutoPartsShop: void;
   quoteAutoPart: { partId: string };
@@ -137,6 +138,7 @@ export interface GameCommands {
   devGrantCash(): void;
   openContacts(): void;
   closeContacts(): void;
+  towVehicle(): void;
   openAutoPartsShop(): void;
   closeAutoPartsShop(): void;
   quoteAutoPart(partId: string): void;
@@ -192,6 +194,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     devGrantCash: () => dispatch('devGrantCash'),
     openContacts: () => dispatch('openContacts'),
     closeContacts: () => dispatch('closeContacts'),
+    towVehicle: () => dispatch('towVehicle'),
     openAutoPartsShop: () => dispatch('openAutoPartsShop'),
     closeAutoPartsShop: () => dispatch('closeAutoPartsShop'),
     quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),

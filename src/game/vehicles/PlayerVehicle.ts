@@ -254,6 +254,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   setCondition(condition: VehicleCondition): void {
     this.condition = { ...condition };
+    this.controller.engineOperational = condition.engine > 0;
     this.calculatedPerformance = calculateVehiclePerformance(this.definition.spec, this.performanceParts, this.condition,
       { modifiers: combineModifiers(this.wheelEffects, this.bodyEffects.modifiers) }).stats;
     this.controller.setPerformance(this.baseConfig, calculateVehiclePerformance(this.definition.spec).stats, this.performanceStats);

@@ -59,7 +59,7 @@ export function runtimeBootstrap(dto: PlayerBootstrap): RuntimeBootstrap {
   }
   const jobSerial = Math.max(0, ...dto.progression.jobs.map(job => Number(job.runId.match(/#(\d+)$/)?.[1] ?? 0)));
   return {
-    vehicles: { version: 2, walletPhp: php(dto.economy.balanceCentavos), checkpoint: { balancePhp: php(dto.economy.balanceCentavos), sequence: safeInteger(dto.economy.revision) },
+    vehicles: { version: 2, walletPhp: php(dto.economy.balanceCentavos), towCount: dto.economy.towCount ?? 0, checkpoint: { balancePhp: php(dto.economy.balanceCentavos), sequence: safeInteger(dto.economy.revision) },
       transactions: [], vehicles: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, { condition: vehicle.condition,
         revision: safeInteger(vehicle.conditionRevision), fuelLiters: vehicle.fuelLiters }])) },
     inventory: { version: 1, serial: items.length, items, installed,
