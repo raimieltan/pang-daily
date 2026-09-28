@@ -86,6 +86,12 @@ export class GameAudio {
       events.on('raceStarted', () => this.tone(1320, .45, .15)),
       events.on('raceFinished', ({ position }) => { this.tone(position === 1 ? 880 : 440, .6, .15); if (position > 1 && useAudioStore.getState().settings.explicitVoice && this.audible) { this.voice.currentTime = 0; this.speakingUntil = performance.now() + 6000; this.dialogueDuckUntil = this.speakingUntil; this.play(this.voice); } }),
       events.on('commandRejected', () => this.tone(180, .15, .1)),
+      events.on('tireEvent', ({ kind }) => {
+        if (kind === 'blowout') { this.tone(55, .35, .5); this.tone(180, .08, .3); }
+        else if (kind === 'puncture') this.tone(420, .12, .06);
+        else if (kind === 'rim_damage') this.tone(900, .1, .05);
+        else if (kind === 'service') this.tone(240, .05, .08);
+      }),
       events.on('vehicleImpact', ({ strength }) => { this.tone(65, .25, strength * .4); this.tone(135, .09, strength * .2); }),
       events.on('horn', () => { this.tone(350, .4, .12); this.tone(440, .4, .08); }),
       events.on('playerReturned', () => this.tone(220, .25, .1)),

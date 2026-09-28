@@ -35,6 +35,24 @@ export interface VehicleFeedback {
   frontGripUsage: number; rearGripUsage: number; grip: number;
   reversing?: boolean;
 }
+export type AIState = 'RACING' | 'FOLLOWING' | 'OVERTAKING' | 'DEFENDING' | 'AVOIDING' | 'OFF_ROAD' | 'RECOVERING' | 'STUCK';
+export type RoadEdgeState = 'NORMAL' | 'EDGE_WARNING' | 'EDGE_CRITICAL' | 'OFF_ROAD';
+export type RecoveryStep = 'NONE' | 'STOP' | 'REVERSE' | 'STEER_AWAY' | 'FORWARD' | 'REJOIN';
+/** A static-world probe hit: distance along the probe and the surface normal (x/z). */
+export interface ObstacleHit { distance: number; normal: { x: number; z: number } }
+/** Results of the forward, forward-left and forward-right probes; null means clear. */
+export interface ObstacleFeedback { forward: ObstacleHit | null; left: ObstacleHit | null; right: ObstacleHit | null; range: number }
+export interface AIResult { input: DriverInput; respawnRequest?: { routeS: number } }
+export interface AIDebugSnapshot {
+  state: AIState; phase: CornerPhase; roadState: RoadEdgeState; recovery: RecoveryStep;
+  speed: number; targetSpeed: number; lineSpeed: number; lookahead: AILookahead;
+  corner: { direction: 'left' | 'right'; severity: number; toApex: number } | null;
+  lineOffset: number; racecraftOffset: number; targetOffset: number;
+  throttle: number; brake: number; steering: number; frontGrip: number; rearGrip: number; slip: number;
+  vehicleAhead: boolean; trafficLimited: boolean; stuckSeconds: number; attempts: number; routeS: number;
+}
+/** How many stop/reverse/forward tries before the driver asks to be put back on the road. */
+export const MAX_RECOVERY_ATTEMPTS = 3;
 export interface NearbyVehicle {
   position: Point; velocity: Point; kind: 'traffic' | 'opponent'; width: number; length: number;
 }
@@ -139,6 +157,13 @@ export class RoadCorridor {
 export class AIDriver {
   readonly road: RoadCorridor;
   phase: CornerPhase = 'APPROACH';
+  state: AIState = 'RACING';
+  roadState: RoadEdgeState = 'NORMAL';
+  private offRoadSeconds = 0;
+  private progressMark = { s: 0, at: 0 };
+  private racecraftOffset = 0;
+  private respawnRequest?: { routeS: number };
+  private snapshot?: AIDebugSnapshot;
   laneChange: LaneChangeState = 'NONE';
   lookahead: AILookahead = { immediate: 5, tactical: 20, braking: 50, strategic: 100 };
   private index = 0;
@@ -171,19 +196,41 @@ export class AIDriver {
   reset() { this.index = 0; this.clock = this.decisionAt = this.errorAt = 0; this.cornerKey = this.defendedCorner = undefined;
     this.error = this.laneOffset = this.targetOffset = 0; this.phase = 'APPROACH'; this.laneChange = 'NONE';
     this.lastPosition = this.recoveryPosition = undefined;
-    this.recovery = 'none'; this.stuckSeconds = this.recoveryStarted = this.avoidUntilS = this.recoveryOffset = this.recoveryAttempts = 0; }
-  update(dt: number, car: VehicleFeedback, nearby: readonly NearbyVehicle[]): DriverInput {
+    this.recovery = 'none'; this.stuckSeconds = this.recoveryStarted = this.avoidUntilS = this.recoveryOffset = this.recoveryAttempts = 0;
+    this.state = 'RACING'; this.roadState = 'NORMAL'; this.offRoadSeconds = this.racecraftOffset = 0;
+    this.progressMark = { s: 0, at: 0 }; this.respawnRequest = undefined; }
+  /** After the race system has respawned the car: keep the attempt count low but start fresh. */
+  respawned(s: number) {
+    const attempts = this.recoveryAttempts;
+    this.reset();
+    this.progressMark = { s, at: 0 };
+    this.recoveryAttempts = Math.max(0, attempts - MAX_RECOVERY_ATTEMPTS);
+  }
+  /** Like `update`, plus a respawn request once recovery has failed `MAX_RECOVERY_ATTEMPTS` times. */
+  drive(dt: number, car: VehicleFeedback, nearby: readonly NearbyVehicle[], obstacles?: ObstacleFeedback): AIResult {
+    const input = this.update(dt, car, nearby, obstacles);
+    const respawnRequest = this.respawnRequest;
+    this.respawnRequest = undefined;
+    return respawnRequest ? { input, respawnRequest } : { input };
+  }
+  debug(): AIDebugSnapshot | undefined { return this.snapshot; }
+  update(dt: number, car: VehicleFeedback, nearby: readonly NearbyVehicle[], obstacles?: ObstacleFeedback): DriverInput {
     this.clock += dt;
     this.index = this.road.nearest(car.position, this.index);
     const speed = Math.max(0, car.speed), s = this.road.progress(car.position, this.index);
-    this.lookahead = { immediate: 4 + speed * .35, tactical: 9 + speed * .8,
-      braking: 18 + speed * 2.2, strategic: 35 + speed * 4 };
+    // Steering reads the immediate range; braking and planning read much further, never the reverse.
+    this.lookahead = { immediate: clamp(4 + speed * .35, 5, 15), tactical: clamp(9 + speed * .8, 15, 35),
+      braking: Math.max(40, 18 + speed * 2.2), strategic: clamp(35 + speed * 4, 70, 150) };
     const corner = this.road.segments[this.index].corner ??
       this.road.segments[this.road.at(s + this.lookahead.tactical).index].corner;
     if (corner !== this.cornerKey || (!corner && this.clock >= this.errorAt)) {
       this.cornerKey = corner; this.errorAt = this.clock + 3;
-      this.error = (this.random() * 2 - 1) * (1 - this.skill.consistency) *
-        (1 + this.personality.mistakeFrequency) * 1.5;
+      // Line accuracy: rookies ±.3–.6 m, experts ±.05–.15 m, chosen per corner, not per frame.
+      // Misses err toward the road centre (a missed apex) rather than toward the edge.
+      const size = mix(.45, .1, this.skill.corneringSkill) * mix(.6, 1.3, this.random()) *
+        (1 + .5 * this.personality.mistakeFrequency) * mix(1.3, .8, this.skill.consistency);
+      const here = this.road.at(s), towardCentre = -here.roadOffset;
+      this.error = Math.abs(towardCentre) > .2 ? Math.sign(towardCentre) * size : (this.random() * 2 - 1) * size;
     }
     if (this.clock >= this.decisionAt) {
       this.decisionAt = this.clock + Math.max(.2, this.skill.reactionTime + .2);
@@ -216,17 +263,46 @@ export class AIDriver {
         cornerOffset = mix(cornerOffset, (side > 0 ? rightEdge : leftEdge) * .3, .6 * this.skill.racecraft);
     }
     if (s >= this.avoidUntilS) this.recoveryOffset = 0;
-    this.targetOffset = clamp(this.recoveryOffset || (this.laneChange === 'MOVING' ? this.laneOffset : cornerOffset + this.error), leftEdge, rightEdge);
     const lateral = (car.position.x - here.point.x) * here.forward.z -
       (car.position.z - here.point.z) * here.forward.x;
+    // Road risk from the body's distance to the paving, with hysteresis so states don't chatter.
+    const pavedHalf = here.width / 2, centreLateral = lateral + here.roadOffset;
+    const usage = Math.abs(centreLateral) / Math.max(1, pavedHalf);
+    const bodyOver = Math.abs(centreLateral) + .85 - pavedHalf;
+    const previousRoadState = this.roadState;
+    if (Math.abs(centreLateral) > pavedHalf + .3) this.offRoadSeconds += dt;
+    else if (Math.abs(centreLateral) < pavedHalf - .5) this.offRoadSeconds = 0;
+    this.roadState = this.offRoadSeconds > .4 || (previousRoadState === 'OFF_ROAD' && this.offRoadSeconds > 0) ? 'OFF_ROAD' :
+      bodyOver > .1 || (previousRoadState === 'EDGE_CRITICAL' && bodyOver > -.2) ? 'EDGE_CRITICAL' :
+      usage > .7 || (previousRoadState === 'EDGE_WARNING' && usage > .65) ? 'EDGE_WARNING' : 'NORMAL';
+    const offRoad = this.roadState === 'OFF_ROAD';
+    // Racecraft (passing, defending) is an offset on top of the line, eased in and out so it never snaps.
+    const racecraftTarget = offRoad || this.roadState === 'EDGE_CRITICAL' || this.laneChange !== 'MOVING' ? 0 :
+      this.laneOffset - cornerOffset;
+    this.racecraftOffset += (racecraftTarget - this.racecraftOffset) * Math.min(1, dt * (racecraftTarget ? 6 : 1.5));
+    const racecraft = this.laneChange === 'MOVING' ? this.laneOffset - cornerOffset : this.racecraftOffset;
+    this.targetOffset = clamp(this.recoveryOffset || cornerOffset + this.error + racecraft, leftEdge, rightEdge);
+    // Static obstacles ahead: steer toward a clear side probe, or stop short when both are blocked.
+    let obstacleLimit = Infinity;
+    const blockedAhead = obstacles?.forward && obstacles.forward.distance < Math.max(8, this.lookahead.braking * .6);
+    if (blockedAhead && obstacles) {
+      const leftClear = !obstacles.left, rightClear = !obstacles.right;
+      if (leftClear && !rightClear) this.targetOffset = leftEdge;
+      else if (rightClear && !leftClear) this.targetOffset = rightEdge;
+      else if (leftClear && rightClear) this.targetOffset = lateral >= 0 ? rightEdge : leftEdge;
+      else obstacleLimit = Math.sqrt(2 * Math.max(1, this.brakeDeceleration * .8) * Math.max(0, obstacles.forward!.distance - 3));
+    }
+    // Off the road: forget the line and aim back at the route 5–15 m ahead.
+    if (offRoad) this.targetOffset = clamp(-here.roadOffset, leftEdge, rightEdge);
     // The line brushes the edge at every apex, so only pull back once the car is actually past it.
     const warn = this.limits ? 0 : .2, back = this.limits ? .3 : .8;
     if (lateral > rightEdge - warn) this.targetOffset = Math.min(this.targetOffset, rightEdge - back);
     if (lateral < leftEdge + warn) this.targetOffset = Math.max(this.targetOffset, leftEdge + back);
     this.targetOffset = clamp(this.targetOffset, leftEdge, rightEdge);
     const fx = Math.sin(car.heading), fz = Math.cos(car.heading), rx = fz, rz = -fx;
-    const target = { x: steerTarget.point.x + steerTarget.forward.z * this.targetOffset,
-      z: steerTarget.point.z - steerTarget.forward.x * this.targetOffset };
+    const rejoin = offRoad ? this.road.at(s + clamp(5 + speed * .5, 5, 15)) : steerTarget;
+    const target = { x: rejoin.point.x + rejoin.forward.z * this.targetOffset,
+      z: rejoin.point.z - rejoin.forward.x * this.targetOffset };
     const dx = target.x - car.position.x, dz = target.z - car.position.z;
     const localX = dx * Math.cos(car.heading) - dz * Math.sin(car.heading);
     const localZ = dx * Math.sin(car.heading) + dz * Math.cos(car.heading);
@@ -234,7 +310,7 @@ export class AIDriver {
     const desiredYaw = clamp(headingError * 2.1 - car.lateralSlip * (1 + this.skill.recoverySkill), -1.5, 1.5);
     const maxAngle = Math.atan(this.wheelbase * 9.81 / Math.max(9, speed * speed));
     let steering = clamp(Math.atan(desiredYaw * this.wheelbase / Math.max(3, speed)) / maxAngle, -1, 1);
-    if (this.limits) {
+    if (this.limits && !offRoad) {
       // Path following: the line's own curvature (read a steering-lag ahead) plus heading and
       // cross-track correction, turned into the wheel angle the car's rack actually gives.
       const feed = this.road.curvatureAt(s);
@@ -249,6 +325,9 @@ export class AIDriver {
     }
     if (car.rearGripUsage > .93 && Math.abs(car.lateralSlip) > .1) steering = clamp(steering - car.lateralSlip * this.skill.recoverySkill * 2, -1, 1);
     if (!this.limits && car.frontGripUsage > .94) steering *= .82;
+    // Understeer: more lock on saturated fronts only scrubs speed. Hold the lock and lift instead.
+    const understeer = car.frontGripUsage > .97 && car.rearGripUsage < .9;
+    if (understeer) steering = clamp(steering, -Math.abs(this.held.steering) - .05, Math.abs(this.held.steering) + .05);
 
     const grip = clamp(car.grip, .3, 1.3);
     const decel = Math.max(1, this.brakeDeceleration * grip *
@@ -268,7 +347,9 @@ export class AIDriver {
       const q = this.road.segments[i], ahead = Math.max(0, this.road.cumulative[i] - s);
       const lateral = Math.sqrt(Math.max(1, grip * 9.81 * Math.min(1, this.skill.corneringSkill * .72 + .34)) / Math.max(.0001, Math.abs(q.curvature)));
       const cornerSpeed = Math.min((q.speedLimit ?? Infinity) * pace, lateral);
-      const reachable = Math.sqrt(cornerSpeed ** 2 + 2 * decel * Math.max(0, ahead - speed * this.skill.reactionTime));
+      // Downhill the brakes also fight gravity; uphill they are helped by it.
+      const sloped = Math.max(1, decel + 9.81 * q.grade);
+      const reachable = Math.sqrt(cornerSpeed ** 2 + 2 * sloped * Math.max(0, ahead - speed * this.skill.reactionTime));
       if (reachable < desiredSpeed) { desiredSpeed = reachable; dangerDistance = ahead; }
     }
     if (!Number.isFinite(desiredSpeed)) desiredSpeed = this.road.points[this.index].speed * pace;
@@ -280,6 +361,11 @@ export class AIDriver {
     // Braking mid-corner spends the front grip the car needs to turn back in, so on a line it only lifts.
     if (lateral > pavedRight || lateral < pavedLeft)
       desiredSpeed = Math.min(desiredSpeed, this.limits ? Math.min(lineSpeed, speed) * .97 : 12);
+    // Off road: racecraft is cancelled and the car crawls back at 15–30 km/h.
+    if (offRoad) desiredSpeed = Math.min(desiredSpeed, mix(4.2, 8.3, this.skill.recoverySkill));
+    if (this.roadState === 'EDGE_CRITICAL') desiredSpeed = Math.min(desiredSpeed, speed * .97);
+    if (understeer && this.limits) desiredSpeed = Math.min(desiredSpeed, speed * .98);
+    desiredSpeed = Math.min(desiredSpeed, obstacleLimit);
     const remaining = this.road.cumulative[this.road.cumulative.length - 1] - s;
     desiredSpeed = Math.min(desiredSpeed, Math.sqrt(2 * decel * Math.max(0, remaining - 2)));
     let alongside = false, trafficLimited = false;
@@ -307,6 +393,21 @@ export class AIDriver {
           const emergencySpeed = Math.max(0, speed - decel * dt * 10);
           if (emergencySpeed < desiredSpeed) { desiredSpeed = emergencySpeed; trafficLimited = true; }
         }
+      }
+    }
+    // Following an opponent: hold a personality-sized time gap instead of closing to the bumper.
+    let following = false;
+    if (this.laneChange !== 'MOVING') for (const other of nearby) {
+      if (other.kind !== 'opponent' || Math.abs(other.position.y - car.position.y) > 3) continue;
+      const px = other.position.x - car.position.x, pz = other.position.z - car.position.z;
+      const ahead = px * fx + pz * fz, side = px * rx + pz * rz;
+      if (ahead <= 0 || Math.abs(side) > (other.width + 1.8) / 2 + .3) continue;
+      const theirs = Math.max(0, other.velocity.x * fx + other.velocity.z * fz);
+      const gapSeconds = mix(1.8, .7, this.personality.aggression);
+      const gap = ahead - other.length / 2 - 1;
+      if (gap < gapSeconds * Math.max(speed, 5) + 4) {
+        const hold = theirs + (gap - gapSeconds * theirs) * .4;
+        if (hold < desiredSpeed) { desiredSpeed = Math.max(0, hold); following = true; }
       }
     }
     if (alongside && corner) desiredSpeed = Math.min(desiredSpeed, this.limits ?
@@ -350,20 +451,33 @@ export class AIDriver {
         // reverse that same pedal drives backward. Steer the nose toward the road.
         const steer = Math.abs(lateral) > .3 ? Math.sign(lateral) * .6 :
           this.recoveryAttempts % 2 ? -.6 : .6;
-        return { throttle: 0, brake: 1, steer, handbrake: false };
+        return this.recoverySnapshot(car.speed > .3 && !car.reversing ? 'STOP' : 'REVERSE', s,
+          { throttle: 0, brake: 1, steer, handbrake: false });
       }
     }
     if (this.recovery === 'forward') {
       // Throttle reselects drive once stopped. Give the car time to clear the
       // obstruction before normal line braking can stop it in reverse again.
       if (this.clock - this.recoveryStarted < 2.5 || car.reversing) {
-        return { throttle: 1, brake: 0, steer: steering, handbrake: false };
+        return this.recoverySnapshot(this.clock - this.recoveryStarted < 1 ? 'STEER_AWAY' : 'FORWARD', s,
+          { throttle: 1, brake: 0, steer: steering, handbrake: false });
       }
       this.recovery = 'none';
     }
-    if (remaining > 8 && !vehicleAhead && throttle > .3 && Math.abs(car.speed) < 1 && movement < .4)
+    // Stuck is judged by route progress, not the pedals: wanting to move while going nowhere.
+    const progressing = s - this.progressMark.s > .6 || movement > 1.5;
+    if (progressing) this.progressMark = { s, at: this.clock };
+    if (remaining > 8 && !vehicleAhead && !trafficLimited && desiredSpeed > 2 && Math.abs(car.speed) < 1 && !progressing)
       this.stuckSeconds += dt;
     else this.stuckSeconds = 0;
+    // Real progress since the last recovery clears the attempt count.
+    if (this.recoveryAttempts && this.recoveryPosition && s - this.road.progress(this.recoveryPosition,
+      this.road.nearest(this.recoveryPosition, this.index)) > 40) this.recoveryAttempts = 0;
+    if (this.stuckSeconds > 1.2 + (1 - this.skill.recoverySkill) * .8 && this.recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+      this.respawnRequest = { routeS: s };
+      this.state = 'STUCK'; this.stuckSeconds = 0;
+      return { throttle: 0, brake: 1, steer: 0, handbrake: false };
+    }
     if (this.stuckSeconds > 1.2 + (1 - this.skill.recoverySkill) * .8) {
       const side = Math.abs(lateral) > .3 ? -Math.sign(lateral) : this.recoveryAttempts % 2 ? -1 : 1;
       this.recoveryOffset = (side > 0 ? rightEdge : leftEdge) * .75;
@@ -384,7 +498,24 @@ export class AIDriver {
       Math.abs(bend) > .015 ? (dangerDistance < this.lookahead.immediate ? 'APEX' : 'TURN_IN') :
       Math.abs(steering) > .15 ? 'EXIT' : throttle > .5 ? 'ACCELERATING' : 'APPROACH';
     this.held = { throttle, brake, steering, handbrake: 0 };
+    this.state = offRoad ? 'OFF_ROAD' : blockedAhead ? 'AVOIDING' :
+      this.defendedCorner && s < this.defendedCorner.apexS && this.laneChange === 'MOVING' ? 'DEFENDING' :
+      this.laneChange === 'MOVING' ? 'OVERTAKING' : following || trafficLimited ? 'FOLLOWING' : 'RACING';
+    this.snapshot = { state: this.state, phase: this.phase, roadState: this.roadState, recovery: 'NONE',
+      speed, targetSpeed: desiredSpeed, lineSpeed: Number.isFinite(lineSpeed) ? lineSpeed : desiredSpeed,
+      lookahead: this.lookahead, corner: corner ? { direction: corner.direction, severity: corner.severity,
+        toApex: corner.apexS - s } : null,
+      lineOffset: cornerOffset, racecraftOffset: racecraft, targetOffset: this.targetOffset,
+      throttle, brake, steering, frontGrip: car.frontGripUsage, rearGrip: car.rearGripUsage, slip: car.lateralSlip,
+      vehicleAhead, trafficLimited, stuckSeconds: this.stuckSeconds, attempts: this.recoveryAttempts, routeS: s };
     return { throttle, brake, steer: steering, handbrake: false };
+  }
+  private recoverySnapshot(step: RecoveryStep, s: number, input: DriverInput) {
+    this.state = 'RECOVERING';
+    if (this.snapshot) this.snapshot = { ...this.snapshot, state: 'RECOVERING', recovery: step, routeS: s,
+      throttle: input.throttle, brake: input.brake, steering: input.steer,
+      stuckSeconds: this.stuckSeconds, attempts: this.recoveryAttempts };
+    return input;
   }
   private chooseLane(car: VehicleFeedback, nearby: readonly NearbyVehicle[], s: number) {
     const fx = Math.sin(car.heading), fz = Math.cos(car.heading), rx = fz, rz = -fx;
@@ -414,6 +545,8 @@ export class AIDriver {
         Math.abs(dx * rx + dz * rz) < (v.width + 1.8) / 2 + .5;
     });
     const traffic = blocked.find(v => v.kind === 'traffic');
+    // No passing into heavy braking unless the driver is both very aggressive and very capable.
+    if (!traffic && this.held.brake > .5 && !(this.personality.aggression > .8 && this.skill.racecraft > .8)) return;
     if (blocked.length && Math.abs(cornerSoon) < .025 && width >= 6 && this.laneChange === 'NONE' &&
       (traffic || this.personality.aggression + this.skill.racecraft > .55 + this.personality.patience * .25)) {
       const trafficSide = traffic ? (traffic.position.x - car.position.x) * rx + (traffic.position.z - car.position.z) * rz : 0;

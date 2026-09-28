@@ -57,6 +57,8 @@ import { PerformanceSystem } from "../vehicles/PerformanceSystem";
 import { TalyerPerformanceSystem } from '../vehicles/TalyerPerformanceSystem';
 import { AutoPartsShopSystem, autoPartsShopRejection } from '../marketplace/AutoPartsShopSystem';
 import { WheelSystem } from "../vehicles/WheelSystem";
+import { TireSystem } from "../vehicles/TireSystem";
+import { surfaceResolver } from "../world/surfaceAt";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
 import { PLAYER_CARS, STARTER_SEDAN, playerCar } from "../vehicles/VehicleDefinition";
@@ -180,7 +182,10 @@ export const hubScene: SceneDefinition = {
       fuelLiters: () => session.summary(maintainedCar.definition.spec).fuelLiters ?? 0,
       boards: zones.filter((zone) => zone.action === "browse_jobs"), marker: new JobMarker(scene),
     });
-    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions]));
+    const tires = new TireSystem(bridge, maintainedCar, modes, surfaceResolver(CONNECTED_LAYOUT), socialStorage);
+    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions, tires.interactions]));
+    tires.connect(interactions);
+    addSystem(tires);
     let talyerSystem: MaintenanceSystem | null = null;
     const dialogue = addSystem(new DialogueController(bridge, input, socialStorage, id => {
       if (id === 'talyer_mang_boy' && !signal.aborted) talyerSystem?.inspect();

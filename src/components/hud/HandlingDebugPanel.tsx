@@ -94,7 +94,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+export function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
       <span className="text-white/55">{label}</span>
@@ -104,7 +104,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /** 0..1 bar; `signed` draws −1..1 from the centre. */
-function Bar({ label, value, signed = false, hint }: { label: string; value: number; signed?: boolean; hint?: string }) {
+export function Bar({ label, value, signed = false, hint }: { label: string; value: number; signed?: boolean; hint?: string }) {
   const clamped = Math.max(signed ? -1 : 0, Math.min(1, value));
   const width = `${(signed ? Math.abs(clamped) / 2 : clamped) * 100}%`;
   const left = signed ? (clamped < 0 ? `${50 - Math.abs(clamped) * 50}%` : "50%") : "0%";

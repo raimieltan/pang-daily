@@ -19,6 +19,7 @@ import { NPC_CAR_BUILDS, npcCarId } from "@/game-core/exterior/npcBuilds";
 import { Race, type RaceProgress, type RaceDefinition } from "./Race";
 import { LOCAL_ROUTE } from "./localRoute";
 import { AIDriver, DRIVER_SKILLS, type NearbyVehicle } from './AIDriver';
+import { ObstacleProbes } from './obstacleProbes';
 import { rivalCar, rivalLine } from './rivalDriver';
 import { buildRacingLine, carLimits } from './racingLine';
 import { RaceLineVisual } from './RaceLineVisual';
@@ -52,6 +53,11 @@ export class RaceSystem implements GameSystem {
   private rivalBody?: VehicleBody;
   private rivalController?: VehicleController;
   private driver?: AIDriver;
+  private probes?: ObstacleProbes;
+  /** Seconds the rival is held after a respawn, as a small penalty. */
+  private respawnHold = 0;
+  private pendingRespawn?: number;
+  private telemetryAge = 0;
   private raceLine?: RaceLineVisual;
   private traffic?: TrafficSystem;
   setTraffic(traffic: TrafficSystem) { this.traffic = traffic; }
@@ -190,6 +196,13 @@ export class RaceSystem implements GameSystem {
       this.race.rival.departed = this.race.opponent.finished && remaining < 3 && state.vx < .5;
     }
     if (this.race.rival.departed) { this.root.setEnabled(false); this.disposeRival(); }
+    this.respawnHold = Math.max(0, this.respawnHold - dt);
+    if (this.pendingRespawn !== undefined) { this.respawnRival(this.pendingRespawn); this.pendingRespawn = undefined; }
+    if (this.driver && (this.telemetryAge += dt) >= .2) {
+      this.telemetryAge = 0;
+      const snapshot = this.driver.debug();
+      if (snapshot) this.bridge.emit('aiTelemetry', { driverId: this.selected.rival?.name ?? 'rival', ...snapshot });
+    }
     (this.current ?? this.visual)?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
     this.gates.filter(g=>g.metadata.routeId===this.selected.id).forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
@@ -268,9 +281,13 @@ export class RaceSystem implements GameSystem {
     const line = rivalLine(route, config);
     const driver = new AIDriver(line.points, skill, personality, config.brakes.decelerationMps2,
       config.chassis.wheelbaseM, seed, line.limits);
+    const probes = new ObstacleProbes(this.world, body, definition.collision.body.width / 2);
     const source = { read: () => {
       if (this.race.phase !== 'RUNNING' && this.race.phase !== 'FINISHED') return { throttle: 0, brake: 0, steer: 0 };
+      if (this.respawnHold > 0) return { throttle: 0, brake: 1, steer: 0 };
       const model = this.rivalController!.model;
+      // Same weather as the player: the rival gets no extra grip in the rain.
+      model.surfaceGrip = this.player.controller.model.surfaceGrip;
       body.updateAxes();
       const nearby: NearbyVehicle[] = [{ position: this.player.position, velocity: {
         x: this.player.forward.x * this.player.speed, y: 0, z: this.player.forward.z * this.player.speed },
@@ -281,16 +298,41 @@ export class RaceSystem implements GameSystem {
           z: Math.cos(actor.follower.heading) * actor.follower.speed },
         kind: 'traffic', width: actor.kind.width, length: actor.kind.length,
       });
-      return driver.update(this.world!.fixedStep, {
+      const step = this.world!.fixedStep;
+      const result = driver.drive(step, {
         position: body.position, heading: Math.atan2(body.forward.x, body.forward.z), speed: model.state.vx,
         yawRate: model.state.yawRate, lateralSlip: model.diagnostics.bodySlip,
         frontGripUsage: model.diagnostics.frontGripUse, rearGripUsage: model.diagnostics.rearGripUse,
         grip: model.surfaceGrip, reversing: model.state.reversing,
-      }, nearby);
+      }, nearby, probes.sample(step, model.state.vx));
+      // Applied in `update`, outside the physics step that is reading this input.
+      if (result.respawnRequest) this.pendingRespawn = result.respawnRequest.routeS;
+      return result.input;
     } };
     this.rivalBody = body;
     this.driver = driver;
+    this.probes = probes;
     this.rivalController = new VehicleController(this.world, body, config, source);
+  }
+  /**
+   * Puts a hopelessly stuck rival back on its line: on pavement, aligned with the road,
+   * clear of the player, at rest, then held briefly as a penalty.
+   */
+  private respawnRival(routeS: number) {
+    const body = this.rivalBody, driver = this.driver, controller = this.rivalController;
+    if (!body || !driver || !controller) return;
+    const road = driver.road, end = road.cumulative[road.cumulative.length - 1];
+    for (let s = routeS; s < Math.min(end - 5, routeS + 60); s += 5) {
+      const at = road.at(s);
+      if (Math.hypot(at.point.x - this.player.position.x, at.point.z - this.player.position.z) < 8) continue;
+      const pose = { position: new Vector3(at.point.x, at.point.y + .3, at.point.z),
+        headingRad: Math.atan2(at.forward.x, at.forward.z) };
+      if (!body.place(pose)) continue;
+      controller.reset();
+      driver.respawned(s);
+      this.respawnHold = 1.5;
+      return;
+    }
   }
   private syncRivalVisual() {
     if (!this.rivalBody) return;
@@ -300,7 +342,7 @@ export class RaceSystem implements GameSystem {
   }
   private disposeRival() {
     this.rivalController?.dispose(); this.rivalBody?.dispose();
-    this.rivalController = undefined; this.rivalBody = undefined; this.driver = undefined;
+    this.rivalController = undefined; this.rivalBody = undefined; this.driver = undefined; this.probes = undefined;
   }
   private standing() { return { raceId: this.selected.id, position: this.race.position, racers: 2 }; }
   dispose() {

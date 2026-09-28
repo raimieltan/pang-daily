@@ -68,6 +68,14 @@ export type GameEventMap = {
   footsteps: { distance: number };
   npcSound: import('../traffic/RoadsidePeople').NpcSound;
   vehicleImpact: { strength: number };
+  /** Player car's tires: change-only status for the HUD. */
+  tireStatus: import('../vehicles/TireSystem').TireStatus;
+  /** One-shot tire moments for audio, HUD toasts and visuals. */
+  tireEvent: import('../vehicles/TireSystem').TireEventPayload;
+  /** Per-corner forces and tire state, 5 Hz, for the debug panel. */
+  tireTelemetry: import('../vehicles/TireSystem').TireTelemetry;
+  /** Result of inspecting a wheel. */
+  tireInspection: { corner: import('../../game-core/tires').CornerId; text: string };
   horn: void;
   error: { message: string };
   paused: { paused: boolean };
@@ -82,6 +90,8 @@ export type GameEventMap = {
   /** Handling debug readout, ~10 Hz while a car is driving. */
   vehicleTelemetry: VehicleTelemetry;
   vehicleDebugInfo: VehicleDebugInfo;
+  /** Race AI debug readout, ~5 Hz while a rival drives. */
+  aiTelemetry: import('../races/AIDriver').AIDebugSnapshot & { driverId: string };
   /** Entered or left a hub location's area. */
   locationEntered: LocationChange;
   locationExited: LocationChange;

@@ -19,6 +19,10 @@ export type GameCommandMap = {
   openContacts: void;
   closeContacts: void;
   towVehicle: void;
+  /** Dev: fail one of the player car's tires. */
+  debugPuncture: { corner: import('../../game-core/tires').CornerId; failure: 'SLOW_LEAK' | 'RAPID_LEAK' | 'BLOWOUT' };
+  /** Dev: refit a fresh stock set with a donut spare, jack and wrench. */
+  debugResetTires: void;
   openAutoPartsShop: void;
   closeAutoPartsShop: void;
   quoteAutoPart: { partId: string };
@@ -139,6 +143,8 @@ export interface GameCommands {
   openContacts(): void;
   closeContacts(): void;
   towVehicle(): void;
+  debugPuncture(corner: import('../../game-core/tires').CornerId, failure: 'SLOW_LEAK' | 'RAPID_LEAK' | 'BLOWOUT'): void;
+  debugResetTires(): void;
   openAutoPartsShop(): void;
   closeAutoPartsShop(): void;
   quoteAutoPart(partId: string): void;
@@ -195,6 +201,8 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     openContacts: () => dispatch('openContacts'),
     closeContacts: () => dispatch('closeContacts'),
     towVehicle: () => dispatch('towVehicle'),
+    debugPuncture: (corner, failure) => dispatch('debugPuncture', { corner, failure }),
+    debugResetTires: () => dispatch('debugResetTires'),
     openAutoPartsShop: () => dispatch('openAutoPartsShop'),
     closeAutoPartsShop: () => dispatch('closeAutoPartsShop'),
     quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),

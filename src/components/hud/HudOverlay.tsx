@@ -11,6 +11,7 @@ import { useGraphicsStore } from "@/state/graphicsStore";
 import { RaceIntro } from "./RaceIntro";
 import { useGameUiStore } from "@/state/gameUiStore";
 import { CommandNotice } from "./CommandNotice";
+import { TireHud } from "./TireHud";
 import { DialogueBox } from "./DialogueBox";
 import { RecognitionBadge } from "./RecognitionBadge";
 import { DrivingHud } from "./DrivingHud";
@@ -98,7 +99,7 @@ export function HudOverlay() {
 
       {status === "ready" && toolsOpen && <PauseSettings onClose={closeSettings} />}
       {status === "ready" && !paused && !intro && <div className="flex flex-col gap-3">
-        <LocationToast /><CommandNotice /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
+        <LocationToast /><CommandNotice /><TireHud /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
       </div>}
       {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /><MarketplaceApp /><AutoPartsShopPanel /></>}
       <ContactsApp />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AIDriver, DRIVER_SKILLS } from './AIDriver';
+import { AIDriver, DRIVER_SKILLS, MAX_RECOVERY_ATTEMPTS } from './AIDriver';
 import type { Waypoint } from './Race';
 
 const personality = { aggression: .4, patience: .6, overtakingPreference: 'balanced' as const,
@@ -94,5 +94,46 @@ describe('racing driver input planner', () => {
     expect(edge.steer).toBeLessThan(centered.steer);
     expect(edge.brake).toBeGreaterThan(0);
     expect(driver.road.segments[4].rightBoundary[0].x).toBeCloseTo(1.6, 1);
+  });
+
+  it('goes off-road mode and crawls back toward the route when well off the paving', () => {
+    const driver = new AIDriver(straight, DRIVER_SKILLS[2], personality, 7, 2.5);
+    let input = driver.update(1 / 60, { ...feedback(20, 15), position: { x: 6, y: 0, z: 20 } }, []);
+    for (let i = 0; i < 40; i++) input = driver.update(1 / 60, { ...feedback(20 + i * .25, 15), position: { x: 6, y: 0, z: 20 + i * .25 } }, []);
+    expect(driver.state).toBe('OFF_ROAD');
+    expect(driver.debug()!.targetSpeed).toBeLessThanOrEqual(30 / 3.6 + .01);
+    expect(input.steer).toBeLessThan(0);
+  });
+
+  it('asks for a respawn once recovery has failed its allowed attempts', () => {
+    const driver = new AIDriver(straight, DRIVER_SKILLS[1], personality, 7, 2.5);
+    let respawn: { routeS: number } | undefined;
+    for (let frame = 0; frame < 60 * 60 && !respawn; frame++)
+      respawn = driver.drive(1 / 60, { ...feedback(20, 0), position: { x: 1.5, y: 0, z: 20 } }, []).respawnRequest;
+    expect(respawn).toBeDefined();
+    expect(respawn!.routeS).toBeCloseTo(20, 0);
+    expect(driver.debug()!.attempts).toBe(MAX_RECOVERY_ATTEMPTS);
+  });
+
+  it('steers toward the clear probe around a static obstacle and stops when boxed in', () => {
+    const hit = { distance: 15, normal: { x: 0, z: -1 } };
+    const left = new AIDriver(straight, DRIVER_SKILLS[2], personality, 7, 2.5)
+      .update(1 / 60, feedback(20, 12), [], { forward: hit, left: null, right: hit, range: 40 });
+    const right = new AIDriver(straight, DRIVER_SKILLS[2], personality, 7, 2.5)
+      .update(1 / 60, feedback(20, 12), [], { forward: hit, left: hit, right: null, range: 40 });
+    expect(left.steer).toBeLessThan(0);
+    expect(right.steer).toBeGreaterThan(0);
+    const boxed = new AIDriver(straight, DRIVER_SKILLS[2], personality, 7, 2.5);
+    const input = boxed.update(1 / 60, feedback(20, 14), [], { forward: { ...hit, distance: 8 }, left: hit, right: hit, range: 40 });
+    expect(input.brake).toBeGreaterThan(0);
+    expect(boxed.state).toBe('AVOIDING');
+  });
+
+  it('keeps a time gap behind a slower opponent instead of closing up', () => {
+    const driver = new AIDriver(straight, DRIVER_SKILLS[1], { ...personality, aggression: .1 }, 7, 2.5);
+    const input = driver.update(1 / 60, feedback(20, 20), [{ position: { x: 0, y: 0, z: 40 },
+      velocity: { x: 0, y: 0, z: 15 }, kind: 'opponent', width: 1.7, length: 4.3 }]);
+    expect(driver.state === 'FOLLOWING' || driver.state === 'OVERTAKING').toBe(true);
+    if (driver.state === 'FOLLOWING') expect(input.throttle).toBe(0);
   });
 });

@@ -24,6 +24,8 @@ export const INTERACTION_ACTIONS = [
   "browse_jobs",
   "browse_auto_parts",
   "job_objective",
+  "wheel_service",
+  "inspect_tire",
 ] as const;
 
 export type InteractionAction = (typeof INTERACTION_ACTIONS)[number];

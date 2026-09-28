@@ -89,6 +89,12 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private wheelEffects: StatModifiers = NO_MODIFIERS;
   private bodyEffects: ExteriorEffects = NO_EXTERIOR_EFFECTS;
   readonly wheels: WheelSwapper;
+  private readonly impactListeners = new Set<(strength: number, point: Vector3 | null | undefined) => void>();
+  /** Hard hits, with the contact point when Havok reports one. */
+  onImpact(listener: (strength: number, point: Vector3 | null | undefined) => void): () => void {
+    this.impactListeners.add(listener);
+    return () => { this.impactListeners.delete(listener); };
+  }
   readonly bodyParts: BodyPartSwapper;
   private readonly effects: VehicleEffects;
 
@@ -115,6 +121,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       this.impactStrength = Math.min(1, (deltaV - 2.4) / 7 + 0.2);
         this.impactSerial++;
         bridge.emit("vehicleImpact", { strength: this.impactStrength });
+        this.impactListeners.forEach((listener) => listener(this.impactStrength, event.point));
       this.impactCooldown = 0.32;
     });
     this.releaseImpact = () => impacts.remove(observer);

@@ -105,7 +105,7 @@ describe("vehicle physics body", () => {
     expect(peakRebound).toBeLessThan(0.05);
     expect(peakPlanar).toBeLessThan(0.01);
     expect(velocity().length()).toBeLessThan(0.01);
-    expect(vehicle.contact).toEqual({ front: 1, rear: 1 });
+    expect(vehicle.contact).toEqual({ front: 1, rear: 1, wheels: [true, true, true, true] });
     // Wheel spheres on the road: the car-space origin sits at road level.
     expect(vehicle.position.y).toBeCloseTo(0, 1);
     expect(vehicle.up.y).toBeGreaterThan(0.999);

@@ -44,8 +44,57 @@ export type DriverInput = {
   handbrake?: boolean;
 };
 
-/** Share (0..1) of each axle's wheels touching the ground, from the physics layer. */
-export type AxleContact = { front: number; rear: number };
+/**
+ * Share (0..1) of each axle's wheels touching the ground, from the physics layer. `wheels`, when
+ * given, is each corner's own contact in `CORNERS` order and overrides the axle shares.
+ */
+export type AxleContact = { front: number; rear: number; wheels?: readonly boolean[] };
+
+/** Stable corner order used everywhere: front-left, front-right, rear-left, rear-right. */
+export const CORNERS = ["FL", "FR", "RL", "RR"] as const;
+export type WheelCorner = (typeof CORNERS)[number];
+
+/**
+ * What one corner's tire can do right now, from its assembly, pressure and the surface under it.
+ * Neutral values (1, 1, 0, installed, not raised) reproduce the plain axle model exactly.
+ */
+export type CornerTire = {
+  /** Friction scale from tire spec, pressure, health and surface. */
+  grip: number;
+  /** Peak slip angle scale: >1 = softer, slower-building lateral force (low pressure, donut). */
+  slipScale: number;
+  /** Extra rolling resistance as a share of this corner's normal load (0.015 = 1.5% of load). */
+  rollingResistance: number;
+  /** False = empty hub: no tire force at all. */
+  installed: boolean;
+  /** Jacked up: the wheel is off the ground whatever the ray says. */
+  raised: boolean;
+};
+
+/** Per-corner result of the last step, for tire wear, telemetry and tests. Forces in N, car frame. */
+export type CornerForces = {
+  corner: WheelCorner;
+  grounded: boolean;
+  normalLoadN: number;
+  /** Wheel-frame forces: longitudinal (forward +) and lateral (right +). */
+  fx: number;
+  fy: number;
+  driveN: number;
+  brakeN: number;
+  rollingN: number;
+  /** Available friction force (N) at this corner. */
+  capN: number;
+  slipAngle: number;
+  /** Estimated longitudinal slip ratio, -1 = locked. */
+  slipRatio: number;
+  /** Rolling speed of the contact patch along the wheel, m/s (sign = direction). */
+  wheelSpeed: number;
+  steerAngle: number;
+};
+
+export const NEUTRAL_CORNER: CornerTire = { grip: 1, slipScale: 1, rollingResistance: 0, installed: true, raised: false };
+/** Slip ratio at which a healthy tire peaks; used to estimate wheel spin/lock from force demand. */
+const PEAK_SLIP_RATIO = 0.1;
 
 export type HandlingState = {
   /** Body-frame forward speed, m/s. */
@@ -174,6 +223,13 @@ export class ArcadeHandlingModel {
 
   /** Environmental grip; independent of handling preset and retained across resets. */
   surfaceGrip = 1;
+  /** Each corner's tire, set by the wheel/tire simulation. Retained across resets. */
+  readonly tires: CornerTire[] = CORNERS.map(() => ({ ...NEUTRAL_CORNER }));
+  /** Each corner's forces from the last step. */
+  readonly corners: CornerForces[] = CORNERS.map((corner) => ({
+    corner, grounded: false, normalLoadN: 0, fx: 0, fy: 0, driveN: 0, brakeN: 0, rollingN: 0, capN: 0,
+    slipAngle: 0, slipRatio: 0, wheelSpeed: 0, steerAngle: 0,
+  }));
 
   constructor(config: HandlingConfig) {
     this.c = config;
@@ -256,15 +312,29 @@ export class ArcadeHandlingModel {
 
     const frontShare = clamp(c.chassis.frontWeight + s.loadShift, 0.15, 0.85);
     // A loaded outside tire gains less grip than the unloaded inside tire loses.
-    // The bicycle model has one tire per axle, so this is the paired tires' net grip.
     const loadImbalanceSq = (2 * s.lateralLoadShift) ** 2;
     const frontLoadGrip = 1 - c.tires.frontLoadSensitivity * loadImbalanceSq;
     const rearLoadGrip = 1 - c.tires.rearLoadSensitivity * loadImbalanceSq;
     const lift = s.liftOff * c.balance.liftOffRotation;
     const frontHandbrake = lerp(1, c.handbrake.frontGripMultiplier, handbrake);
     const rearHandbrake = lerp(1, c.handbrake.rearGripMultiplier, handbrake);
-    const frontCap = this.surfaceGrip * c.tires.frontGrip * frontLoadGrip * (1 + lift * 0.5) * frontHandbrake * d.m * G * frontShare * contact.front;
-    const rearCap = this.surfaceGrip * c.tires.rearGrip * rearLoadGrip * (1 - lift) * rearHandbrake * d.m * G * (1 - frontShare) * contact.rear;
+    // Friction per unit of normal load at each axle, before the corner's own tire and surface.
+    const frontMu = this.surfaceGrip * c.tires.frontGrip * frontLoadGrip * (1 + lift * 0.5) * frontHandbrake;
+    const rearMu = this.surfaceGrip * c.tires.rearGrip * rearLoadGrip * (1 - lift) * rearHandbrake;
+    const frontLoad = d.m * G * frontShare, rearLoad = d.m * G * (1 - frontShare);
+
+    // Every corner has its own load (lateral transfer moves it left/right), contact and tire.
+    const ll = s.lateralLoadShift;
+    const cornerContact = (i: number) => {
+      const tire = this.tires[i];
+      if (!tire.installed || tire.raised) return 0;
+      const axle = i < 2 ? contact.front : contact.rear;
+      return contact.wheels ? (contact.wheels[i] ? 1 : 0) : axle;
+    };
+    const loads = [frontLoad * (1 + ll) / 2, frontLoad * (1 - ll) / 2, rearLoad * (1 + ll) / 2, rearLoad * (1 - ll) / 2];
+    const caps = loads.map((load, i) => (i < 2 ? frontMu : rearMu) * load * this.tires[i].grip * cornerContact(i));
+    const frontCap = caps[0] + caps[1];
+    const rearCap = caps[2] + caps[3];
 
     // Longitudinal requests. Retarding forces oppose motion; drive pushes in the selected direction.
     const dir = s.reversing ? -1 : 1;
@@ -276,16 +346,24 @@ export class ArcadeHandlingModel {
     const motion = Math.sign(s.vx);
     const engineBrake = (1 - s.throttle) * d.m * c.drive.engineBrakingMps2 * Math.min(1, speed / 3) * motion;
     const brake = s.brake * d.m * c.brakes.decelerationMps2 * motion;
+    const handbrakeForce = handbrake * d.m * c.handbrake.rearBrakeMps2 * motion;
 
     const frontDrive = drive * d.frontDriveShare;
     const rearDrive = drive - frontDrive;
-    const frontFx = axleForce(frontDrive, engineBrake * d.frontDriveShare + brake * c.brakes.frontBias, frontCap, this.frontLatDemand, c.assists.traction);
+    const frontRetard = engineBrake * d.frontDriveShare + brake * c.brakes.frontBias;
     const rearRetard = engineBrake * (1 - d.frontDriveShare) + brake * (1 - c.brakes.frontBias);
-    const rearFx = axleForce(rearDrive, rearRetard + handbrake * d.m * c.handbrake.rearBrakeMps2 * motion, rearCap, this.rearLatDemand, c.assists.traction, handbrake > 0 ? 1 : ABS_LIMIT);
+    // Extra rolling drag from soft, flat or damaged tires, opposing each corner's own motion.
+    const rolling = loads.map((load, i) => this.tires[i].rollingResistance * load *
+      (this.tires[i].installed && !this.tires[i].raised ? 1 : 0) * Math.min(1, speed / 0.5) * motion);
+    const frontAxle = axlePair(frontDrive, frontRetard, 0, rolling[0], rolling[1], caps[0], caps[1], this.frontLatDemand, c.assists.traction, ABS_LIMIT);
+    const rearAxle = axlePair(rearDrive, rearRetard, handbrakeForce, rolling[2], rolling[3], caps[2], caps[3], this.rearLatDemand, c.assists.traction, handbrake > 0 ? 1 : ABS_LIMIT);
+    const fxs = [frontAxle.left, frontAxle.right, rearAxle.left, rearAxle.right];
+    const frontFx = { force: fxs[0].force + fxs[1].force, driveApplied: fxs[0].drive + fxs[1].drive };
+    const rearFx = { force: fxs[2].force + fxs[3].force, driveApplied: fxs[2].drive + fxs[3].drive };
     const requested = Math.abs(frontDrive) + Math.abs(rearDrive);
     diag.tractionCut = requested > 1 ? clamp01(1 - (frontFx.driveApplied + rearFx.driveApplied) / requested) : 0;
 
-    // Lateral: slip angles against each axle's own velocity, capped by what the friction circle leaves.
+    // Lateral: slip angles against each axle's own velocity, capped per corner by what its friction circle leaves.
     const cosD = Math.cos(delta);
     const sinD = Math.sin(delta);
     const frontLatVel = s.vy + d.a * s.yawRate;
@@ -294,21 +372,30 @@ export class ArcadeHandlingModel {
     const wheelLat = -s.vx * sinD + frontLatVel * cosD;
     const frontSlip = Math.atan2(wheelLat, Math.max(Math.abs(wheelLong), MIN_SLIP_SPEED));
     const rearSlip = Math.atan2(rearLatVel, Math.max(speed, MIN_SLIP_SPEED));
-    const frontLatCap = Math.sqrt(Math.max(0, frontCap ** 2 - frontFx.force ** 2));
-    const rearLatCap = Math.sqrt(Math.max(0, rearCap ** 2 - rearFx.force ** 2));
-    const frontCurve = tireCurve(frontSlip / d.frontPeakSlip, c.balance.understeer);
-    const rearCurve = tireCurve(rearSlip / d.rearPeakSlip, c.balance.rearSlideFalloff);
-    const frontFy = -frontLatCap * frontCurve;
     // A rear tire far beyond its peak slip cannot immediately develop peak sideways
     // force when the handbrake is released. Its force builds back as the slide unwinds.
     const rearSlidingGrip = 1 - 0.3 * smoothstep(10 * DEG, 30 * DEG, Math.abs(rearSlip));
-    const rearFy = -rearLatCap * rearCurve * rearSlidingGrip;
-    this.frontLatDemand = Math.abs(frontCurve);
-    this.rearLatDemand = Math.abs(rearCurve);
+    const fys = caps.map((cap, i) => {
+      const front = i < 2;
+      const latCap = Math.sqrt(Math.max(0, cap ** 2 - fxs[i].force ** 2));
+      const curve = tireCurve((front ? frontSlip : rearSlip) / ((front ? d.frontPeakSlip : d.rearPeakSlip) * this.tires[i].slipScale),
+        front ? c.balance.understeer : c.balance.rearSlideFalloff);
+      return { force: -latCap * curve * (front ? 1 : rearSlidingGrip), curve };
+    });
+    const frontFy = fys[0].force + fys[1].force;
+    const rearFy = fys[2].force + fys[3].force;
+    const demand = (l: number, r: number) => (caps[l] + caps[r] > 0 ?
+      (Math.abs(fys[l].curve) * caps[l] + Math.abs(fys[r].curve) * caps[r]) / (caps[l] + caps[r]) : 0);
+    this.frontLatDemand = demand(0, 1);
+    this.rearLatDemand = demand(2, 3);
 
     const fx = frontFx.force * cosD - frontFy * sinD + rearFx.force;
     const fy = frontFx.force * sinD + frontFy * cosD + rearFy;
-    let yawAccel = (d.a * (frontFx.force * sinD + frontFy * cosD) - d.b * rearFy) / d.Iz;
+    // Left/right longitudinal imbalance (a dragging flat, split-grip braking) turns the car
+    // through the track width: more force on the left wheel yaws it right.
+    const halfTrack = c.chassis.trackWidthM / 2;
+    const splitYaw = halfTrack * ((fxs[0].force - fxs[1].force) * cosD + (fxs[2].force - fxs[3].force));
+    let yawAccel = (d.a * (frontFx.force * sinD + frontFy * cosD) - d.b * rearFy + splitYaw) / d.Iz;
 
     // In a FWD slide, accelerating the front axle pulls the nose back toward the
     // direction of travel. This gives the driver a throttle-controlled way to catch
@@ -377,21 +464,51 @@ export class ArcadeHandlingModel {
     diag.frontGripUse = frontCap > 0 ? Math.hypot(frontFx.force, frontFy) / frontCap : 0;
     diag.rearGripUse = rearCap > 0 ? Math.hypot(rearFx.force, rearFy) / rearCap : 0;
     diag.handbrakeEffect = handbrake;
+
+    const rearSpeed = s.vx;
+    this.corners.forEach((out, i) => {
+      const front = i < 2, cap = caps[i], force = fxs[i];
+      out.grounded = cornerContact(i) > 0;
+      out.normalLoadN = out.grounded ? loads[i] : 0;
+      out.fx = force.force;
+      out.fy = fys[i].force;
+      out.driveN = force.drive;
+      out.brakeN = force.retard;
+      out.rollingN = Math.abs(rolling[i]);
+      out.capN = cap;
+      out.slipAngle = front ? frontSlip : rearSlip;
+      out.steerAngle = front ? delta : 0;
+      const locked = !front && handbrake > 0.5 && cap > 0 && Math.abs(force.force) >= cap * 0.98;
+      out.slipRatio = !out.grounded ? 0 : locked ? -1 : clamp(cap > 0 ? (force.force / cap) * PEAK_SLIP_RATIO * this.tires[i].slipScale : 0, -1, 1);
+      out.wheelSpeed = (front ? wheelLong : rearSpeed) * (1 + out.slipRatio);
+    });
   }
 }
 
 /**
- * Longitudinal force one axle can deliver. Drive is capped by grip; the traction assist
- * blends that cap toward "whatever cornering leaves over" (friction circle), trading
- * acceleration for steering. Retarding forces are capped by arcade ABS.
+ * One axle's two corners. Drive goes through a mildly limited-slip differential: each side gets
+ * half, capped by its own traction, and half of what a spinning side can't use moves across.
+ * Brakes are split evenly and each side is capped by its own grip, so split-grip braking pulls.
+ * The traction assist trades drive for steering (friction circle); retarding is capped by arcade ABS.
  */
-function axleForce(drive: number, retard: number, cap: number, latDemand: number, tractionAssist: number, brakeLimit = ABS_LIMIT) {
+function axlePair(drive: number, retard: number, handbrake: number, rollLeft: number, rollRight: number,
+  capLeft: number, capRight: number, latDemand: number, tractionAssist: number, brakeLimit: number) {
   const cornering = clamp01(latDemand);
-  const driveLimit = cap * lerp(1, Math.sqrt(1 - cornering * cornering), tractionAssist);
-  const driveApplied = Math.min(Math.abs(drive), driveLimit);
-  const limit = cap * brakeLimit;
-  const force = clamp(Math.sign(drive) * driveApplied - retard, -limit, limit);
-  return { force, driveApplied };
+  const assist = lerp(1, Math.sqrt(1 - cornering * cornering), tractionAssist);
+  const limitLeft = capLeft * assist, limitRight = capRight * assist;
+  const half = Math.abs(drive) / 2;
+  let left = Math.min(half, limitLeft), right = Math.min(half, limitRight);
+  const spare = Math.abs(drive) - left - right;
+  if (spare > 0) {
+    left += Math.min(spare * 0.5, Math.max(0, limitLeft - left));
+    right += Math.min(spare * 0.5, Math.max(0, limitRight - right));
+  }
+  const side = (applied: number, roll: number, cap: number) => {
+    const limit = cap * brakeLimit;
+    const retardN = retard / 2 + handbrake / 2 + roll;
+    return { force: clamp(Math.sign(drive) * applied - retardN, -limit, limit), drive: applied, retard: Math.abs(retard / 2 + handbrake / 2) };
+  };
+  return { left: side(left, rollLeft, capLeft), right: side(right, rollRight, capRight) };
 }
 
 /**

@@ -57,6 +57,8 @@ export type PlayerModeParts = {
 export class PlayerModes implements GameSystem {
   readonly name = "playerModes";
   canExit?: () => boolean;
+  /** Why the car can't be driven right now (mid wheel change), or null. */
+  canEnter?: () => string | null;
   private current: PlayerMode = "driving";
   private interactions: InteractionSystem | null = null;
   private pushing = false;
@@ -167,6 +169,8 @@ export class PlayerModes implements GameSystem {
     const { vehicle } = this.parts;
     if (this.current !== "walking") return { rejected: "Already driving" };
     if (vehicleId !== vehicle.id) return { rejected: "That's not your car" };
+    const blocked = this.canEnter?.();
+    if (blocked) return { rejected: blocked };
     if (!this.safeSpeed()) return { rejected: "Wait for the car to stop" };
     if (!this.doors().some((door) => this.doorReachable(door))) return { rejected: "Walk up to a car door to get in" };
     this.toDriving();

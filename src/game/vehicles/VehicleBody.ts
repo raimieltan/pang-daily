@@ -45,7 +45,7 @@ export class VehicleBody {
   readonly body: PhysicsBody;
   readonly wheels: readonly WheelContact[];
   /** Share of each axle's wheels on the ground, refreshed by `updateContacts`. */
-  readonly contact: AxleContact = { front: 0, rear: 0 };
+  readonly contact: AxleContact & { wheels: boolean[] } = { front: 0, rear: 0, wheels: [false, false, false, false] };
   /** Car axes in world space, refreshed by `updateAxes`. */
   readonly forward = new Vector3(0, 0, 1);
   readonly right = new Vector3(1, 0, 0);
@@ -150,6 +150,7 @@ export class VehicleBody {
       const hit = this.world.raycast(this.tmpFrom, this.tmpTo, this.probeQuery);
       wheel.grounded = hit !== null;
       wheel.gap = hit ? Math.max(0, hit.hitDistance - radius) : Infinity;
+      this.contact.wheels[this.wheels.indexOf(wheel)] = wheel.grounded;
       if (wheel.grounded) {
         if (wheel.front) front++;
         else rear++;

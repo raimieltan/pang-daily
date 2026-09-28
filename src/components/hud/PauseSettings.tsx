@@ -10,6 +10,8 @@ import { useGameUiStore } from "@/state/gameUiStore";
 import { useMaintenanceStore } from "@/state/maintenanceStore";
 import { GraphicsDebugPanel } from "./GraphicsDebugPanel";
 import { HandlingDebugPanel } from "./HandlingDebugPanel";
+import { AIDebugPanel } from "./AIDebugPanel";
+import { TireDebugPanel } from "./TireDebugPanel";
 import { AudioPanel } from "./AudioPanel";
 
 type Tab = "map" | "graphics" | "audio" | "gameplay" | "development";
@@ -60,6 +62,8 @@ export function PauseSettings({ onClose }: { onClose: () => void }) {
         <div className="pause-settings-card"><h3>Scenes</h3><div className="pause-settings-actions">{scenes.filter(s => s.id !== activeScene).map(s => <button key={s.id} onClick={() => commands?.switchScene(s.id)}>{s.label}</button>)}{activeScene && <button onClick={() => commands?.switchScene(activeScene)}>Reload scene</button>}</div></div>
         {activeScene === "debug" && <div className="pause-settings-card"><h3>Bridge demo</h3><div className="pause-settings-actions"><button onClick={() => commands?.spawnAt("coffee_shop")}>Spawn at coffee shop</button><button onClick={() => commands?.startRace("debug_sprint")}>Start race</button></div></div>}
         <HandlingDebugPanel />
+        <AIDebugPanel />
+        <TireDebugPanel />
       </div>}
     </div>
     <footer className="pause-settings-foot"><span>ILOILO, PH / VOL. 01</span><span>SELECT A SECTION · BACK TO GAME TO DRIVE</span></footer>
