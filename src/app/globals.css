@@ -60,6 +60,22 @@ body {
 .driving-minimap-head span:last-child { color: #eaa47e; }
 .driving-minimap svg { display: block; width: 100%; aspect-ratio: 1; margin: 6px 0; border: 1px solid #9aab8a68; background: #0a1a19; }
 .driving-minimap-foot { padding: 1px; color: #a9bea8; }
+.drift-impact { position: absolute; z-index: 8; left: 57%; top: 34%; width: max-content; max-width: 38vw; pointer-events: none; isolation: isolate; transform: rotate(-9deg); animation: drift-impact-pop 1.2s both; filter: drop-shadow(9px 10px 0 #090a0a); }
+.drift-impact-burst { position: absolute; z-index: -1; inset: -25px -35px -16px -30px; background: #e9e7d9; clip-path: polygon(0 45%, 19% 35%, 3% 14%, 35% 25%, 40% 0, 56% 23%, 86% 6%, 75% 31%, 100% 45%, 79% 58%, 96% 83%, 64% 72%, 50% 100%, 39% 72%, 5% 87%, 22% 61%); box-shadow: inset 0 0 0 4px #080808; }
+.drift-impact-heavy .drift-impact-burst { background: #f5c765; }
+.drift-impact-text { display: block; padding: 5px 16px; color: #f7f6ef; -webkit-text-stroke: 2px #08090a; paint-order: stroke fill; text-shadow: 3px 3px 0 #09090a, -2px 4px 0 #09090a; font-family: Impact, "Arial Black", sans-serif; font-size: clamp(38px, 5.3vw, 88px); font-style: italic; font-weight: 900; line-height: .95; letter-spacing: -.035em; white-space: nowrap; }
+.drift-impact-under { display: block; width: max-content; margin: 3px 0 0 20px; padding: 2px 8px; background: #08090a; color: #f5c765; font: bold 10px/1 monospace; letter-spacing: .22em; }
+.drift-impact-lines { position: absolute; z-index: -2; right: 38%; top: 50%; width: 58vw; height: 170px; transform: translateY(-50%); overflow: hidden; }
+.drift-impact-lines i { position: absolute; right: 0; width: 100%; height: 5px; background: linear-gradient(90deg, transparent, #f4f1e8 20%, #f4f1e8 80%, transparent); transform: skewY(-7deg); animation: drift-line .42s ease-out both; }
+.drift-impact-lines i:nth-child(1) { top: 16%; width: 72%; }
+.drift-impact-lines i:nth-child(2) { top: 38%; height: 2px; animation-delay: 30ms; }
+.drift-impact-lines i:nth-child(3) { top: 66%; width: 85%; height: 9px; animation-delay: 55ms; }
+.drift-impact-lines i:nth-child(4) { top: 87%; width: 65%; height: 2px; animation-delay: 75ms; }
+@keyframes drift-impact-pop { 0% { opacity: 0; transform: translate(18px, 7px) rotate(-13deg) scale(.35); } 9% { opacity: 1; transform: translate(-7px, -4px) rotate(-7deg) scale(1.22); } 15% { transform: translate(5px, 2px) rotate(-11deg) scale(.95); } 22%, 62% { opacity: 1; transform: translate(0, 0) rotate(-9deg) scale(1); } 100% { opacity: 0; transform: translate(22px, -45px) rotate(-9deg) scale(1.08); } }
+@keyframes drift-line { from { opacity: 0; transform: translateX(20%) skewY(-7deg) scaleX(.3); } 35% { opacity: .9; } to { opacity: 0; transform: translateX(-12%) skewY(-7deg) scaleX(1); } }
+@media (max-width: 600px) { .drift-impact { left: 39%; top: 38%; max-width: 58vw; } .drift-impact-text { font-size: clamp(32px, 8vw, 54px); -webkit-text-stroke: 1.5px #08090a; } }
+.is-steady .drift-impact, .is-steady .drift-impact-lines i { animation: none; }
+@media (prefers-reduced-motion: reduce) { .drift-impact, .drift-impact-lines i { animation: none; } }
 @media (max-width: 600px) { .driving-minimap { width: 134px; bottom: 12px; left: 12px; padding: 6px; font-size: 7px; } }
 .race-readout { max-width: 350px; border-right: 1px solid #ffffff50; padding: 10px 16px; font-size: 11px; line-height: 1.8; background: linear-gradient(90deg, transparent, #05070965); }
 .tape-settings { text-shadow: none; letter-spacing: 0.025em; }

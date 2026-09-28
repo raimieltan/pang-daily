@@ -61,12 +61,12 @@ import { TireSystem } from "../vehicles/TireSystem";
 import { surfaceResolver } from "../world/surfaceAt";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
-import { PLAYER_CARS, STARTER_SEDAN, playerCar } from "../vehicles/VehicleDefinition";
+import { PLAYER_CARS, STARTER_SEDAN, parkedPlayerCars, playerCar } from "../vehicles/VehicleDefinition";
 import { VehicleModel } from "../vehicles/VehicleModel";
 import { HomeGarage } from "../vehicles/HomeGarage";
 import { loadActiveCar, saveActiveCar } from "../vehicles/garageStorage";
 import { loadSocialSession } from '../social/socialStorage';
-import { HOME_SECOND_BAY, HUB_LAYOUT, HUB_LOCATIONS } from "../world/hub/hubLayout";
+import { HOME_PARKED_BAYS, HUB_LAYOUT, HUB_LOCATIONS } from "../world/hub/hubLayout";
 import { HubLocations, toVehiclePose } from "../world/hub/HubLocations";
 import { buildChunk, WorldKit } from "../world/WorldChunk";
 
@@ -146,33 +146,40 @@ export const hubScene: SceneDefinition = {
       chaseCamera: chase, walkCamera, world,
     }));
     player.onPlaced = () => modes.vehiclePlaced();
-    // The other owned car waits at home; getting in it rebuilds the scene around that car.
-  const parked = Object.values(PLAYER_CARS).find((car) => car !== driven && (!ownedVehicleDefinitionIds || ownedVehicleDefinitionIds.includes(car.spec.id)));
-    const garage = parked ? await HomeGarage.create(scene, parked, toVehiclePose(HOME_SECOND_BAY), modes, inventory, async (car) => {
-      saveActiveCar(car.spec.id, garageStorage);
-      const url = new URL(window.location.href);
-      url.searchParams.delete("car");
-      url.searchParams.delete("spawn");
-      window.history.replaceState(window.history.state, "", url);
-      restart();
-    }) : null;
-    if (signal.aborted) return garage?.dispose();
-    if (garage) addSystem(garage);
-    // NPC templates are world content, independent of player ownership.
-    const otherDefinition = Object.values(PLAYER_CARS).find(car => car !== driven)!;
-    const npcTemplate = garage ? null : await VehicleModel.load(scene, otherDefinition.spec);
-    if (signal.aborted) return npcTemplate?.dispose();
-    if (npcTemplate) {
-      npcTemplate.root.setEnabled(false);
-      addSystem({ name: 'npcCarTemplate', dispose: () => npcTemplate.dispose() });
+    // Each other owned car waits at home; entering one rebuilds the scene around it.
+    const garages: HomeGarage[] = [];
+    for (const [index, parked] of parkedPlayerCars(driven, ownedVehicleDefinitionIds).entries()) {
+      const bay = HOME_PARKED_BAYS[index];
+      if (!bay) throw new Error(`Missing home parking bay for ${parked.spec.id}`);
+      const garage = await HomeGarage.create(scene, parked, toVehiclePose(bay), modes, inventory, async (car) => {
+        saveActiveCar(car.spec.id, garageStorage);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("car");
+        url.searchParams.delete("spawn");
+        window.history.replaceState(window.history.state, "", url);
+        restart();
+      });
+      if (signal.aborted) return garage.dispose();
+      garages.push(garage);
+      addSystem(garage);
+    }
+    // NPC templates are keyed by their actual model, independently of account ownership.
+    const templates: Record<string, VehicleModel> = { [driven.spec.id]: player.visual.model };
+    for (const garage of garages) templates[garage.car.spec.id] = garage.model;
+    for (const definition of Object.values(PLAYER_CARS)) {
+      if (templates[definition.spec.id]) continue;
+      const model = await VehicleModel.load(scene, definition.spec);
+      if (signal.aborted) return model.dispose();
+      model.root.setEnabled(false);
+      templates[definition.spec.id] = model;
+      addSystem({ name: `npcCarTemplate:${definition.spec.id}`, dispose: () => model.dispose() });
     }
     const lightCar = (car: PlayerVehicle) => lighting.attachCar(modes, [...car.visual.model.root.getChildMeshes(), ...character.mesh.getChildMeshes()]);
     const litCar = player;
     lightCar(litCar);
     litCar.onVisualsChanged = () => lightCar(litCar);
     addSystem(new HubLocations(CONNECTED_LAYOUT, modes, bridge));
-    // NPC cars clone whichever owned car their build names; both are loaded by now.
-    const npcModels = () => ({ [driven.spec.id]: player.visual.model, [otherDefinition.spec.id]: garage?.model ?? npcTemplate! });
+    const npcModels = () => ({ ...templates, [driven.spec.id]: player.visual.model });
     const race = addSystem(new RaceSystem(scene, bridge, player, controls, modes, [LOCAL_ROUTE, ...MOUNTAIN_RACES, ...RACE_CALENDAR],
       { models: npcModels, wallet: session, access: new SocialOpportunityService(bridge, socialStorage).raceRejection }, world));
     const zones = interactablesFromZones([...HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones), ...MOUNTAIN_ZONES]);
@@ -185,7 +192,7 @@ export const hubScene: SceneDefinition = {
     const surfaceAt = surfaceResolver(CONNECTED_LAYOUT);
     race.setSurfaces(surfaceAt);
     const tires = new TireSystem(bridge, maintainedCar, modes, surfaceAt, tireSession ?? socialStorage);
-    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions, tires.interactions]));
+    const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, () => garages.flatMap(garage => garage.interactions()), race.interactions, jobSystem.interactions, tires.interactions]));
     tires.connect(interactions);
     addSystem(tires);
     let talyerSystem: MaintenanceSystem | null = null;
@@ -196,7 +203,7 @@ export const hubScene: SceneDefinition = {
       interactions.handle(action, (target) => target.dialogueId && CONVERSATIONS.some((item) => item.id === target.dialogueId) ? dialogue.open(target.dialogueId) : undefined);
     }
     modes.useInteractions(interactions);
-    garage?.connect(interactions);
+    HomeGarage.connectAll(interactions, garages);
     race.connect(interactions);
     jobSystem.connect(interactions);
     const talyer = () => talyerRejection({
@@ -252,7 +259,7 @@ export const hubScene: SceneDefinition = {
     }, dispose() {} });
     const car = player;
     const roadUser = () => ({ x: car.position.x, y: car.position.y, z: car.position.z, speed: car.speed, heading: Math.atan2(car.forward.x, car.forward.z) });
-    const sedanModel = driven === STARTER_SEDAN ? player.visual.model : garage?.model ?? npcTemplate!;
+    const sedanModel = templates[STARTER_SEDAN.spec.id];
     const traffic = addSystem(new TrafficSystem(scene, kit, world, sedanModel, TRAFFIC_LANES, roadUser, () => lighting.mood.headlight));
     race.setTraffic(traffic);
     const listener = () => modes.position;

@@ -1,0 +1,80 @@
+{
+  "vehicle": "banwa_silak_1983",
+  "contract": "silak83-v1",
+  "triangles": 19856,
+  "drawCalls": 96,
+  "materials": 14,
+  "bounds_min": [
+    -0.9129999876022339,
+    -1.1920928966180355e-8,
+    -2.2100000381469727
+  ],
+  "bounds_max": [
+    0.9129999876022339,
+    1.3947551250457764,
+    2.1870000143051147
+  ],
+  "dimensions_xyz": [
+    1.8259999752044678,
+    1.3947551369667053,
+    4.397000052452087
+  ],
+  "wheelbase": 2.5,
+  "track": 1.456,
+  "wheel_radius": 0.3,
+  "ground_contact_y": 0,
+  "axes": {
+    "up": "+Y",
+    "forward": "+Z",
+    "left": "+X"
+  },
+  "mesh_nodes": 55,
+  "attachment_nodes": [
+    "attach_fender_fr",
+    "attach_sideskirt_r",
+    "attach_fender_fl",
+    "attach_sideskirt_l",
+    "attach_hood",
+    "attach_trunk",
+    "attach_bumper_front",
+    "attach_bumper_rear",
+    "attach_chin_front",
+    "attach_lip_front",
+    "attach_spoiler_rear",
+    "attach_engine",
+    "attach_wheel_fl",
+    "attach_wheel_fr",
+    "attach_wheel_rl",
+    "attach_wheel_rr",
+    "attach_headlight_l",
+    "attach_headlight_r",
+    "attach_taillight_l",
+    "attach_taillight_r",
+    "attach_grille",
+    "attach_exhaust",
+    "attach_lip_rear",
+    "attach_overfender_rl",
+    "attach_overfender_rr"
+  ],
+  "required_nodes_present": true,
+  "export_reimport_checks": true,
+  "zero_area_triangles": 0,
+  "invalid_normals": 0,
+  "engine_clearance_conservative": 0.11200001537799831,
+  "drivetrain_geometry": [
+    "engine_stock",
+    "rwd_gearbox",
+    "rwd_prop_shaft",
+    "rwd_rear_axle"
+  ],
+  "source": {
+    "file": "../banwa_dalagan_1996_modular.glb",
+    "sha256": "82d2f1bfa8b946c389af27c801b13bf3d096de8d39ca6104e6e562a4791a5291"
+  },
+  "issues": [],
+  "limitations": [
+    "Assembled closed components are not globally boolean-unioned.",
+    "Open exhaust outlet is intentional.",
+    "No collision mesh, suspension rig, LODs or texture atlas is embedded; runtime supplies collision and handling."
+  ]
+}

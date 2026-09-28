@@ -1,4 +1,4 @@
-import { BANWA_DALAGAN_1996, HIRAYA_KIDLAT_1997, type VehicleDefinition } from "@/game-core/vehicles";
+import { BANWA_DALAGAN_1996, BANWA_SILAK_1983, HIRAYA_KIDLAT_1997, type VehicleDefinition } from "@/game-core/vehicles";
 import type { HandlingPresetId } from "./handling/presets";
 
 /**
@@ -70,12 +70,32 @@ export const STARTER_HATCH: VehicleRuntimeDefinition = {
   gearThresholdsKmh: [1, 35, 65, 100, 140],
 };
 
+export const RWD_BOX_SEDAN: VehicleRuntimeDefinition = {
+  spec: BANWA_SILAK_1983,
+  handlingPreset: "rwd_box_turbo",
+  collision: {
+    body: { width: 1.68, height: 1.1, length: 4.34, bottomY: .25, centerZ: 0 },
+    wheels: { halfTrack: .728, frontZ: 1.28, rearZ: -1.22, radius: .3 },
+    // -1.22 + 53% of the 2.50 m wheelbase.
+    centerOfMass: { y: .34, z: .105 },
+    tipInertiaScale: 3, angularDamping: .5, suspensionTravel: .2,
+  },
+  gearThresholdsKmh: [1, 38, 68, 105, 145],
+};
+
 /** Drivable cars by spec id. Scenes pick one with `?car=<id>`, defaulting to the sedan. */
 export const PLAYER_CARS: Readonly<Record<string, VehicleRuntimeDefinition>> = {
   [STARTER_SEDAN.spec.id]: STARTER_SEDAN,
   [STARTER_HATCH.spec.id]: STARTER_HATCH,
+  [RWD_BOX_SEDAN.spec.id]: RWD_BOX_SEDAN,
 };
 
 export function playerCar(id: string | null): VehicleRuntimeDefinition {
   return (id && PLAYER_CARS[id]) || STARTER_SEDAN;
+}
+
+/** Standalone fixtures expose the catalog; account sessions only expose owned cars. */
+export function parkedPlayerCars(driven: VehicleRuntimeDefinition, ownedIds?: readonly string[]): VehicleRuntimeDefinition[] {
+  return Object.values(PLAYER_CARS).filter(car => car.spec.id !== driven.spec.id
+    && (!ownedIds || ownedIds.includes(car.spec.id)));
 }

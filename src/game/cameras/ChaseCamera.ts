@@ -4,6 +4,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { GameSystem } from "../engine/types";
 import { VelocityEnvelope } from "../rendering/VelocityEffect";
 import { DEFAULT_CHASE_CAMERA, type ChaseCameraConfig, type SpeedRange } from "./ChaseCameraConfig";
+import { driftShake } from './DriftShake';
 
 const DEG = Math.PI / 180;
 
@@ -14,6 +15,8 @@ export type ChaseTarget = {
   /** Signed forward speed, m/s. */
   readonly speed: number;
   readonly recordingMotion?: { rpm: number; suspension: number };
+  readonly driftImpactSerial?: number;
+  readonly driftImpactStrength?: number;
 };
 
 export interface ChaseCameraInput {
@@ -47,6 +50,9 @@ export class ChaseCamera implements GameSystem {
   private look = 0;
   private readonly velocity = new VelocityEnvelope();
   private readonly aim = new Vector3();
+  private driftSerial = 0;
+  private driftAge = 1;
+  private driftStrength = 0;
 
   constructor(
     scene: Scene,
@@ -84,6 +90,11 @@ export class ChaseCamera implements GameSystem {
     if (!this.active) { this.velocity.reset(); return; }
     this.recordingTime += dt;
     this.enginePhase = (this.enginePhase + (this.target.recordingMotion?.rpm ?? 0) / 60 * 0.12 * Math.PI * 2 * dt) % (Math.PI * 2);
+    if ((this.target.driftImpactSerial ?? 0) !== this.driftSerial) {
+      this.driftSerial = this.target.driftImpactSerial ?? 0;
+      this.driftStrength = this.target.driftImpactStrength ?? 0;
+      this.driftAge = 0;
+    } else this.driftAge += dt;
     const c = this.config;
     const p = this.target.position;
 
@@ -144,6 +155,11 @@ export class ChaseCamera implements GameSystem {
     if (!this.reducedMotion && this.velocity.value > 0.01) {
       const vibration = this.velocity.value * 0.012;
       this.camera.position.y += Math.sin(this.recordingTime * 43) * vibration;
+    }
+    if (!this.reducedMotion) {
+      const kick = driftShake(this.driftAge, this.driftStrength);
+      this.camera.position.x += Math.cos(yaw) * kick;
+      this.camera.position.z -= Math.sin(yaw) * kick;
     }
     this.camera.setTarget(this.aim);
 

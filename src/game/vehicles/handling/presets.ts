@@ -129,6 +129,19 @@ export const HANDLING_PRESETS = {
       balance: { understeer: 0.38, liftOffRotation: 0.11 },
     },
   },
+  rwd_box_turbo: {
+    name: "'80s RWD turbo sedan",
+    description: "Longitudinal turbo four and a live rear axle. Balanced turn-in with progressive power oversteer.",
+    extends: "fwd_worn_sedan",
+    overrides: {
+      chassis: { massKg: 1090, wheelbaseM: 2.5, frontWeight: .53, cgHeightM: .49, trackWidthM: 1.456, yawInertiaScale: 1.05 },
+      drive: { drivetrain: "RWD", accelerationMps2: 5.2, topSpeedKmh: 190, engineBrakingMps2: 1.1 },
+      brakes: { decelerationMps2: 8.2, frontBias: .64 },
+      tires: { frontGrip: 1.02, rearGrip: 1, frontPeakSlipDeg: 7, rearPeakSlipDeg: 7 },
+      balance: { understeer: .12, rearSlideFalloff: .18, liftOffRotation: .04 },
+      assists: { traction: .12, stability: .25 },
+    },
+  },
 } satisfies Record<string, HandlingPreset>;
 
 export type HandlingPresetId = keyof typeof HANDLING_PRESETS;

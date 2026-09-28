@@ -1,0 +1,118 @@
+{
+  "renderer": "Three.js in headless Chrome through the bundled workshop viewer",
+  "source": "lancer_box_1983_modular.glb",
+  "pageErrors": [],
+  "views": [
+    {
+      "view": "01_front_left",
+      "hidden": []
+    },
+    {
+      "view": "02_rear_left",
+      "hidden": []
+    },
+    {
+      "view": "03_left_side",
+      "hidden": []
+    },
+    {
+      "view": "04_front",
+      "hidden": []
+    },
+    {
+      "view": "05_rear",
+      "hidden": []
+    },
+    {
+      "view": "06_hood_removed",
+      "hidden": [
+        {
+          "name": "hood_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "07_fenders_removed",
+      "hidden": [
+        {
+          "name": "fender_fl_stock",
+          "hidden": true
+        },
+        {
+          "name": "fender_fr_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "08_front_bumper_removed",
+      "hidden": [
+        {
+          "name": "bumper_front_stock",
+          "hidden": true
+        },
+        {
+          "name": "chin_front_stock",
+          "hidden": true
+        },
+        {
+          "name": "lip_front_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "09_rear_bumper_removed",
+      "hidden": [
+        {
+          "name": "bumper_rear_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "10_skirts_removed",
+      "hidden": [
+        {
+          "name": "sideskirt_l_stock",
+          "hidden": true
+        },
+        {
+          "name": "sideskirt_r_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "11_spoiler_removed",
+      "hidden": [
+        {
+          "name": "spoiler_rear_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "12_trunk_removed",
+      "hidden": [
+        {
+          "name": "trunk_stock",
+          "hidden": true
+        },
+        {
+          "name": "spoiler_rear_stock",
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "view": "13_underside",
+      "hidden": []
+    },
+    {
+      "view": "14_exploded",
+      "hidden": []
+    }
+  ]
+}

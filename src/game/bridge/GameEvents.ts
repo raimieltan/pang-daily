@@ -68,6 +68,8 @@ export type GameEventMap = {
   footsteps: { distance: number };
   npcSound: import('../traffic/RoadsidePeople').NpcSound;
   vehicleImpact: { strength: number };
+  /** Discrete arcade feedback; continuous tire physics stays in Babylon. */
+  driftCallout: { text: string; intensity: number };
   /** Player car's tires: change-only status for the HUD. */
   tireStatus: import('../vehicles/TireSystem').TireStatus;
   /** One-shot tire moments for audio, HUD toasts and visuals. */

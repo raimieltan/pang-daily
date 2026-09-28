@@ -94,9 +94,15 @@ export class HomeGarage implements GameSystem {
   };
 
   connect(interactions: InteractionSystem): () => void {
+    return HomeGarage.connectAll(interactions, [this]);
+  }
+
+  /** The interaction system accepts one handler per action, shared by all parked cars. */
+  static connectAll(interactions: InteractionSystem, garages: readonly HomeGarage[]): () => void {
     return interactions.handle('switch_vehicle', (target) => {
-      if (target.target !== this.car.spec.id) return { rejected: "That's not your car" };
-      return this.onSwitch(this.car);
+      const garage = garages.find(item => !item.disposed && item.car.spec.id === target.target);
+      if (!garage) return { rejected: "That's not your car" };
+      return garage.onSwitch(garage.car);
     });
   }
 

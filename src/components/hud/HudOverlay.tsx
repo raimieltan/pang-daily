@@ -15,6 +15,7 @@ import { TireHud } from "./TireHud";
 import { DialogueBox } from "./DialogueBox";
 import { RecognitionBadge } from "./RecognitionBadge";
 import { DrivingHud } from "./DrivingHud";
+import { DriftCallout } from "./DriftCallout";
 import { DrivingAtmosphere } from "./DrivingAtmosphere";
 import { PauseSettings } from "./PauseSettings";
 import { LocationToast } from "./LocationToast";
@@ -61,6 +62,7 @@ export function HudOverlay() {
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
       {status === "ready" && !intro && <DrivingAtmosphere />}
+      {status === "ready" && !intro && <DriftCallout />}
       {offline && <p role="status" className="absolute bottom-14 left-3 rounded bg-black/90 p-3 text-sm text-amber-200">Offline. Progress requires a connection to save. Reconnect and retry any failed action.</p>}
       {saving && <p role="status" className="absolute top-10 left-3 text-xs text-white/70">Saving progress…</p>}
       {saved && !saving && !saveError && <p role="status" className="absolute top-10 left-3 text-xs text-emerald-200">Progress saved</p>}

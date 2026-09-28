@@ -10,7 +10,7 @@ import { loadHavok } from "../physics/havok";
 import { PhysicsWorld } from "../physics/PhysicsWorld";
 import type { PlayerMode } from "../player/PlayerMode";
 import { HomeGarage } from "./HomeGarage";
-import { STARTER_SEDAN } from "./VehicleDefinition";
+import { RWD_BOX_SEDAN, STARTER_SEDAN } from "./VehicleDefinition";
 
 const require = createRequire(import.meta.url);
 const GLB = new Uint8Array(readFileSync("public/model/banwa_dalagan_1996_modular.glb"));
@@ -43,6 +43,34 @@ describe("HomeGarage", () => {
     expect(garage.model.root.getAbsolutePosition().asArray()).toEqual([10, 0, 20]);
     expect(garage.model.paint).toBe("#aa2222");
     expect(garage.model.rideHeight).toBe(-0.03);
+  });
+
+  it("routes both parked cars through one switch handler", async () => {
+    const player = { mode: "walking" as PlayerMode, position: Vector3.Zero() };
+    const { garage, onSwitch } = await park(player);
+    const onLancer = vi.fn();
+    const lancer = await HomeGarage.create(garage.model.root.getScene(), RWD_BOX_SEDAN,
+      { position: new Vector3(14, 0, 20), headingRad: Math.PI }, player,
+      new InventorySession(), onLancer,
+      new Uint8Array(readFileSync("public/model/lancer/lancer_box_1983_modular.glb")));
+    const handlers = new Map<string, (target: ReturnType<typeof garage.interactions>[number]) => unknown>();
+    const handle = vi.fn((action: string, fn: (target: ReturnType<typeof garage.interactions>[number]) => unknown) => {
+      if (handlers.has(action)) throw new Error("Duplicate handler");
+      handlers.set(action, fn);
+      return () => handlers.delete(action);
+    });
+    HomeGarage.connectAll({ handle } as never, [garage, lancer]);
+    expect(handle).toHaveBeenCalledTimes(1);
+    const switchCar = handlers.get("switch_vehicle")!;
+    switchCar(garage.interactions()[0]);
+    expect(onSwitch).toHaveBeenCalledWith(STARTER_SEDAN);
+    expect(onLancer).not.toHaveBeenCalled();
+    const lancerDoor = lancer.interactions()[0];
+    switchCar(lancerDoor);
+    expect(onLancer).toHaveBeenCalledWith(RWD_BOX_SEDAN);
+    lancer.dispose();
+    expect(switchCar(lancerDoor)).toEqual({ rejected: "That's not your car" });
+    expect(onLancer).toHaveBeenCalledTimes(1);
   });
 
   it("offers a door prompt on foot only, and hands the car to onSwitch", async () => {

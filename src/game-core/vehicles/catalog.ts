@@ -202,9 +202,53 @@ export const HIRAYA_KIDLAT_1997: VehicleDefinition = parseVehicleDefinition({
   },
 });
 
+/** Lancer EX inspired box sedan, using the project's modular panel and wheel conventions. */
+export const BANWA_SILAK_1983: VehicleDefinition = parseVehicleDefinition({
+  ...BANWA_DALAGAN_1996,
+  id: "banwa_silak_1983",
+  tags: ["banwa_silak", "sedan", "compact", "eighties", "rwd", "turbo"],
+  identity: {
+    make: "Banwa", model: "Silak", trim: "1.8 Turbo", year: 1983, bodyStyle: "sedan",
+    description: "Straight panels, a small turbo and a live rear axle. The old box that still wants to take the long way home.",
+  },
+  drivetrain: { layout: "RWD", transmission: "manual", gears: 5 },
+  engine: {
+    id: "banwa_18_turbo", displacementCc: 1795, layout: "inline_4", aspiration: "turbo",
+    fuelSystem: "efi", basePowerHp: 150, baseTorqueNm: 215, weightKg: 140, reliability: .75, heatOutput: 1.25,
+  },
+  power: { displacementCc: 1795, aspiration: "turbo", peakPowerHp: 150, peakPowerRpm: 6000,
+    peakTorqueNm: 215, peakTorqueRpm: 3800, redlineRpm: 6500 },
+  weight: { curbKg: 1090, frontWeightRatio: .53 },
+  grip: { tireGrip: 1, tireSize: "185/60R14" },
+  braking: { decelerationMps2: 8.2, frontBias: .64, front: "disc", rear: "drum" },
+  reliability: { baseline: .75, wearRate: 1.15, weakPoints: ["cooling", "electrical"] },
+  dimensions: { lengthM: 4.4, widthM: 1.712, heightM: 1.395, wheelbaseM: 2.5, trackM: 1.456, wheelRadiusM: .3 },
+  market: { basePricePhp: 165000, partsAvailability: .7 },
+  visual: {
+    ...BANWA_DALAGAN_1996.visual,
+    model: {
+      ...BANWA_DALAGAN_1996.visual.model,
+      url: "/model/lancer/lancer_box_1983_modular.glb",
+      attachments: BANWA_DALAGAN_1996.visual.model.attachments.map(attachment => ({ ...attachment })),
+      budget: { maxTriangles: 30000, maxDrawCalls: 100, maxMaterials: 16 },
+    },
+    defaultPaint: "#eaece9",
+  },
+  wheels: {
+    ...BANWA_DALAGAN_1996.wheels,
+    stock: { diameterM: .6, widthM: .185, offsetMm: 35, massKg: 14 },
+  },
+  condition: {
+    ...BANWA_DALAGAN_1996.condition,
+    typical: { engine: .82, transmission: .85, suspension: .8, brakes: .85, tires: .8, body: .82,
+      electrical: .75, clutch: .85, cooling: .8 },
+  },
+});
+
 export const VEHICLE_CATALOG: Readonly<Record<string, VehicleDefinition>> = {
   [BANWA_DALAGAN_1996.id]: BANWA_DALAGAN_1996,
   [HIRAYA_KIDLAT_1997.id]: HIRAYA_KIDLAT_1997,
+  [BANWA_SILAK_1983.id]: BANWA_SILAK_1983,
 };
 
 export function getVehicleDefinition(id: string): VehicleDefinition {

@@ -71,6 +71,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   canReposition?: () => boolean;
   impactSerial = 0;
   impactStrength = 0;
+  driftImpactSerial = 0;
+  driftImpactStrength = 0;
   private impactCooldown = 0;
   private releaseImpact: () => void;
   private baseConfig: HandlingConfig;
@@ -114,7 +116,14 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   ) {
     this.wheels = new WheelSwapper(visual.model.root.getScene(), visual.model, options.wheelSource);
     this.bodyParts = new BodyPartSwapper(visual.model.root.getScene(), visual.model, options.bodyPartSource);
-    this.effects = new VehicleEffects(visual.model.root.getScene(), body, visual.model);
+    this.effects = new VehicleEffects(visual.model.root.getScene(), body, visual.model,
+      (text, intensity) => {
+        if (text === 'DRIFT') {
+          this.driftImpactSerial++;
+          this.driftImpactStrength = intensity;
+        }
+        bridge.emit('driftCallout', { text, intensity });
+      });
     this.presetId = presetId;
     this.baseConfig = controller.model.config;
     this.spawnId = options.initialSpawn;

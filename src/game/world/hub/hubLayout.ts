@@ -126,6 +126,10 @@ innerBlock();
 
 /** Beside the carport, inside the yard wall: where the car you aren't driving stays parked. */
 export const HOME_SECOND_BAY: Pose = { x: -70.5, z: 151.5, headingDeg: 180 };
+export const HOME_PARKED_BAYS: readonly Pose[] = [
+  HOME_SECOND_BAY,
+  { x: -74, z: 151.5, headingDeg: 180 },
+];
 
 export const HUB_LOCATIONS: readonly LocationData[] = [
   {
