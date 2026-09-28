@@ -5,9 +5,7 @@ import { ChapterExperience } from './ChapterExperience';
 import { ContactsApp } from './ContactsApp';
 import { SocialFeedback } from './SocialFeedback';
 import { useSocialStore } from '@/state/socialStore';
-import { useState, useSyncExternalStore } from "react";
-import { raceLineEnabled, setRaceLineEnabled, subscribeRaceLine } from '@/game/races/raceLineSettings';
-import { setTrafficEnabled, subscribeTraffic, trafficEnabled } from '@/game/traffic/trafficSettings';
+import { useState } from "react";
 import { useHudStore } from "@/state/hudStore";
 import { useGraphicsStore } from "@/state/graphicsStore";
 import { RaceIntro } from "./RaceIntro";
@@ -15,27 +13,19 @@ import { useGameUiStore } from "@/state/gameUiStore";
 import { CommandNotice } from "./CommandNotice";
 import { DialogueBox } from "./DialogueBox";
 import { RecognitionBadge } from "./RecognitionBadge";
-import type { SceneId } from "@/game";
 import { DrivingHud } from "./DrivingHud";
-import { GraphicsDebugPanel } from "./GraphicsDebugPanel";
-import { HandlingDebugPanel } from "./HandlingDebugPanel";
+import { PauseSettings } from "./PauseSettings";
 import { LocationToast } from "./LocationToast";
 import { InteractionPrompt } from "./InteractionPrompt";
-import { AudioPanel, SoundButton } from "./AudioPanel";
+import { SoundButton } from "./AudioPanel";
 import { FuelPanel } from "./FuelPanel";
 import { ConditionHud, RepairPanel } from "./RepairPanel";
 import { JobBoardPanel, JobTracker } from "./JobPanels";
 import { MarketplaceApp } from "./MarketplaceApp";
 import { AutoPartsShopPanel } from './AutoPartsShopPanel';
 import { useMarketStore } from "@/state/marketStore";
-import { useMaintenanceStore } from '@/state/maintenanceStore';
 
 const buttonClass = "tape-button";
-const SCENES: { id: SceneId; label: string }[] = [
-  { id: "hub", label: "Hub" },
-  { id: "driving", label: "Handling track" },
-  { id: "debug", label: "Bridge demo" },
-];
 
 /** Presentation-only overlay. Reads the UI store and sends intents via commands. */
 export function HudOverlay() {
@@ -45,21 +35,26 @@ export function HudOverlay() {
   const failure = usePersistenceStore(s => s.failure);
   const saved = usePersistenceStore(s => s.saved);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const showRaceLine = useSyncExternalStore(subscribeRaceLine, raceLineEnabled, () => false);
-  const showTraffic = useSyncExternalStore(subscribeTraffic, trafficEnabled, () => true);
+  const [resumeOnClose, setResumeOnClose] = useState(false);
   const intro = useHudStore(s => s.raceIntro);
   const settings = useGraphicsStore(s => s.settings);
   const time = useGraphicsStore(s => s.timeOfDay);
   const status = useGameUiStore((s) => s.status);
   const errorMessage = useGameUiStore((s) => s.errorMessage);
   const paused = useGameUiStore((s) => s.paused);
-  const fps = useGameUiStore((s) => s.fps);
   const commands = useGameUiStore((s) => s.commands);
-  const activeScene = useGameUiStore((s) => s.activeScene);
   const loadingScene = useGameUiStore((s) => s.loadingScene);
   const contactsOpen = useSocialStore(s => s.contactsOpen);
   const marketOpen = useMarketStore((s) => s.view !== null);
-  const walletPhp = useMaintenanceStore(s => s.summary?.walletPhp);
+  const openSettings = () => {
+    setResumeOnClose(!paused);
+    if (!paused) commands?.pause();
+    setToolsOpen(true);
+  };
+  const closeSettings = () => {
+    setToolsOpen(false);
+    if (resumeOnClose) commands?.resume();
+  };
 
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
@@ -84,7 +79,7 @@ export function HudOverlay() {
             <SoundButton />
             <button type="button" className={buttonClass} aria-expanded={contactsOpen} onClick={() => contactsOpen ? commands?.closeContacts() : commands?.openContacts()}>Contacts · P</button>
             <button type="button" className={buttonClass} onClick={() => marketOpen ? commands?.closeMarketplace() : commands?.openMarketplace()} aria-expanded={marketOpen}>{marketOpen ? "Close phone" : "Phone · Baligya"}</button>
-            <button type="button" className={buttonClass} onClick={() => setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen}>{toolsOpen ? "Close settings" : "Settings"}</button>
+            <button type="button" className={buttonClass} onClick={() => toolsOpen ? closeSettings() : openSettings()} aria-expanded={toolsOpen}>{toolsOpen ? "Close settings" : "Settings"}</button>
             <button type="button" className={buttonClass} onClick={() => paused ? commands?.resume() : commands?.pause()}>{paused ? "Resume" : "Menu"}</button>
           </>}
         </div>
@@ -97,34 +92,11 @@ export function HudOverlay() {
         <p className="tape-eyebrow">TAPE PAUSED / ILOILO AFTER HOURS</p>
         <h1>NIGHT RUN</h1>
         <button onClick={() => commands?.resume()}>DRIVE <span>↗</span></button>
-        <button onClick={() => setToolsOpen(true)}>SETTINGS</button>
+        <button onClick={openSettings}>SETTINGS</button>
         <p className="mt-10 text-[10px] tracking-[0.22em] text-white/40">OLD CARS. LATE NIGHTS. / VOL. 01</p>
       </nav>}
 
-      {status === "ready" && toolsOpen && <div className="pointer-events-auto absolute top-24 right-4 z-30 flex max-h-[76dvh] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-auto sm:right-8">
-        <label className="flex items-center gap-3 border border-white/15 bg-black/85 p-3 text-xs text-white/85">
-          <input type="checkbox" checked={showRaceLine} onChange={event => setRaceLineEnabled(event.target.checked)} />
-          <span>Racing line and braking zones<span className="mt-1 block text-[10px] text-white/60">Green: drive · amber: lift · red: brake</span></span>
-        </label>
-        <label className="flex items-center gap-3 border border-white/15 bg-black/85 p-3 text-xs text-white/85">
-          <input type="checkbox" checked={showTraffic} onChange={event => setTrafficEnabled(event.target.checked)} />
-          Moving traffic
-        </label>
-        <GraphicsDebugPanel />
-        <AudioPanel />
-        <details className="bg-black/80 p-3 text-xs"><summary className="cursor-pointer tracking-widest">DEVELOPMENT / {fps} FPS</summary>
-          <HandlingDebugPanel />
-          {process.env.NODE_ENV === 'development' && <div className="mt-3 flex items-center gap-3">
-            <button type="button" className={buttonClass} onClick={() => commands?.devGrantCash()}>+₱50,000 dev cash</button>
-            {walletPhp !== undefined && <span>Wallet: ₱{walletPhp.toLocaleString('en-PH')}</span>}
-          </div>}
-          <div className="mt-3 flex flex-wrap gap-3">
-            {SCENES.filter(s => s.id !== activeScene).map(s => <button key={s.id} className={buttonClass} onClick={() => commands?.switchScene(s.id)}>{s.label}</button>)}
-            {activeScene && <button className={buttonClass} onClick={() => commands?.switchScene(activeScene)}>Reload scene</button>}
-            {activeScene === "debug" && <><button className={buttonClass} onClick={() => commands?.spawnAt("coffee_shop")}>Spawn at coffee shop</button><button className={buttonClass} onClick={() => commands?.startRace("debug_sprint")}>Start race</button></>}
-          </div>
-        </details>
-      </div>}
+      {status === "ready" && toolsOpen && <PauseSettings onClose={closeSettings} />}
       {status === "ready" && !paused && !intro && <div className="flex flex-col gap-3">
         <LocationToast /><CommandNotice /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
       </div>}

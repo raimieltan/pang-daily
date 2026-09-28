@@ -17,6 +17,8 @@ const DEG = Math.PI / 180;
 const MIN_SLIP_SPEED = 0.5;
 /** Counter-yaw (rad/s² per rad of body slip past the threshold) at stability = 1. */
 const STABILITY_GAIN = 60;
+/** Throttle-controlled front axle yaw recovery during a FWD handbrake slide. */
+const FRONT_PULL_GAIN = 120;
 /** Yaw-rate decay per second while fully airborne. */
 const AIR_YAW_DAMPING = 0.8;
 /** Share of axle grip braking may use: arcade ABS, so brakes never lock and steal all steering. */
@@ -249,7 +251,7 @@ export class ArcadeHandlingModel {
     const handbrakeWindow =
       s.reversing || !grounded
         ? 0
-        : clamp01((s.vx - d.handbrakeMinSpeed) / (d.handbrakeFullSpeed - d.handbrakeMinSpeed));
+        : clamp01((Math.hypot(s.vx, s.vy) - d.handbrakeMinSpeed) / (d.handbrakeFullSpeed - d.handbrakeMinSpeed));
     const handbrake = s.handbrake * handbrakeWindow;
 
     const frontShare = clamp(c.chassis.frontWeight + s.loadShift, 0.15, 0.85);
@@ -297,7 +299,10 @@ export class ArcadeHandlingModel {
     const frontCurve = tireCurve(frontSlip / d.frontPeakSlip, c.balance.understeer);
     const rearCurve = tireCurve(rearSlip / d.rearPeakSlip, c.balance.rearSlideFalloff);
     const frontFy = -frontLatCap * frontCurve;
-    const rearFy = -rearLatCap * rearCurve;
+    // A rear tire far beyond its peak slip cannot immediately develop peak sideways
+    // force when the handbrake is released. Its force builds back as the slide unwinds.
+    const rearSlidingGrip = 1 - 0.3 * smoothstep(10 * DEG, 30 * DEG, Math.abs(rearSlip));
+    const rearFy = -rearLatCap * rearCurve * rearSlidingGrip;
     this.frontLatDemand = Math.abs(frontCurve);
     this.rearLatDemand = Math.abs(rearCurve);
 
@@ -305,13 +310,26 @@ export class ArcadeHandlingModel {
     const fy = frontFx.force * sinD + frontFy * cosD + rearFy;
     let yawAccel = (d.a * (frontFx.force * sinD + frontFy * cosD) - d.b * rearFy) / d.Iz;
 
+    // In a FWD slide, accelerating the front axle pulls the nose back toward the
+    // direction of travel. This gives the driver a throttle-controlled way to catch
+    // the rear while the handbrake remains held.
+    if (handbrake > 0 && frontFx.driveApplied > 0) {
+      const frontPull = frontFx.driveApplied / (d.m * G);
+      const pullYaw = handbrake * frontPull * FRONT_PULL_GAIN * Math.sign(rearSlip) * Math.max(0, Math.abs(rearSlip) - d.stabilityThreshold);
+      yawAccel += clamp(pullYaw, -d.a * frontFx.driveApplied / d.Iz, d.a * frontFx.driveApplied / d.Iz);
+    }
+
     // Stability assist: counter-yaw once the rear axle slides past the threshold. Keyed on rear slip
     // (not body slip) so tight low-speed turns, which have large body slip but no sliding, are untouched.
     const slipExcess = Math.abs(rearSlip) - d.stabilityThreshold;
     diag.stabilityYaw = 0;
-    if (grounded && slipExcess > 0) {
-      // Half-relaxed while the handbrake is doing its job; returns with rear grip to help the catch.
-      diag.stabilityYaw = c.assists.stability * (1 - 0.5 * handbrake) * STABILITY_GAIN * Math.sign(rearSlip) * slipExcess;
+    if (grounded && slipExcess > 0 && !handbrakeHeld && s.yawRate * rearSlip < 0) {
+      // The driver is deliberately asking the rear to rotate. Let it slide until the lever
+      // is released; bring stability control back as the rear brake fades out.
+      const requestedYaw = c.assists.stability * (1 - s.handbrake) * STABILITY_GAIN * Math.sign(rearSlip) * slipExcess;
+      // Electronic correction cannot produce more yaw moment than the tires can transmit.
+      const maxYaw = 0.3 * (d.a * frontCap + d.b * rearCap) / d.Iz;
+      diag.stabilityYaw = clamp(requestedYaw, -maxYaw, maxYaw);
       yawAccel += diag.stabilityYaw;
     }
 
@@ -328,15 +346,19 @@ export class ArcadeHandlingModel {
     // Retarding forces stop the car; they never push it backwards.
     if (vxBefore !== 0 && Math.sign(s.vx) !== Math.sign(vxBefore) && drive * s.vx <= 0) s.vx = 0;
 
-    // Low speed: blend to pure rolling kinematics (rear axle doesn't slip, yaw follows the wheels).
+    // Low speed: blend ordinary parking maneuvers to pure rolling kinematics.
     const kinematicYaw = (s.vx * Math.tan(delta)) / d.L;
-    const dynamicBlend = smoothstep(d.kinematicBelow, d.dynamicAbove, Math.abs(s.vx));
+    // Keep simulating tire forces while a sliding car slows through the parking-speed
+    // range. Switching to no-slip kinematics at that point would erase the slide at once.
+    const lowSpeedBlend = smoothstep(d.kinematicBelow, d.dynamicAbove, Math.abs(s.vx));
+    const slidingBlend = smoothstep(3 * DEG, 10 * DEG, Math.abs(rearSlip));
+    const dynamicBlend = Math.max(lowSpeedBlend, slidingBlend);
     if (grounded && dynamicBlend < 1) {
       s.yawRate = lerp(kinematicYaw, s.yawRate, dynamicBlend);
       s.vy = lerp(kinematicYaw * d.b, s.vy, dynamicBlend);
     }
 
-    diag.held = grounded && driveInput === 0 && s.throttle < 0.05 && Math.abs(s.vx) < d.holdBelow;
+    diag.held = grounded && driveInput === 0 && s.throttle < 0.05 && Math.hypot(s.vx, s.vy) < d.holdBelow;
     if (diag.held) {
       s.vx = 0;
       s.vy = 0;

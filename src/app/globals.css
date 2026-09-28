@@ -57,6 +57,67 @@ body {
 .race-readout { max-width: 350px; border-right: 1px solid #ffffff50; padding: 10px 16px; font-size: 11px; line-height: 1.8; background: linear-gradient(90deg, transparent, #05070965); }
 .tape-settings { text-shadow: none; letter-spacing: 0.025em; }
 .tape-settings summary, .tape-settings label { line-height: 1.5; }
+.pause-settings { padding: clamp(18px, 3vw, 42px); background: radial-gradient(circle at 72% 18%, #25302d 0, transparent 42%), #101513f5; color: #e9e8dc; text-shadow: none; letter-spacing: .035em; }
+.pause-settings-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; padding-bottom: 22px; }
+.pause-settings-head h1 { margin-top: 10px; font-size: clamp(38px, 5vw, 76px); font-weight: 300; line-height: 1; text-transform: uppercase; letter-spacing: .06em; }
+.pause-settings-close { color: #e7c47c; font-size: 11px; text-transform: uppercase; letter-spacing: .18em; cursor: pointer; }
+.pause-settings-close span { margin-left: 16px; font-size: 18px; }
+.pause-settings-tabs { display: flex; gap: clamp(12px, 3vw, 48px); flex-wrap: wrap; border-top: 1px solid #ffffff30; border-bottom: 1px solid #ffffff30; }
+.pause-settings-tabs button { padding: 16px 0 14px; border-bottom: 3px solid transparent; color: #c4c7c0; font-size: 12px; text-transform: uppercase; letter-spacing: .19em; cursor: pointer; }
+.pause-settings-tabs button:hover, .pause-settings-tabs button[aria-current="page"] { color: #f5d48b; border-bottom-color: #e4bb70; }
+.pause-settings-content { flex: 1; min-height: 0; overflow-y: auto; padding: clamp(18px, 3vw, 38px) 0; }
+.pause-settings-content.is-map { overflow: hidden; padding: 12px 0; }
+.pause-settings-column { max-width: 760px; margin: 0 auto; }
+.pause-settings-kicker { color: #c3a66d; font-size: 10px; letter-spacing: .26em; text-transform: uppercase; }
+.pause-settings-column h2, .pause-map h2 { margin: 10px 0; font-size: clamp(30px, 4vw, 54px); font-weight: 300; line-height: 1.1; text-transform: uppercase; letter-spacing: .08em; }
+.pause-settings-column > p:not(.pause-settings-kicker) { margin-bottom: 24px; color: #aeb8b0; font-size: 13px; }
+.pause-settings-column .tape-settings, .pause-settings-column [aria-label="Sound settings"] { background: #1b2420; padding: clamp(16px, 3vw, 28px); border: 1px solid #ffffff24; }
+.pause-settings-column .tape-settings > div:last-child { gap: 16px; }
+.pause-settings-column .tape-settings input[type="range"], .pause-settings-column [aria-label="Sound settings"] input[type="range"] { accent-color: #e5bf76; }
+.pause-settings-option { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 12px 0; padding: 22px; background: #1b2420; border: 1px solid #ffffff24; cursor: pointer; }
+.pause-settings-option strong, .pause-settings-option small { display: block; }
+.pause-settings-option strong { font-size: 15px; font-weight: 400; }
+.pause-settings-option small { margin-top: 6px; color: #aeb8b0; font-size: 11px; }
+.pause-settings-option input { width: 19px; height: 19px; }
+.pause-settings-card { margin: 12px 0; padding: 22px; background: #1b2420; border: 1px solid #ffffff24; }
+.pause-settings-card h3 { margin-bottom: 15px; color: #e7c47c; font-size: 12px; text-transform: uppercase; letter-spacing: .2em; }
+.pause-settings-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.pause-settings-actions button { padding: 10px 14px; border: 1px solid #e4bb7080; font-size: 11px; text-transform: uppercase; cursor: pointer; }
+.pause-settings-actions button:hover { background: #e4bb702b; }
+.pause-settings-actions span { color: #bbc5ba; font-size: 12px; }
+.pause-settings-foot { display: flex; justify-content: space-between; gap: 20px; padding-top: 14px; border-top: 1px solid #ffffff24; color: #939d96; font-size: 10px; letter-spacing: .2em; }
+.pause-map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); gap: clamp(16px, 3vw, 38px); height: 100%; min-height: 0; }
+.pause-map-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pause-map-top { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 10px; }
+.pause-map-switch { display: flex; gap: 5px; margin-bottom: 12px; }
+.pause-map-switch button { padding: 8px 10px; border: 1px solid #ffffff38; color: #acb6ac; font-size: 10px; text-transform: uppercase; cursor: pointer; }
+.pause-map-switch button[aria-pressed="true"] { border-color: #e4bb70; color: #f5d48b; background: #e4bb701c; }
+.pause-map-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1px solid #ffffff26; background-color: #26352e; background-image: linear-gradient(#ffffff0a 1px, transparent 1px), linear-gradient(90deg, #ffffff0a 1px, transparent 1px), radial-gradient(circle at 60% 40%, #405542, transparent 60%); background-size: 32px 32px, 32px 32px, auto; }
+.pause-map-canvas svg { width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.pause-map-canvas svg:active { cursor: grabbing; }
+.pause-map-zoom { position: absolute; top: 14px; left: 14px; display: flex; align-items: center; gap: 2px; padding: 3px; background: #101713dc; border: 1px solid #ffffff30; }
+.pause-map-zoom button { min-width: 30px; height: 30px; padding: 0 6px; color: #f1dbab; font-size: 16px; cursor: pointer; }
+.pause-map-zoom button:last-child { font-size: 10px; text-transform: uppercase; }
+.pause-map-zoom button:hover:not(:disabled) { background: #ffffff20; }
+.pause-map-zoom button:disabled { color: #879187; cursor: default; }
+.pause-map-zoom span { min-width: 42px; text-align: center; font-size: 10px; }
+.pause-map-marker { cursor: pointer; }
+.pause-map-marker:focus-visible { outline: none; filter: drop-shadow(0 0 8px #f5d48b); }
+.pause-map-north, .pause-map-caption { position: absolute; color: #e4ddc4; font-size: 10px; letter-spacing: .18em; }
+.pause-map-north { top: 18px; right: 20px; }
+.pause-map-caption { bottom: 18px; left: 20px; }
+.pause-map-side { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding-top: 8px; }
+.pause-map-list { min-height: 0; overflow-y: auto; margin-top: 18px; border-top: 1px solid #ffffff30; }
+.pause-map-list button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 15px 8px; border-bottom: 1px solid #ffffff24; text-align: left; font-size: 12px; cursor: pointer; }
+.pause-map-list button span:first-child { color: #a7b0a4; font-size: 10px; }
+.pause-map-list button span:last-child { margin-left: auto; }
+.pause-map-list button:hover, .pause-map-list button[aria-pressed="true"] { color: #f5d48b; background: #e4bb7015; }
+.pause-map-selected { margin-top: auto; padding: 20px 0; }
+.pause-map-selected small, .pause-map-selected strong { display: block; }
+.pause-map-selected small { color: #c3a66d; font-size: 10px; letter-spacing: .18em; }
+.pause-map-selected strong { margin-top: 10px; font-size: 18px; font-weight: 400; }
+.pause-map-selected p { margin-top: 8px; color: #aeb8b0; font-size: 11px; }
+@media (max-width: 700px) { .pause-settings-head { align-items: start; } .pause-settings-tabs { gap: 12px 20px; } .pause-settings-tabs button { padding: 10px 0; font-size: 10px; } .pause-map { grid-template-columns: 1fr; grid-template-rows: minmax(160px, 1fr) auto; gap: 8px; } .pause-map-top h2 { font-size: 26px; margin: 4px 0; } .pause-map-switch { margin-bottom: 5px; } .pause-map-side { max-height: 130px; } .pause-map-list { margin-top: 4px; } .pause-map-list button { padding: 8px; } .pause-map-selected { display: none; } .pause-settings-foot span:last-child { display: none; } }
 .race-intro { position: absolute; inset: 0; z-index: 10; pointer-events: none; display: flex; align-items: center; justify-content: center; }
 .race-intro-fade { position: absolute; inset: 0; background: #000; animation: tape-arrival 3.2s linear both; }
 .race-intro-title { position: relative; width: 100%; text-align: center; animation: tape-title 3.2s linear both; }

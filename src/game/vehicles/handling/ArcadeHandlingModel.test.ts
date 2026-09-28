@@ -107,6 +107,16 @@ describe("ArcadeHandlingModel — low speed", () => {
     expect(m.diagnostics.held).toBe(true);
   });
 
+  it("keeps a real lateral slide dynamic below the normal parking-speed blend", () => {
+    const m = car(6);
+    m.state.vy = 2;
+    m.state.yawRate = 0.6;
+    m.step(DT, input(0, 0, 0), GROUNDED);
+    expect(Math.abs(m.state.vy)).toBeGreaterThan(1.5);
+    expect(Math.abs(m.state.yawRate)).toBeGreaterThan(0.3);
+    expect(m.diagnostics.held).toBe(false);
+  });
+
   it("does nothing while airborne except carry momentum", () => {
     const m = car(80);
     m.state.yawRate = 0.2;
@@ -235,6 +245,37 @@ describe("ArcadeHandlingModel — FWD balance", () => {
 describe("ArcadeHandlingModel — handbrake", () => {
   const hb = (throttle: number, steer: number): DriverInput => ({ throttle, brake: 0, steer, handbrake: true });
 
+  it("settles a lift-off handbrake slide without snapping into opposite yaw", () => {
+    for (const exitSteer of [0, -0.7]) {
+      const m = car(70);
+      drive(m, 0.5, input(1, 0, 0));
+      drive(m, 0.2, input(0, 0, 0));
+      drive(m, 0.45, hb(0, -0.7));
+      expect(m.state.yawRate).toBeLessThan(-0.5);
+      let oppositeYaw = 0;
+      drive(m, 2, input(0, 0, exitSteer), (x) => {
+        oppositeYaw = Math.max(oppositeYaw, x.state.yawRate);
+      });
+      expect(oppositeYaw).toBeLessThan(0.15);
+      expect(kmh(m)).toBeGreaterThan(35);
+      expect(Math.abs(m.diagnostics.rearSlip)).toBeLessThan(4 * Math.PI / 180);
+    }
+  });
+
+  it("does not violently reverse yaw when releasing the handbrake from a deep slide", () => {
+    const m = car(70);
+    drive(m, 0.2, hb(0, 0.8));
+    drive(m, 1, hb(0, 0));
+    expect(Math.abs(m.diagnostics.rearSlip)).toBeGreaterThan(60 * Math.PI / 180);
+    const yawAtRelease = m.state.yawRate;
+    let maxCorrection = 0;
+    drive(m, 0.15, input(0, 0, 0), (x) => {
+      maxCorrection = Math.max(maxCorrection, Math.abs(x.diagnostics.stabilityYaw));
+    });
+    expect(maxCorrection).toBeLessThan(4);
+    expect(m.state.yawRate).toBeGreaterThan(yawAtRelease * 0.5);
+  });
+
   /** Heading plus body slip: where the car is actually travelling, radians. */
   function turn(kmhStart: number, phases: [number, DriverInput][]) {
     const m = car(kmhStart);
@@ -271,6 +312,13 @@ describe("ArcadeHandlingModel — handbrake", () => {
     expect(effect(110)).toBeGreaterThan(effect(45) * 0.9);
   });
 
+  it("keeps the rear brake engaged while the car moves sideways", () => {
+    const m = car(4);
+    m.state.vy = 45 / 3.6;
+    drive(m, 0.1, hb(0, 0));
+    expect(m.diagnostics.handbrakeEffect).toBeGreaterThan(0.5);
+  });
+
   it("without steering it bleeds speed in a straight line and never rotates", () => {
     const plain = drive(car(45), 1, input(0, 0, 0));
     const pulled = drive(car(45), 1, hb(0, 0));
@@ -286,6 +334,44 @@ describe("ArcadeHandlingModel — handbrake", () => {
     expect(pulled.diagnostics.handbrakeEffect).toBeGreaterThan(0.9);
     expect(pulled.diagnostics.rearGripUse).toBeGreaterThan(plain.diagnostics.rearGripUse);
     expect(kmh(pulled)).toBeLessThan(kmh(plain));
+  });
+
+  it("does not use stability control to straighten a held handbrake slide", () => {
+    const m = car(70);
+    let sliding = false;
+    drive(m, 0.8, hb(0, 0.8), (x) => {
+      if (Math.abs(x.diagnostics.rearSlip) > x.config.assists.stabilityThresholdDeg * Math.PI / 180) {
+        sliding = true;
+        expect(x.diagnostics.stabilityYaw).toBe(0);
+      }
+    });
+    expect(sliding).toBe(true);
+    drive(m, 0.2, input(0, 0, 0));
+    expect(m.diagnostics.stabilityYaw).not.toBe(0);
+  });
+
+  it("brings stability control back gradually when the handbrake is released", () => {
+    const released = drive(car(70), 0.45, hb(0, 0.8));
+    const fullAssist = car(70);
+    Object.assign(fullAssist.state, released.state, { handbrake: 0 });
+    released.step(DT, input(0, 0, 0), GROUNDED);
+    fullAssist.step(DT, input(0, 0, 0), GROUNDED);
+
+    expect(Math.abs(fullAssist.diagnostics.stabilityYaw)).toBeGreaterThan(0);
+    expect(Math.abs(released.diagnostics.stabilityYaw)).toBeLessThan(Math.abs(fullAssist.diagnostics.stabilityYaw) * 0.3);
+  });
+
+  it("lets FWD throttle catch a handbrake slide while coasting keeps rotating", () => {
+    const coast = car(70);
+    const power = car(70);
+    drive(coast, 0.25, hb(0, 0.8));
+    drive(power, 0.25, hb(0, 0.8));
+    drive(coast, 0.5, hb(0, 0));
+    drive(power, 0.5, hb(1, 0));
+
+    expect(Math.abs(coast.diagnostics.rearSlip)).toBeGreaterThan(20 * Math.PI / 180);
+    expect(Math.abs(power.diagnostics.rearSlip)).toBeLessThan(Math.abs(coast.diagnostics.rearSlip) * 0.6);
+    expect(kmh(power)).toBeGreaterThan(kmh(coast));
   });
 
   it("a tap mid-corner rotates the car into a tighter line, then the front pulls it straight", () => {

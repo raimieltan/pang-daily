@@ -38,7 +38,7 @@ export function GraphicsDebugPanel() {
 
   return (
     <div
-      className="tape-settings pointer-events-auto w-72 max-h-[72dvh] overflow-y-auto border border-white/15 bg-black/85 p-4 text-[11px] leading-tight"
+      className="tape-settings pointer-events-auto w-full border border-white/15 bg-black/35 p-4 text-xs leading-relaxed"
       data-testid="graphics-debug"
     >
       <div className="flex items-center justify-between">

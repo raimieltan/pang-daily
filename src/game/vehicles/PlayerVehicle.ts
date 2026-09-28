@@ -16,6 +16,7 @@ import { VehicleBody, type VehiclePose } from "./VehicleBody";
 import { VehicleController, type DriverInputSource } from "./VehicleController";
 import type { VehicleRuntimeDefinition } from "./VehicleDefinition";
 import { VehicleVisual } from "./VehicleVisual";
+import { VehicleEffects } from "./VehicleEffects";
 import { combineModifiers, NO_MODIFIERS, PRISTINE_CONDITION, type StatModifiers } from "../../game-core/vehicles/vehicleStats";
 import { exteriorEffects, NO_EXTERIOR_EFFECTS, resolveBodyPartLook, type BodyPart, type ExteriorEffects, type FittedBodyPart, type PaintFinish } from "../../game-core/exterior";
 import type { ExteriorSlot } from "../../game-core/vehicles/VehicleDefinition";
@@ -89,6 +90,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private bodyEffects: ExteriorEffects = NO_EXTERIOR_EFFECTS;
   readonly wheels: WheelSwapper;
   readonly bodyParts: BodyPartSwapper;
+  private readonly effects: VehicleEffects;
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -100,6 +102,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   ) {
     this.wheels = new WheelSwapper(visual.model.root.getScene(), visual.model, options.wheelSource);
     this.bodyParts = new BodyPartSwapper(visual.model.root.getScene(), visual.model, options.bodyPartSource);
+    this.effects = new VehicleEffects(visual.model.root.getScene(), body, visual.model);
     this.presetId = presetId;
     this.baseConfig = controller.model.config;
     this.spawnId = options.initialSpawn;
@@ -169,6 +172,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.controller.reset();
     this.impactCooldown = 0.4;
     const placed = this.body.place(this.options.spawnPoints[this.spawnId]);
+    if (placed) this.effects.clear();
     if (placed) this.onPlaced?.();
     return placed;
   }
@@ -178,6 +182,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.controller.reset();
     this.impactCooldown = 0.4;
     const placed = this.body.place(pose);
+    if (placed) this.effects.clear();
     if (placed) this.onPlaced?.();
     return placed;
   }
@@ -193,6 +198,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.controller.reset();
     this.impactCooldown = 0.4;
     if (!this.body.place(pose)) return this.reset();
+    this.effects.clear();
     this.onPlaced?.();
     return true;
   }
@@ -235,6 +241,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.impactCooldown = Math.max(0, this.impactCooldown - dt);
     const { state } = this.controller.model;
     this.visual.update(dt, state.steerAngle, state.vx);
+    this.effects.update(dt, this.controller.model, this.condition.engine);
     this.hud.tick(dt, () => this.summarize());
     this.telemetry.tick(dt, () => this.sample());
   }
@@ -325,6 +332,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   }
 
   dispose(): void {
+    this.effects.dispose();
     this.wheels.dispose();
     this.bodyParts.dispose();
     this.releaseImpact();

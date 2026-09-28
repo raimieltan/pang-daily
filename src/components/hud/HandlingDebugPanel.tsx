@@ -22,7 +22,7 @@ export function HandlingDebugPanel() {
 
   return (
     <div
-      className="pointer-events-auto w-72 rounded border border-white/20 bg-black/70 p-2 text-[11px] leading-tight"
+      className="pointer-events-auto w-full border border-white/20 bg-black/35 p-4 text-xs leading-relaxed"
       data-testid="handling-debug"
     >
       <div className="flex items-center justify-between">
