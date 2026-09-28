@@ -138,7 +138,7 @@ export const HUB_LOCATIONS: readonly LocationData[] = [
   },
   {
     id: "talyer",
-    name: "Talyer ni Mang Boy",
+    name: "Talyer ni Tito Jun",
     chunk: "talyer",
     area: rect(4, 144.5, 50, 170),
     spawn: { x: 16, z: 158, headingDeg: 180 },
@@ -245,7 +245,7 @@ function talyer() {
   a.block({ center: [24, 0.5, 164], size: [0.4, 1, 8], color: "#8d887c", collide: true });
 
   // Budget spray booth in the left bay: washable panels, open front and bright inspection strips.
-  // The 5.6 m opening stays clear for the player's car and walking access to Mang Boy.
+  // The 5.6 m opening stays clear for the player's car and walking access to Tito Jun.
   for (const x of [12.8, 19.2]) {
     a.block({ center: [x, 1.6, 161], size: [0.12, 3.2, 8], color: "#d4d7cf", collide: true });
     a.block({ center: [x + (x < 16 ? 0.08 : -0.08), 1.5, 161], size: [0.05, 0.15, 6], color: "#f2f2d7" });
@@ -323,10 +323,10 @@ function talyer() {
       kind: "interact",
       rect: r,
       locationId: "talyer",
-      interaction: { action: "talk_mechanic", label: "Repairs · Paint · Parts · Mang Boy", dialogueId: "talyer_mang_boy" },
+      interaction: { action: "talk_mechanic", label: "Repairs · Paint · Parts · Tito Jun", dialogueId: "talyer_mang_boy" },
     });
   }
-  // Corkboard on the waiting-area side of the bay wall: Mang Boy's errands (see game/jobs/hubJobs).
+  // Corkboard on the waiting-area side of the bay wall: Tito Jun's errands (see game/jobs/hubJobs).
   a.block({ center: [40.38, 1.55, 154], size: [0.06, 0.8, 1.1], color: "#9a6b3f" });
   for (const [z, y] of [[153.75, 1.65], [154.25, 1.5]] as const) a.block({ center: [40.42, y, z], size: [0.02, 0.3, 0.24], color: "#f1ece0" });
   a.zone({
@@ -334,7 +334,7 @@ function talyer() {
     kind: "interact",
     rect: rect(40.4, 153.2, 41.3, 154.8),
     locationId: "talyer",
-    interaction: { action: "browse_jobs", label: "Check Mang Boy's errands", reach: 1.2, priority: 1 },
+    interaction: { action: "browse_jobs", label: "Check Tito Jun's errands", reach: 1.2, priority: 1 },
   });
   a.zone({ id: "talyer_apron", kind: "parking", rect: rect(5, 145, 40, 150), locationId: "talyer" });
 

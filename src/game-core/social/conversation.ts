@@ -15,6 +15,7 @@ export type DialogueCondition =
  | { unlockId: string; unlocked: boolean };
 
 export type DialogueEffect =
+ | { kind: 'standing'; npcId: string; trust: number; respect: number; unlockId: string; introduceNpcIds: readonly string[] }
  | { kind: 'socialChoice'; choiceId: 'promise_help' | 'apologize' | 'congratulate_casey' | 'insult_casey' | 'introduce_mang_boy' }
  | { kind: 'favorOffer'; favorId: string }
  | { kind: 'crewInvitation'; crewId: string }
@@ -29,23 +30,26 @@ export type ConversationView = { dialogueId: string; node: DialogueNode; choices
 /** Stable authored nodes. Every graph has an unconditional fallback and an exit-capable node. */
 export const CONVERSATIONS: readonly ConversationDefinition[] = [
  { id: 'talyer_mang_boy', npcId: 'mang_boy', fallbackNodeId: 'mang_familiar', branches: [
+  { nodeId: 'mang_setback', when: { all: [{ npcId: 'mang_boy', flag: 'brake_setback' }, { npcId: 'kyo_barista', notFlag: 'daily_recovered' }] } },
   { nodeId: 'mang_referred', when: { all: [{ npcId: 'mang_boy', introduced: false }, { npcId: 'kyo_barista', flag: 'introduced_mang_boy' }] } },
   { nodeId: 'mang_first', when: { npcId: 'mang_boy', introduced: false } },
   { nodeId: 'mang_repaired', when: { favorId: 'mang_boy_recovery', favorStatus: 'completed' } },
   { nodeId: 'mang_low_trust', when: { any: [{ favorId: 'mang_boy_parts_help', favorStatus: 'failed' }, { favorId: 'mang_boy_parts_help', favorStatus: 'abandoned' }, { npcId: 'mang_boy', trustAtMost: 35 }] } },
   { nodeId: 'mang_helped', when: { favorId: 'mang_boy_parts_help', favorStatus: 'completed' } },
  ], nodes: [
-  { id: 'mang_first', speakerId: 'mang_boy', text: 'Bag-o ka diri? Sige, tan-awon ta ang daily mo. May gamay nga bulig ko unta.', choices: [
-   { id: 'promise_help', text: 'Sige, Mang Boy. Ako na bahala sa oil run.', when: { favorId: 'mang_boy_parts_help', favorStatus: 'none' }, effect: { kind: 'socialChoice', choiceId: 'promise_help' }, once: true, nextNodeId: 'mang_familiar' },
+  { id: 'mang_setback', speakerId: 'mang_boy', text: 'The old brake system gave out under load. The bill is real; buying wheels will not fix it. You can earn more on the oil errand, or spend only on the brakes and keep the rest for your build.', choices: [{ id: 'recovery_work', text: 'Work first. Keep my cash reserve; spend more time.', nextNodeId: 'mang_favor' }, { id: 'recovery_budget', text: 'Repair only the brakes. Delay the other work.', nextNodeId: 'mang_budget' }] },
+  { id: 'mang_budget', speakerId: 'mang_boy', text: 'At the repair panel, select only Brakes. That clears the urgent problem; engine, tires and suspension still keep their existing wear. Repairing more costs more. The oil errand is always there if you are short.', choices: [] },
+  { id: 'mang_first', speakerId: 'mang_boy', text: 'Bag-o ka diri? Your old brake system pulls under load. Repair the brakes before buying wheels; the talyer panel has the quote. Pick up oil & coolant for me to earn ₱300. You can walk it if the tank is empty.', choices: [
+   { id: 'promise_help', text: 'Sige, Tito Jun. Ako na bahala sa oil run.', when: { favorId: 'mang_boy_parts_help', favorStatus: 'none' }, effect: { kind: 'socialChoice', choiceId: 'promise_help' }, once: true, nextNodeId: 'mang_familiar' },
   ] },
-  { id: 'mang_referred', speakerId: 'mang_boy', text: 'Si Kyo nagpadala sa imo? Sige, tan-awon ta ang daily mo. May gamay nga bulig ko unta.', choices: [
-   { id: 'promise_help_referred', text: 'Sige, Mang Boy. Ako na bahala sa oil run.', when: { favorId: 'mang_boy_parts_help', favorStatus: 'none' }, effect: { kind: 'socialChoice', choiceId: 'promise_help' }, once: true, nextNodeId: 'mang_familiar' },
+  { id: 'mang_referred', speakerId: 'mang_boy', text: 'Kyo sent you? Your brakes need work. Check the repair quote at the bay. My oil & coolant errand pays ₱300, even on foot.', choices: [
+   { id: 'promise_help_referred', text: 'Sige, Tito Jun. Ako na bahala sa oil run.', when: { favorId: 'mang_boy_parts_help', favorStatus: 'none' }, effect: { kind: 'socialChoice', choiceId: 'promise_help' }, once: true, nextNodeId: 'mang_familiar' },
   ] },
   { id: 'mang_low_trust', speakerId: 'mang_boy', text: 'Ginpaabot ta ka. Indi lang ni parts; salig man ni.', choices: [
    { id: 'apologize', text: 'Pasensya gid. Bawi ako sa trabaho.', when: { any: [{ favorId: 'mang_boy_parts_help', favorStatus: 'failed' }, { favorId: 'mang_boy_parts_help', favorStatus: 'abandoned' }] }, effect: { kind: 'socialChoice', choiceId: 'apologize' }, once: true },
    { id: 'offer_recovery', text: 'May lain pa ko nga mabuligan?', when: { any: [{ favorId: 'mang_boy_parts_help', favorStatus: 'failed' }, { favorId: 'mang_boy_parts_help', favorStatus: 'abandoned' }] }, effect: { kind: 'favorOffer', favorId: 'mang_boy_recovery' }, once: true },
   ] },
-  { id: 'mang_helped', speakerId: 'mang_boy', text: 'Salamat gid sa oil run. Masaligan ka. Kumusta na ang daily mo?', choices: [] },
+  { id: 'mang_helped', speakerId: 'mang_boy', text: 'Salamat gid sa oil run. Stop by KYO Coffee east of here; Sean, Michael and Casey hang out there. The oil errand stays on the board if you need more cash.', choices: [] },
   { id: 'mang_repaired', speakerId: 'mang_boy', text: 'Nakita ko nga nagbawi ka. Sige, balik ta sa pag-ayo sang daily mo.', choices: [] },
   { id: 'mang_familiar', speakerId: 'mang_boy', text: 'Kumusta ang daily? Ari lang ko kung may kinahanglan ka.', choices: [
    { id: 'ask_favor', text: 'May maubra ko para sa talyer?', when: { favorId: 'mang_boy_parts_help', favorStatus: 'offered' }, nextNodeId: 'mang_favor' },
@@ -59,7 +63,7 @@ export const CONVERSATIONS: readonly ConversationDefinition[] = [
   { nodeId: 'casey_first', when: { npcId: 'casey', introduced: false } },
   { nodeId: 'casey_post_race', when: { raceId: 'pahuway_descent', raceResult: 'finished' } },
  ], nodes: [
-  { id: 'casey_first', speakerId: 'casey', text: 'Ikaw ang may daily? Kitaay ta sa Pahuway. Dahan-dahan sa liko, ha.', choices: [] },
+  { id: 'casey_first', speakerId: 'casey', text: 'Sean says you helped the talyer. One easy run? Barangay sprint on the north street. No entry fee. First to the end; finish even if I get ahead.', choices: [] },
   { id: 'casey_familiar', speakerId: 'casey', text: 'Ara ka naman. Kumusta ang andar sang daily?', choices: [{ id: 'crew_info_familiar', text: 'Tell me about Kyo Regulars.', nextNodeId: 'kyo_crew' }] },
   { id: 'casey_low_trust', speakerId: 'casey', text: 'Kung mag-istorya ta, tarong lang. Wala ko gana sa hambog.', choices: [{ id: 'crew_info_low', text: 'Talk about my crew status.', nextNodeId: 'kyo_crew' }] },
   { id: 'casey_post_race', speakerId: 'casey', text: 'Maayo nga run. May masunod pa gid na sa dalan.', reactions: {
@@ -86,16 +90,23 @@ export const CONVERSATIONS: readonly ConversationDefinition[] = [
   ] },
   { id: 'casey_rematch', speakerId: 'casey', text: 'Sa north street ang Barangay sprint. Balik sa daily mo, drive sa start line kag pili-a Race Casey. Wala entry fee; same Casey, same puti nga Kidlat.', choices: [{ id: 'casey_back_to_tambay', text: 'Sige. Istorya anay kita.', nextNodeId: 'casey_post_race' }] },
  ] },
- { id: 'kyo_order', npcId: 'kyo_barista', fallbackNodeId: 'kyo_familiar', branches: [{ nodeId: 'kyo_first', when: { npcId: 'kyo_barista', introduced: false } }, { nodeId: 'kyo_referred', when: { npcId: 'kyo_barista', flag: 'introduced_mang_boy' } }], nodes: [
+ { id: 'kyo_order', npcId: 'kyo_barista', fallbackNodeId: 'kyo_familiar', branches: [{ nodeId: 'kyo_regular', when: { unlockId: 'chapter_1_recognition', unlocked: true } }, { nodeId: 'kyo_recognition', when: { npcId: 'kyo_barista', flag: 'daily_recovered' } }, { nodeId: 'kyo_scene', when: { all: [{ npcId: 'kyo_barista', introduced: true }, { unlockId: 'met_kyo_regulars', unlocked: false }] } }, { nodeId: 'kyo_first', when: { npcId: 'kyo_barista', introduced: false } }, { nodeId: 'kyo_referred', when: { npcId: 'kyo_barista', flag: 'introduced_mang_boy' } }], nodes: [
+  { id: 'kyo_scene', speakerId: 'sean', text: 'Uy, the old daily! I’m Sean. This is Michael; he spots every bad part. Casey is outside. Park beside us.', choices: [{ id: 'hear_michael', text: 'Michael, what should I fix first?', nextNodeId: 'kyo_advice' }, { id: 'talk_builds', text: 'Sean, tell me about your builds.', effect: { kind: 'standing', npcId: 'sean', trust: 3, respect: 0, unlockId: 'met_kyo_regulars', introduceNpcIds: ['sean', 'michael'] }, once: true, nextNodeId: 'kyo_invitation' }] },
+  { id: 'kyo_advice', speakerId: 'michael', text: 'Brakes before wheels. The old system can still fail under load after a quick service. Keep money for it. Caring for the daily earns more respect than loud parts.', choices: [{ id: 'listen_michael', text: 'I’ll put the brakes before the build.', effect: { kind: 'standing', npcId: 'michael', trust: 0, respect: 4, unlockId: 'met_kyo_regulars', introduceNpcIds: ['sean', 'michael'] }, once: true, nextNodeId: 'kyo_invitation' }] },
+  { id: 'kyo_invitation', speakerId: 'sean', text: 'You’re welcome here. Talk to Casey outside about the north-street run.', choices: [] },
+  { id: 'kyo_recognition', speakerId: 'sean', text: 'Uy, you got the daily running again. Michael noticed the brakes. Nobody had to invite you tonight. We saved you a parking spot.', choices: [{ id: 'take_parking', text: 'Park with the regulars.', effect: { kind: 'unlock', unlockId: 'chapter_1_recognition' }, once: true, nextNodeId: 'kyo_regular' }] },
+  { id: 'kyo_regular', speakerId: 'kyo_barista', text: 'Same coffee? Your spot is beside Sean. You’re a regular now. More roads and builds can wait; tonight, just tambay.', choices: [] },
   { id: 'kyo_first', speakerId: 'kyo_barista', text: 'Kape anay? Park ka lang, boss. Diri lang ang mga regular.', choices: [{ id: 'meet_kyo', text: 'Salamat. Ano pangalan mo?', nextNodeId: 'kyo_familiar' }] },
-  { id: 'kyo_familiar', speakerId: 'kyo_barista', text: 'Balik ka gali. Same nga kape? Kumusta ang daily mo?', choices: [{ id: 'introduce_mang_boy', text: 'May kilala ka nga mekaniko?', effect: { kind: 'socialChoice', choiceId: 'introduce_mang_boy' }, once: true }] },
-  { id: 'kyo_referred', speakerId: 'kyo_barista', text: 'Nakita mo na si Mang Boy sa talyer? Maayo na siya magtan-aw sang old daily.', choices: [] },
+  { id: 'kyo_familiar', speakerId: 'kyo_barista', text: 'Balik ka gali. Same nga kape? Kumusta ang daily mo?', choices: [{ id: 'meet_regulars', text: 'Who’s parked outside?', when: { unlockId: 'met_kyo_regulars', unlocked: false }, nextNodeId: 'kyo_scene' }, { id: 'introduce_mang_boy', text: 'May kilala ka nga mekaniko?', effect: { kind: 'socialChoice', choiceId: 'introduce_mang_boy' }, once: true }] },
+  { id: 'kyo_referred', speakerId: 'kyo_barista', text: 'Nakita mo na si Tito Jun sa talyer? Maayo na siya magtan-aw sang old daily.', choices: [] },
  ] },
  { id: 'seller_jun_surplus', npcId: 'jun_surplus', fallbackNodeId: 'jun_familiar', branches: [{ nodeId: 'jun_first', when: { npcId: 'jun_surplus', introduced: false } }, { nodeId: 'jun_offer', when: { all: [{ npcId: 'jun_surplus', trustAtLeast: 52 }, { reputationTier: 'Regular' }] } }], nodes: [
   { id: 'jun_first', speakerId: 'jun_surplus', text: 'May piyesa ako diri. Tan-awa anay antes ka magbayad.', choices: [] },
   { id: 'jun_familiar', speakerId: 'jun_surplus', text: 'Salamat, boss. Message lang kung may kinahanglan ka.', choices: [] },
   { id: 'jun_offer', speakerId: 'jun_surplus', text: 'Suki ka na diri. May bawas sa piyesa kung may makita ka nga bagay sa daily mo.', choices: [] },
  ] },
+ { id: 'sean_tambay', npcId: 'sean', fallbackNodeId: 'sean_familiar', branches: [], nodes: [{ id: 'sean_familiar', speakerId: 'sean', text: 'Ara ka naman! Park beside us. There is always another parts lead.', choices: [] }] },
+ { id: 'michael_tambay', npcId: 'michael', fallbackNodeId: 'michael_familiar', branches: [], nodes: [{ id: 'michael_familiar', speakerId: 'michael', text: 'Brakes first. Wheels later. Let the car tell you what it needs.', choices: [] }] },
 ];
 
 export function evaluateDialogueCondition(condition: DialogueCondition, state: SocialState): boolean {
@@ -171,6 +182,7 @@ export function validateConversations(definitions: readonly ConversationDefiniti
     const effect = choice.effect;
     if (effect && !choice.once) errors.push(`effect must be one-shot: ${choice.id}`);
    if (effect?.kind === 'socialChoice' && (effect.choiceId === 'introduce_mang_boy' ? definition.npcId !== 'kyo_barista' : (effect.choiceId === 'promise_help' || effect.choiceId === 'apologize') ? definition.npcId !== 'mang_boy' : definition.npcId !== 'casey')) errors.push(`invalid social choice target: ${effect.choiceId}`);
+    if (effect?.kind === 'standing' && (!content.npcs.some(npc => npc.id === effect.npcId) || !content.unlocks.some(unlock => unlock.id === effect.unlockId) || effect.introduceNpcIds.some(id => !content.npcs.some(npc => npc.id === id)) || !Number.isSafeInteger(effect.trust) || Math.abs(effect.trust) > 100 || !Number.isSafeInteger(effect.respect) || Math.abs(effect.respect) > 100)) errors.push(`invalid standing effect: ${choice.id}`);
     if (effect?.kind === 'favorOffer' && !content.favors.some((item) => item.id === effect.favorId && item.npcId === definition.npcId)) errors.push(`unknown effect favor: ${effect.favorId}`);
     if ((effect?.kind === 'crewInvitation' || effect?.kind === 'crewAcceptance' || effect?.kind === 'crewDecline' || effect?.kind === 'crewLeave') && !content.crews.some((item) => item.id === effect.crewId)) errors.push(`unknown effect crew: ${effect.crewId}`);
     if (effect?.kind === 'unlock' && !content.unlocks.some((item) => item.id === effect.unlockId)) errors.push(`unknown effect unlock: ${effect.unlockId}`);

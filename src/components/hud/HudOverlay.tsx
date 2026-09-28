@@ -1,6 +1,7 @@
 "use client";
 
 import { usePersistenceStore } from '@/state/persistenceStore';
+import { ChapterExperience } from './ChapterExperience';
 import { ContactsApp } from './ContactsApp';
 import { SocialFeedback } from './SocialFeedback';
 import { useSocialStore } from '@/state/socialStore';
@@ -69,7 +70,7 @@ export function HudOverlay() {
         <div>
           <p className="tape-brand">PANG DAILY</p>
           <p className="mt-2 text-[10px] tracking-[0.24em] text-white/50">ILOILO, PH / {time === "night" ? "02:13 AM" : time === "morning" ? "06:24 AM" : "04:38 PM"}</p>
-          <RecognitionBadge showNotices={false} />
+          <RecognitionBadge showNotices={false} /><ChapterExperience />
         </div>
         <div className="pointer-events-auto flex items-center gap-4">
           {settings?.analog && settings.analogPreset !== "CLEAN" && <span className="tape-rec hidden sm:inline"><i /> REC</span>}

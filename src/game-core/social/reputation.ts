@@ -13,6 +13,7 @@ export const REPUTATION_CONFIG = {
   { name: 'Feared', minimum: 90 },
   { name: 'Local Legend', minimum: 130 },
  ],
+ milestones: { saved_parking: { sceneId: 'iloilo_scene', points: 12, limit: 1 } },
  races: {
   barangay_sprint: { sceneId: 'iloilo_scene', win: 8, finish: 5, limit: 3 },
   kyo_block_lap: { sceneId: 'iloilo_scene', win: 8, finish: 5, limit: 3 },
@@ -66,6 +67,7 @@ export type ReputationAward = { sceneId: SceneId; sourceKey: string; points: num
 
 /** Only validated gameplay outcomes named in content can request scene points. */
 export function configuredReputationAward(event: SocialEventInput): ReputationAward | null {
+ if (event.type === 'milestone' && event.milestoneId === 'saved_parking') return { sceneId: 'iloilo_scene', sourceKey: 'milestone:saved_parking', points: 12, limit: 1 };
  if (event.type === 'race' && event.outcome !== 'dnf') {
   const source = REPUTATION_CONFIG.races[event.raceId as keyof typeof REPUTATION_CONFIG.races];
   return source ? { sceneId: source.sceneId, sourceKey: `race:${event.raceId}`, points: event.position === 1 ? source.win : source.finish, limit: source.limit } : null;

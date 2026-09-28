@@ -25,6 +25,7 @@ import type {
 } from "./types";
 
 export type GameEventMap = {
+  chapterDirection: import('../progression/ChapterGuide').ChapterDirection | null;
   persistenceError: string | null;
   contactsOpened: boolean;
   socialViewChanged: import('../../game-core/social/presentation').SocialView;

@@ -10,6 +10,7 @@ import { RoadsidePeople } from "../traffic/RoadsidePeople";
 import { CafeCustomers } from "../traffic/CafeCustomers";
 import { CafeParkedCars } from "../traffic/CafeParkedCars";
 import { CafeCrew } from "../traffic/CafeCrew";
+import { TalyerMechanic } from "../traffic/TalyerMechanic";
 import { NeighborhoodLife } from "../traffic/NeighborhoodLife";
 import { NEIGHBORHOOD_CARS } from "../world/population";
 import { CREW_CARS } from "../world/hub/cafePopulation";
@@ -29,6 +30,8 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RenderingGroup } from "@babylonjs/core/Rendering/renderingGroup";
 import { ChaseCamera } from "../cameras/ChaseCamera";
 import { RaceIntroduction } from "../cameras/RaceIntroduction";
+import { ChapterCamera } from "../cameras/ChapterCamera";
+import { ChapterGuide } from '../progression/ChapterGuide';
 import { WalkCamera } from "../cameras/WalkCamera";
 import { WalkingCharacter } from "../characters/WalkingCharacter";
 import { WalkControls } from "../input/WalkControls";
@@ -177,7 +180,10 @@ export const hubScene: SceneDefinition = {
       boards: zones.filter((zone) => zone.action === "browse_jobs"), marker: new JobMarker(scene),
     });
     const interactions = addSystem(new InteractionSystem(bridge, modes, [() => zones, modes.vehicleInteractables, garage?.interactions ?? (() => []), race.interactions, jobSystem.interactions]));
-    const dialogue = addSystem(new DialogueController(bridge, input, socialStorage));
+    let talyerSystem: MaintenanceSystem | null = null;
+    const dialogue = addSystem(new DialogueController(bridge, input, socialStorage, id => {
+      if (id === 'talyer_mang_boy' && !signal.aborted) talyerSystem?.inspect();
+    }));
     for (const action of ['talk_contact', 'order_coffee', 'hang_out'] as const) {
       interactions.handle(action, (target) => target.dialogueId && CONVERSATIONS.some((item) => item.id === target.dialogueId) ? dialogue.open(target.dialogueId) : undefined);
     }
@@ -189,8 +195,8 @@ export const hubScene: SceneDefinition = {
       mode: modes.mode, player: modes.position, car: maintainedCar.position,
       speedKmh: maintainedCar.speedKmh, racing: race.active,
     });
-    addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
-      () => race.race.phase === 'RUNNING', { interactions, rejection: talyer, onTalk: () => { dialogue.open('talyer_mang_boy'); } }));
+    talyerSystem = addSystem(new MaintenanceSystem(bridge, session, maintainedCar, () => modes.mode === 'driving',
+      () => race.race.phase === 'RUNNING', { interactions, rejection: talyer, onTalk: () => dialogue.open('talyer_mang_boy') }));
     // Marketplace parts ride in the trunk: bring the car to Mang Boy to have one inspected.
     market.useWorkshop({ rejection: talyer });
     addSystem(new FuelSystem(bridge, session, maintainedCar.definition.spec, {
@@ -224,6 +230,7 @@ export const hubScene: SceneDefinition = {
     addSystem(new CafeCustomers(scene, kit, listener, npcSound));
     addSystem(new CafeParkedCars(scene, npcModels, listener));
     addSystem(new CafeCrew(scene, kit, listener, npcSound));
+    addSystem(new TalyerMechanic(scene, kit, listener));
     addSystem(new NeighborhoodLife(scene, kit, listener, npcSound));
     addSystem(new CafeParkedCars(scene, npcModels, listener, NEIGHBORHOOD_CARS, 'neighborhood-parked'));
     addSystem(new CafeParkedCars(scene, npcModels, listener, CREW_CARS, 'crew-car'));
@@ -245,6 +252,8 @@ export const hubScene: SceneDefinition = {
     addSystem(chase);
     addSystem(walkCamera);
     addSystem(new RaceIntroduction(race, player, chase));
+    addSystem(new ChapterCamera(chase, player, modes, dialogue, () => socialStorage.chapters?.(), () => talyerSystem?.inspectionOpen ?? false));
+    addSystem(new ChapterGuide(bridge, modes, socialStorage, () => race.active || jobs.current !== null, () => socialStorage.chapters?.()));
     const pools = [...chunks, ...mountain.chunks].map((c) => c.pools).filter((m): m is Mesh => m !== null);
     const graphics = addSystem(new GraphicsSystem(scene, engine, chase.camera, bridge, lighting, pools, preset.quality, {
       get speedKmh() { return modes.mode === "driving" ? car.speedKmh : 0; },

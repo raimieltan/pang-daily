@@ -89,7 +89,9 @@ export class GameRuntime {
       getItem: (key: string) => socialFallback.get(key) ?? null,
       setItem: (key: string, value: string) => { socialFallback.set(key, value); },
     };
+    let loadedChapters = options.bootstrap?.chapters;
     const socialStorage: SocialStoragePort = options.bootstrap ? {
+      chapters: () => loadedChapters,
       getItem: key => key === SOCIAL_SESSION_KEY ? JSON.stringify(loadedSocial) : baseSocialStorage.getItem(key),
       setItem: (key, value) => { if (key === SOCIAL_SESSION_KEY) throw new Error('Social state is server-owned.'); baseSocialStorage.setItem(key, value); },
     } : baseSocialStorage;
@@ -101,7 +103,7 @@ export class GameRuntime {
     session.useSocialAccess(access);
     const jobs = options.bootstrap ? new JobSession(session, HUB_JOBS, options.bootstrap.jobs) : loadJobSession(session, HUB_JOBS, storage);
     if (options.bootstrap && options.persistence) {
-      this.persistence = options.persistence({ initial: options.bootstrap, wallet: session, inventory, jobs, report: message => emit('persistenceError', message), refresh: fresh => { loadedSocial = fresh.social; } });
+      this.persistence = options.persistence({ initial: options.bootstrap, wallet: session, inventory, jobs, report: message => emit('persistenceError', message), refresh: fresh => { loadedSocial = fresh.social; loadedChapters = fresh.chapters; } });
       socialStorage.executeSocial = intent => this.persistence!.execute(intent);
       session.usePersistence(this.persistence); inventory.usePersistence(this.persistence);
       for (const race of options.bootstrap.interruptedRaces ?? []) void this.persistence.execute({ type: 'race_complete', ...race, finish: false }).catch(error => emit('persistenceError', `Interrupted race could not be saved: ${error instanceof Error ? error.message : String(error)}`));

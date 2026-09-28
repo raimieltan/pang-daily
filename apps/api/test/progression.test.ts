@@ -1,3 +1,4 @@
+import { freePlayFixture } from './fixtures/free-play';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -16,10 +17,13 @@ test('durable social and content progression', async t => {
   return fetch(`${base}/api${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json', 'X-Pang-Request': '1', Origin: 'http://localhost:3000' }, body: body === undefined ? undefined : JSON.stringify(body) });
  }
  async function load(cookie: string) { return bootstrapSchema.parse(await (await call('/player/bootstrap', cookie)).json()); }
- async function account() {
+ async function account(campaign = false) {
   const response = await call('/auth/register', '', { username: `prog_${randomUUID().slice(0,8)}`, password: 'progression-test-password' });
   assert.equal(response.status, 201); const cookie = response.headers.get('set-cookie')!.split(';')[0];
-  const dto = await load(cookie); return { cookie, playerId: dto.profile.id, car: dto.vehicles[0].id };
+  const dto = await load(cookie);
+  if (!campaign) await freePlayFixture(db, dto.profile.id);
+  else await command(cookie, { type: 'starter_origin', originId: 'family' });
+  return { cookie, playerId: dto.profile.id, car: dto.vehicles[0].id };
  }
  async function command(cookie: string, action: PlayerAction, status = 200, key = randomUUID()) {
   const response = await call('/player/commands', cookie, { key, action }); const result = await response.json();
@@ -102,7 +106,7 @@ test('durable social and content progression', async t => {
    assert.equal((await call('/player/commands', '', { key: randomUUID(), action: { type: 'social_introduce', dialogueId: 'casey_intro' } })).status, 401);
   });
   await t.test('NPC favors, rewards and chapter continuation survive reload; duplicate completion is inert', async () => {
-   const a = await account();
+   const a = await account(true);
    assert.equal((await load(a.cookie)).progression.chapters[0].currentBeatId, 'meet_mang_boy');
    await command(a.cookie, { type: 'chapter_continue', chapterId: 'chapter_1', beatId: 'finish_first_race' }, 409);
    await command(a.cookie, { type: 'chapter_continue', chapterId: 'chapter_1', beatId: 'meet_mang_boy' }, 409);
@@ -123,13 +127,18 @@ test('durable social and content progression', async t => {
    assert.equal(loaded.social.state.favors.mang_boy_parts_help.status, 'completed');
    assert.equal(loaded.social.state.unlocks.mang_boy_service.unlocked, true);
    assert.equal(loaded.progression.chapters[0].currentBeatId, 'meet_casey');
+   await introduce(a.cookie, 'kyo_order');
+   await choose(a.cookie, 'kyo_order', 'kyo_first', 'meet_kyo');
+   await choose(a.cookie, 'kyo_order', 'kyo_familiar', 'meet_regulars');
+   await choose(a.cookie, 'kyo_order', 'kyo_scene', 'talk_builds');
    await introduce(a.cookie, 'casey_intro'); await race(a);
    loaded = await load(a.cookie);
-   assert.ok(loaded.progression.chapters[0].completedAt);
-   assert.equal(loaded.progression.chapters[0].markers.length, 4);
-   assert.ok(loaded.progression.unlockedLocations.some(unlock => unlock.unlockId === 'chapter_2_access'));
+   assert.equal(loaded.progression.chapters[0].currentBeatId, 'repair_daily');
+   assert.equal(loaded.progression.chapters[0].completedAt, null);
+   assert.equal(loaded.progression.chapters[0].markers.length, 6);
+   assert.ok(!loaded.progression.unlockedLocations.some(unlock => unlock.unlockId === 'chapter_2_access'));
    await command(a.cookie, { type: 'chapter_continue', chapterId: 'chapter_1', beatId: 'finish_first_race' });
-   assert.equal(await db.chapterMarker.count({ where: { playerId: a.playerId } }), 4);
+   assert.equal(await db.chapterMarker.count({ where: { playerId: a.playerId } }), 6);
   });
   await t.test('race continuity, inclusive thresholds, invitations and membership are deterministic across retries and sessions', async () => {
    const a = await account(); await introduce(a.cookie, 'casey_intro');

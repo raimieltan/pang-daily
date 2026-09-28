@@ -3,7 +3,7 @@ import type { CommandOutcome, RuntimePort } from '../bridge';
 
 /** Where a part can go on the bench. Scenes with a talyer register one; null means "you can inspect here". */
 export type Workshop = { rejection(): string | null };
-const NO_WORKSHOP = 'Bring the part to Mang Boy’s talyer to have it inspected.';
+const NO_WORKSHOP = 'Bring the part to Tito Jun’s talyer to have it inspected.';
 /** Countdowns on the phone refresh at this rate while it is open. */
 const VIEW_INTERVAL_S = 1;
 

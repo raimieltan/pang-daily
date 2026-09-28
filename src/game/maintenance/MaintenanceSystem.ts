@@ -16,11 +16,12 @@ export interface MaintenanceVehicle {
   setFuelAvailable?(available: boolean): void;
   setHoodOpen?(open: boolean): void;
 }
-export type WorkshopAccess = { rejection(): string | null; interactions: Pick<InteractionSystem, 'handle'>; onTalk?(): void };
+export type WorkshopAccess = { rejection(): string | null; interactions: Pick<InteractionSystem, 'handle'>; onTalk?(): CommandOutcome };
 
 /** Scene adapter only: sample runtime driving, publish slow summaries, validate workshop access. */
 export class MaintenanceSystem implements GameSystem {
   readonly name = 'maintenance';
+ get inspectionOpen(): boolean { return this.quote !== null; }
   private pending = emptyLoss();
   private elapsed = 0;
   private pendingFuel = 0;
@@ -46,14 +47,17 @@ export class MaintenanceSystem implements GameSystem {
     };
     this.release.push(session.subscribe(publish)); publish();
     if (workshop) {
-      this.release.push(workshop.interactions.handle('talk_mechanic', () => { const outcome = this.inspect(); workshop.onTalk?.(); return outcome; }));
+      this.release.push(workshop.interactions.handle('talk_mechanic', () => {
+    if (workshop.onTalk) { const rejection = workshop.rejection(); return rejection ? { rejected: rejection } : workshop.onTalk(); }
+    return this.inspect();
+   }));
       this.release.push(bridge.handle('inspectVehicle', () => this.inspect()));
       this.release.push(bridge.handle('dismissRepair', () => this.closeQuote()));
       this.release.push(bridge.handle('repairVehicle', ({ quoteId, components }) => {
         const rejection = workshop.rejection();
         if (rejection) { this.closeQuote(); return { rejected: rejection }; }
         this.flush();
-        if (!this.quote || this.quote.id !== quoteId) return { rejected: 'Ask Mang Boy for a current repair quote.' };
+        if (!this.quote || this.quote.id !== quoteId) return { rejected: 'Ask Tito Jun for a current repair quote.' };
         const quote = this.quote;
         if (session.persistent) return session.execute({ type: 'vehicle_repair', operationTag: `repair:${quote.id}:${[...components].sort().join(',')}`, vehicleId: this.definition.id, components, ...(quote.benefitId ? { benefitId: quote.benefitId } : {}) }).then(remote => {
           bridge.emit('repairCompleted', { vehicleId: this.definition.id, components, costPhp: Number(remote.details.costPhp), walletPhp: session.snapshot().walletPhp, transactionId: Number(remote.sequence) });

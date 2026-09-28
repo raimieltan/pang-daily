@@ -25,8 +25,8 @@ try {
   run('yarn', ['prisma', 'migrate', 'deploy']);
   run('yarn', ['db:seed']);
   run('yarn', ['db:seed']);
-  run('node', ['--test', '--test-concurrency=1', 'dist/test/integration.test.js', 'dist/test/schema.test.js',
-    'dist/test/auth.test.js', 'dist/test/economy.test.js', 'dist/test/progression.test.js', 'dist/test/integrity.test.js']);
+  run('node', ['--test', '--test-concurrency=1', ...(process.argv.length > 2 ? process.argv.slice(2) : ['dist/test/integration.test.js', 'dist/test/schema.test.js',
+    'dist/test/auth.test.js', 'dist/test/economy.test.js', 'dist/test/progression.test.js', 'dist/test/chapter.test.js', 'dist/test/integrity.test.js'])]);
 } finally {
   run('docker', [...docker, 'dropdb', '-U', url.username, database]);
 }

@@ -29,8 +29,9 @@ describe('authored conversations', () => {
   expect(validateConversations([{ ...CONVERSATIONS[0], fallbackNodeId: 'missing' }], SOCIAL_CONTENT)).toContain('missing fallback node: missing');
   expect(validateConversations([{ ...CONVERSATIONS[0], nodes: [{ ...CONVERSATIONS[0].nodes[0], speakerId: 'missing' }] }], SOCIAL_CONTENT)).toContain('unknown speaker: missing');
   expect(validateConversations([{ ...CONVERSATIONS[0], branches: [{ nodeId: 'mang_first', when: { favorId: 'missing', favorStatus: 'failed' } }] }], SOCIAL_CONTENT)).toContain('unknown condition favor: missing');
-  const invalidChoice = { ...CONVERSATIONS[0].nodes[0].choices[0], nextNodeId: 'missing', once: false };
-  const invalid = [{ ...CONVERSATIONS[0], nodes: [{ ...CONVERSATIONS[0].nodes[0], choices: [invalidChoice] }] }];
+  const first = CONVERSATIONS.find(c => c.id === 'talyer_mang_boy')!.nodes.find(n => n.id === 'mang_first')!;
+  const invalidChoice = { ...first.choices[0], nextNodeId: 'missing', once: false };
+  const invalid = [{ ...CONVERSATIONS[0], nodes: [{ ...first, choices: [invalidChoice] }] }];
   expect(validateConversations(invalid, SOCIAL_CONTENT)).toContain('missing next node: missing');
   expect(validateConversations(invalid, SOCIAL_CONTENT)).toContain('effect must be one-shot: promise_help');
  });

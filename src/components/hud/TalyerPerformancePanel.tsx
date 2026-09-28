@@ -25,11 +25,11 @@ export function TalyerPerformancePanel() {
   const quoteElement = useRef<HTMLElement>(null);
   useEffect(() => () => { commands?.dismissPerformanceQuote(); }, [commands]);
   useEffect(() => { quoteElement.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, [quote?.id]);
-  if (!view) return <p role="status" className="my-4 text-white/60">Bring your car into Mang Boy’s bay.</p>;
+  if (!view) return <p role="status" className="my-4 text-white/60">Bring your car into Tito Jun’s bay.</p>;
   const short = quote ? Math.max(0, quote.laborPhp - view.walletPhp) : 0;
   return <section aria-label="Performance workshop" className="mt-4 space-y-4 text-sm">
     <div className="flex items-start justify-between gap-3">
-      <div><h3 className="text-lg text-amber-100">Performance parts</h3><p className="mt-1 text-xs text-white/50">Mang Boy · Mechanic level {view.mechanicLevel} · Your reputation {view.reputation}</p></div>
+      <div><h3 className="text-lg text-amber-100">Performance parts</h3><p className="mt-1 text-xs text-white/50">Tito Jun · Mechanic level {view.mechanicLevel} · Your reputation {view.reputation}</p></div>
       <strong>{pesos(view.walletPhp)}</strong>
     </div>
     <p className="text-xs text-white/65">Bring your own parts. Inspect used finds, fit the supporting parts first, then check what the build will do. Prices below are labor only.</p>

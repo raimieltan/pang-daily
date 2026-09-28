@@ -26,7 +26,7 @@ export function ConditionHud() {
     <p className="mt-2 text-white/60">Fuel: {summary.fuelLiters?.toFixed(1)} / {summary.fuelCapacityLiters} L</p>
     {(summary.fuelLiters ?? 45) <= 5 && <p role="status" className="mt-2 text-amber-200">{summary.fuelLiters === 0 ? 'Tank empty · Engine drive unavailable' : 'Low fuel · Visit the gas station'}</p>}
     <p className="mt-2 text-white/40">Refuel: park beside a gas-station pump · Exit · F at the pump</p>
-    <p className="mt-2 text-white/40">Park at the talyer · F to exit · F near Mang Boy to inspect</p>
+    <p className="mt-2 text-white/40">Park at the talyer · F to exit · F near Tito Jun to inspect</p>
   </section>;
 }
 
@@ -50,7 +50,7 @@ function QuoteForm({ quote }: { quote: RepairQuote }) {
   return <section aria-label="Talyer inspection and repair" onKeyDown={event => event.stopPropagation()}
     className="pointer-events-auto absolute right-3 top-24 z-40 max-h-[72dvh] w-[25rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto border border-amber-100/25 bg-neutral-950/95 p-5 text-sm shadow-2xl sm:right-8">
     <header className="flex items-start justify-between gap-3">
-      <div><p className="text-[10px] tracking-[.2em] text-amber-100/60">MANG BOY’S TALYER</p><h2 className="mt-1 text-xl">Inspection & repair</h2><p className="mt-1 text-xs text-white/50">{quote.vehicleName}</p></div>
+      <div><p className="text-[10px] tracking-[.2em] text-amber-100/60">TITO JUN’S TALYER</p><h2 className="mt-1 text-xl">Inspection & repair</h2><p className="mt-1 text-xs text-white/50">{quote.vehicleName}</p></div>
       <button type="button" className="tape-button" onClick={() => commands?.dismissRepair()} aria-label="Close inspection">Close</button>
     </header>
     <nav aria-label="Talyer services" className="mt-4 flex flex-wrap gap-2">

@@ -6,13 +6,13 @@ import { SOCIAL_OPPORTUNITIES } from './opportunities';
 import { getReputationProgress } from './reputation';
 
 /** Authored public copy. Never project raw flags, fingerprints or marketplace data. */
-const LOCATIONS: Record<string, string> = { coffee_shop: 'Kyo coffee shop', talyer: 'Mang Boy’s talyer', marketplace: 'Phone · Baligya' };
-const FAVORS: Record<string, string> = { mang_boy_parts_help: 'Oil errand for Mang Boy', mang_boy_recovery: 'Battery delivery to make amends' };
-const EVENTS: Record<string, string> = { raced_casey: 'Shared a race with Casey', beat_casey: 'Won a race against Casey', lost_to_casey: 'Finished behind Casey', casey_shared_dnf: 'A shared race ended without a finish', met_at_talyer: 'Met at the talyer', met_casey_at_kyo: 'Met Casey at Kyo', helped_mang_boy: 'Completed Mang Boy’s errand', broke_mang_boy_commitment: 'An errand commitment fell through', made_amends_mang_boy: 'Made amends with a follow-up delivery' };
+const LOCATIONS: Record<string, string> = { coffee_shop: 'Kyo coffee shop', talyer: 'Tito Jun’s talyer', marketplace: 'Phone · Baligya' };
+const FAVORS: Record<string, string> = { mang_boy_parts_help: 'Oil errand for Tito Jun', mang_boy_recovery: 'Battery delivery to make amends' };
+const EVENTS: Record<string, string> = { raced_casey: 'Shared a race with Casey', beat_casey: 'Won a race against Casey', lost_to_casey: 'Finished behind Casey', casey_shared_dnf: 'A shared race ended without a finish', met_at_talyer: 'Met at the talyer', met_casey_at_kyo: 'Met Casey at Kyo', helped_mang_boy: 'Completed Tito Jun’s errand', broke_mang_boy_commitment: 'An errand commitment fell through', made_amends_mang_boy: 'Made amends with a follow-up delivery' };
 const OPPORTUNITY_COPY: Record<string, { npcId: string; hint: string; location: string }> = {
  casey_wall_invitation: { npcId: 'casey', hint: 'A future race invitation', location: 'Talk to Casey at Kyo' },
  jun_suki_offer: { npcId: 'jun_surplus', hint: 'A regular-customer opportunity', location: 'Check Jun’s listings in Baligya; purchases build trust' },
- mang_boy_service: { npcId: 'mang_boy', hint: 'A mechanic relationship benefit', location: 'Talk to Mang Boy at the talyer; take his errand from the job board' },
+ mang_boy_service: { npcId: 'mang_boy', hint: 'A mechanic relationship benefit', location: 'Talk to Tito Jun at the talyer; take his errand from the job board' },
  kyo_crew_invitation: { npcId: 'casey', hint: 'Joining the Kyo circle', location: 'Talk to Casey about Kyo Regulars' },
  kyo_midnight_run: { npcId: 'casey', hint: 'A members’ run', location: 'Talk to Casey about membership, then visit Kyo exit' },
 };
@@ -22,7 +22,7 @@ export function socialView(state: SocialState, content: SocialContent = SOCIAL_C
   const unfriendly = standing.trust < 45 || standing.relationshipFlags.includes('hostile');
   const trust = unfriendly ? 'Unfriendly · trust needs rebuilding' : standing.trust >= 60 || standing.relationshipFlags.includes('trusted_friend') ? 'Trusts you' : 'Getting to know you';
   const respect = standing.respect >= 55 ? 'Respects your driving and contributions' : standing.respect < 40 ? 'Respect needs rebuilding' : 'Respect is still growing';
-  const history = state.appliedEvents.filter(event => event.targetId === npc.id).map(event => event.reason);
+  const history = state.appliedEvents.filter(event => event.targetId === npc.id || event.effects.some(effect => effect.npcId === npc.id)).map(event => event.reason);
   const lastEvent = history.at(-1) ?? EVENTS[standing.eventIds.at(-1) ?? ''] ?? 'You have been introduced; no shared events yet.';
   const favors = Object.values(state.favors).filter(favor => favor.npcId === npc.id && favor.status !== 'completed' && !content.favors.some(definition => definition.recoveryFor === favor.favorId && state.favors[definition.id]?.status === 'completed')).map(favor => ({ id: favor.favorId, name: FAVORS[favor.favorId] ?? 'A shared favor', status: favor.status, nextStep: favor.status === 'failed' || favor.status === 'abandoned' ? 'Talk at the talyer about making amends.' : favor.status === 'accepted' ? 'Finish the accepted job; follow its tracker.' : 'Take the errand from the talyer job board.' }));
   return { id: npc.id, name: npc.name, roles: npc.roles.map(role => role.replaceAll('_', ' ')), summary: `${trust}. ${respect}.`, trust: standing.trust, respect: standing.respect, location: LOCATIONS[npc.homeLocationId] ?? 'Ask them where to meet', lastEvent, history: history.slice(-8).reverse(), favors };

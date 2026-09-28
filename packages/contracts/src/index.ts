@@ -39,7 +39,7 @@ export const bootstrapSchema = z.object({
       completedAt: z.string().datetime().nullable().optional(), payoutTransactionId: z.string().uuid().nullable().optional(), lastCheckpointElapsedMs: exactInteger.optional() })),
     bestRaces: z.array(z.object({ definitionId: z.string(), bestElapsedMs: exactInteger, wins: z.number().int().nonnegative(), finishes: z.number().int().positive() })).optional(),
     unlockedLocations: z.array(z.object({ unlockId: z.string(), locationId: z.string().nullable() })),
-    chapters: z.array(z.object({ id: z.string(), currentBeatId: z.string().nullable(), completedAt: z.string().datetime().nullable(), markers: z.array(z.string()) })),
+    chapters: z.array(z.object({ id: z.string(), currentBeatId: z.string().nullable(), completedAt: z.string().datetime().nullable(), markers: z.array(z.string()), beats: z.array(z.object({ id: z.string(), status: z.enum(['locked', 'available', 'active', 'completed', 'recoverable']) })).optional() })),
   }),
 });
 export type PlayerBootstrap = z.infer<typeof bootstrapSchema>;
@@ -74,7 +74,8 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('race_complete'), attemptId: id, elapsedMs: millisecond, finish: z.boolean() }),
     z.strictObject({ type: z.literal('social_introduce'), dialogueId: contentId }),
     z.strictObject({ type: z.literal('social_choice'), dialogueId: contentId, nodeId: contentId, choiceId: contentId }),
-    z.strictObject({ type: z.literal('chapter_continue'), chapterId: z.literal('chapter_1'), beatId: contentId }),
+    z.strictObject({ type: z.literal('starter_origin'), originId: z.enum(['family', 'marketplace', 'project']) }),
+ z.strictObject({ type: z.literal('chapter_continue'), chapterId: z.literal('chapter_1'), beatId: contentId }),
     z.strictObject({ type: z.literal('refund'), transactionId: id }),
   ]),
 });

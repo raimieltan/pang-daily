@@ -15,6 +15,10 @@ export class SocialOpportunityService {
  constructor(private readonly bridge: RuntimePort, private readonly storage: SocialStoragePort) { this.previous = loadSocialSession(storage).snapshot(); }
  readonly access = (id: string) => evaluateEligibility(opportunity(id), loadSocialSession(this.storage).snapshot());
  readonly raceRejection = (raceId: string): string | null => {
+  if (FIRST_RIVAL.raceIds.includes(raceId as 'barangay_sprint' | 'pahuway_descent') && this.storage.chapters) {
+   const chapter = this.storage.chapters()?.find(c => c.id === 'chapter_1');
+   if (chapter && !chapter.markers.includes('meet_casey')) return 'Meet the KYO regulars and Casey after helping Tito Jun first.';
+  }
   if (FIRST_RIVAL.raceIds.includes(raceId as 'barangay_sprint' | 'pahuway_descent')) {
    const rematch = rivalHistory(loadSocialSession(this.storage).snapshot()).rematch;
    if (!rematch.eligible) return `Rematch unavailable: ${rematch.unmetRequirements.join('; ')}`;

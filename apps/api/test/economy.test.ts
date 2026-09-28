@@ -1,3 +1,4 @@
+import { freePlayFixture } from './fixtures/free-play';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -19,6 +20,7 @@ test('server economy and garage commands preserve exact ledger and ownership', a
     const response = await call('/auth/register', '', 'POST', { username: `eco_${randomUUID().slice(0,8)}`, password: 'test-password-for-economy' });
     assert.equal(response.status, 201); const cookie = response.headers.get('set-cookie')!.split(';')[0];
     const bootstrap = bootstrapSchema.parse(await (await call('/player/bootstrap', cookie)).json());
+    await freePlayFixture(db, bootstrap.profile.id);
     return { cookie, bootstrap, playerId: bootstrap.profile.id, car: bootstrap.vehicles[0].id };
   }
   async function command(cookie: string, action: PlayerAction, key = randomUUID(), expected = 200) {

@@ -122,6 +122,13 @@ export class SocialSession {
     if (crew.membership !== 'member') throw new Error('Crew leave unavailable');
     crew.membership = 'left'; reward = { trust: 0, respect: 0, reason: `Left ${definition.name}` };
    }
+  } else if (effect?.kind === 'standing') {
+   const target = next.npcs[effect.npcId];
+   if (!target || next.unlocks[effect.unlockId]?.unlocked) throw new Error('unavailable dialogue choice');
+   for (const id of effect.introduceNpcIds) next.npcs[id].introduced = true;
+   target.trust = clamp(target.trust + effect.trust); target.respect = clamp(target.respect + effect.respect);
+   next.unlocks[effect.unlockId] = { unlockId: effect.unlockId, unlocked: true };
+   reward = { trust: 0, respect: 0, reason: `Got to know ${effect.npcId} at KYO` };
   } else if (effect?.kind === 'unlock') {
    if (!this.content.unlocks.some((item) => item.id === effect.unlockId)) throw new Error('unavailable dialogue choice');
    next.unlocks[effect.unlockId] = { unlockId: effect.unlockId, unlocked: true };
@@ -129,6 +136,7 @@ export class SocialSession {
   }
   const trust = clamp(npc.trust + reward.trust), respect = clamp(npc.respect + reward.respect);
   const record: AppliedSocialEvent = { eventId, sourceId: dialogueId, sourceKey: eventId, fingerprint: JSON.stringify({ dialogueId, nodeId, choiceId }), type: 'conversation', targetId: definition.npcId, contextId: nodeId, reason: reward.reason, effects: [{ npcId: definition.npcId, trustDelta: trust - npc.trust, respectDelta: respect - npc.respect, flagsAdded, flagsRemoved: [] }] };
+  if (effect?.kind === 'standing') record.effects.push({ npcId: effect.npcId, trustDelta: next.npcs[effect.npcId].trust - this.state.npcs[effect.npcId].trust, respectDelta: next.npcs[effect.npcId].respect - this.state.npcs[effect.npcId].respect, flagsAdded: [], flagsRemoved: [] });
   npc.trust = trust; npc.respect = respect;
   next.appliedEvents.push(record);
   this.persist?.(copy(next));
@@ -161,6 +169,12 @@ export class SocialSession {
   const removed: string[] = [];
 
   switch (event.type) {
+   case 'milestone': {
+    if (event.npcId !== (event.milestoneId === 'brake_setback' ? 'mang_boy' : 'kyo_barista') || event.sourceId !== `chapter_1:${event.milestoneId}`) throw new Error('invalid campaign milestone');
+    contextId = event.milestoneId;
+    reward = { trust: event.milestoneId === 'saved_parking' ? 3 : 0, respect: 0, reason: event.milestoneId === 'saved_parking' ? 'A regular at KYO; parking spot saved' : event.milestoneId === 'brake_setback' ? 'The old brake system failed after the first run' : 'Repaired the daily after the setback', flag: event.milestoneId };
+    break;
+   }
    case 'dialogue': {
     const definition = this.content.npcs.find((entry) => entry.id === event.npcId)!;
     if (definition.dialogueEntryId !== event.dialogueId) throw new Error(`invalid dialogue for NPC: ${event.dialogueId}`);
@@ -214,9 +228,9 @@ export class SocialSession {
      requireId(event.runId!, 'job run ID');
      if (!event.runId!.startsWith(`${event.jobId}#`) || event.sourceId !== event.runId) throw new Error('invalid job run source');
      if (event.jobStatus !== event.phase) throw new Error('job outcome does not match favor phase');
+     if (progress?.status === 'completed') return { status: 'ignored' };
      if (event.phase === 'accepted') {
       if (progress?.status === 'accepted' && progress.runId === event.runId) return { status: 'ignored' };
-      if (progress?.status === 'completed') throw new Error('favor already completed');
       next.favors[event.favorId] = { favorId: event.favorId, npcId: event.npcId, status: 'accepted', runId: event.runId! };
       addUnique(npc.favorIds, event.favorId);
       reward = SOCIAL_RULES.favor.accepted;
@@ -339,6 +353,7 @@ export class SocialSession {
 
  private sourceKey(event: SocialEventInput): string {
   switch (event.type) {
+   case 'milestone': return `milestone:${event.sourceId}`;
    case 'dialogue': return event.choiceId ? `dialogue-choice:${event.npcId}:${event.choiceId}` : `dialogue:${event.npcId}:${event.dialogueId}`;
    case 'favor': return `favor:${event.sourceId}:${event.phase}`;
    case 'race_attempt': return `race-start:${event.sourceId}`;
@@ -385,7 +400,7 @@ export function restoreSocialState(input: unknown, content: SocialContent): Soci
  for (const [id, record] of Object.entries(state.reputation)) { known(content.scenes, id, 'scene'); if (record.sceneId !== id) throw new Error(`invalid scene reference: ${id}`); requireInteger(record.points, 'reputation'); if (record.points < 0 || record.points > REPUTATION_CONFIG.cap) throw new Error(`invalid reputation points: ${id}`); }
  for (const [key, source] of Object.entries(state.reputationRewards)) {
   const [kind, id, extra] = key.split(':');
-  const limits: Record<string, Record<string, { limit: number }>> = { race: REPUTATION_CONFIG.races, job: REPUTATION_CONFIG.jobs, favor: REPUTATION_CONFIG.favors };
+  const limits: Record<string, Record<string, { limit: number }>> = { race: REPUTATION_CONFIG.races, job: REPUTATION_CONFIG.jobs, favor: REPUTATION_CONFIG.favors, milestone: REPUTATION_CONFIG.milestones };
   const limit = extra === undefined ? limits[kind]?.[id]?.limit : undefined;
   if (!source || source.sourceKey !== key || limit === undefined) throw new Error(`invalid reputation source: ${key}`);
   requireInteger(source.count, 'reputation reward count');

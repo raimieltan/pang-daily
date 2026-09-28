@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { BOOTSTRAP_VERSION, type PlayerBootstrap } from '@pang-daily/contracts';
+import { chapterBeatStates, CHAPTER_ONE } from '@pang-daily/game-core/progression/chapter';
 import { resolvePlayer } from './player-context';
 import { loadSocialState } from './social-state';
 import { DatabaseService } from './database.service';
@@ -29,7 +30,7 @@ export class PlayerRepository {
               reputation: { create: starter.sceneIds.map(sceneId => ({ sceneId })) },
               crews: { create: starter.crewIds.map(crewId => ({ crewId, membership: { create: {} } })) },
               unlocks: { create: { unlockId: 'hub_access', locationContentId: starter.hubId, source: 'new_game', sourceReference: 'initialization' } },
-              chapters: { create: { chapterId: starter.chapterId, currentBeatId: 'meet_mang_boy' } },
+              chapters: { create: { chapterId: starter.chapterId, currentBeatId: 'choose_origin' } },
               vehicles: { create: { id: vehicleId, definitionId: starter.vehicle.definitionId, acquisitionKey: 'starter_vehicle',
                 paint: starter.vehicle.paint, rideHeightM: starter.vehicle.rideHeightM,
                 condition: { create: { ...starter.vehicle.condition, fuelLiters: starter.vehicle.fuelLiters } } } },
@@ -93,7 +94,8 @@ export class PlayerRepository {
               bestRaces: best.map(row => ({ definitionId: row.raceDefinitionId, bestElapsedMs: row._min.elapsedMs!.toString(), finishes: row._count._all, wins: wins.find(win => win.raceDefinitionId === row.raceDefinitionId)?._count._all ?? 0 })),
               unlockedLocations: player.unlocks.map(unlock => ({ unlockId: unlock.unlockId, locationId: unlock.locationContentId })),
               chapters: player.chapters.map(chapter => ({ id: chapter.chapterId, currentBeatId: chapter.currentBeatId,
-                completedAt: chapter.completedAt?.toISOString() ?? null, markers: chapter.markers.map(marker => marker.markerId) })) } };
+                completedAt: chapter.completedAt?.toISOString() ?? null, markers: chapter.markers.map(marker => marker.markerId),
+              ...(chapter.chapterId === CHAPTER_ONE.id ? { beats: chapterBeatStates(chapter.markers.map(marker => marker.markerId), { metMechanic: false, completedJob: false, metRival: false, finishedRace: false, activeJob: player.jobs.some(j => j.jobDefinitionId === CHAPTER_ONE.firstJobId && (j.status === 'accepted' || j.status === 'active')), failedJob: player.jobs.some(j => j.jobDefinitionId === CHAPTER_ONE.firstJobId && (j.status === 'failed' || j.status === 'abandoned')), activeRace: player.races.some(r => r.raceDefinitionId === CHAPTER_ONE.firstRaceId && r.outcome === 'started'), failedRace: player.races.some(r => r.raceDefinitionId === CHAPTER_ONE.firstRaceId && r.outcome === 'dnf') }) } : {}) })) } };
         }, { isolationLevel: 'Serializable', timeout: 15000 });
       } catch (error) {
         if (attempt < 2 && error && typeof error === 'object' && 'code' in error && ['P2034', 'P2002'].includes(String(error.code))) continue;

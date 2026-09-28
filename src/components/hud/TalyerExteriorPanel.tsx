@@ -36,7 +36,7 @@ export function TalyerExteriorPanel() {
       </div>
       <p className="mt-2 text-white/40">Your choice is saved. Any fitted wing goes back into your inventory.</p>
     </div>}
-    {inventory.parts.length === 0 && <p className="border border-dashed border-white/20 p-4 text-white/60">No exterior parts in your trunk. Buy body parts from Phone · Baligya, then bring them to Mang Boy.</p>}
+    {inventory.parts.length === 0 && <p className="border border-dashed border-white/20 p-4 text-white/60">No exterior parts in your trunk. Buy body parts from Phone · Baligya, then bring them to Tito Jun.</p>}
     <ul className="space-y-3">
       {inventory.parts.map(item => {
         const part = bodyPart(item.partId);

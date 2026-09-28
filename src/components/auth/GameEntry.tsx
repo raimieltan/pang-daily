@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import { StarterOrigin } from './StarterOrigin';
 import { GameCanvas } from '@/components/game/GameCanvas';
 import { HudOverlay } from '@/components/hud/HudOverlay';
 import type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
@@ -51,6 +52,7 @@ export function GameEntry() {
     catch (error) { failed(error); }
     finally { setBusy(false); }
   }
+  if (entry.status === 'ready' && entry.bootstrap.chapters?.some(chapter => chapter.id === 'chapter_1' && chapter.currentBeatId === 'choose_origin')) return <StarterOrigin onSaved={async () => { const loaded = await playerService.bootstrap(); setEntry({ status: 'ready', ...loaded }); }} />;
   if (entry.status === 'ready') return <>
     <GameCanvas bootstrap={entry.bootstrap} />
     <HudOverlay />

@@ -11,6 +11,7 @@ type Outcome = { rejected: string } | void;
 /** Owns the dialogue input context and sends only validated views over the runtime bridge. */
 export class DialogueController implements GameSystem {
  readonly name = 'dialogue';
+ get activeDialogueId(): string | null { return this.dialogueId; }
  private dialogueId: string | null = null;
  private nodeId: string | null = null;
  private selectedChoiceId: string | null = null;
@@ -19,7 +20,7 @@ export class DialogueController implements GameSystem {
  private generation = 0;
  private readonly release: (() => void)[];
 
- constructor(private readonly bridge: RuntimePort, private readonly input: InputManager, private readonly storage: SocialStoragePort) {
+ constructor(private readonly bridge: RuntimePort, private readonly input: InputManager, private readonly storage: SocialStoragePort, private readonly afterClose?: (dialogueId: string) => void) {
   this.release = [
    bridge.handle('chooseDialogue', ({ choiceId }) => this.choose(choiceId)),
    bridge.handle('closeDialogue', () => this.close()),
@@ -82,10 +83,12 @@ export class DialogueController implements GameSystem {
 
  close(): void {
   if (!this.dialogueId) return;
+  const closed = this.dialogueId, successful = !this.pending;
   this.generation++; this.pending = false;
   this.dialogueId = null; this.nodeId = null; this.selectedChoiceId = null;
   this.input.setContext('gameplay');
   this.bridge.emit('dialogueViewChanged', null);
+  if (successful) this.afterClose?.(closed);
  }
 
  update(): void {

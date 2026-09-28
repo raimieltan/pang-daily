@@ -1,3 +1,4 @@
+import { freePlayFixture } from './fixtures/free-play';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -23,6 +24,7 @@ test('shared command integrity boundary', async t => {
     const response = await call('/auth/register', '', { username: `safe_${randomUUID().slice(0, 8)}`, password: 'integrity-test-password' });
     assert.equal(response.status, 201);
     const cookie = response.headers.get('set-cookie')!.split(';')[0], state = await load(cookie);
+    await freePlayFixture(db, state.profile.id);
     await db.$transaction(async tx => {
       const wallet = await tx.wallet.findUniqueOrThrow({ where: { playerId: state.profile.id } });
       await tx.transaction.create({ data: { playerId: state.profile.id, sequence: wallet.revision + 1n, amountCentavos: 1000000n,

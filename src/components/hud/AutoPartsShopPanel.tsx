@@ -16,7 +16,7 @@ export function AutoPartsShopPanel() {
     <header className="flex items-start justify-between gap-3"><div><p className="text-xs tracking-widest text-teal-200">BRAND NEW · READY STOCK</p><h2 className="mt-1 text-xl">{view.name}</h2></div><button className="tape-button" onClick={() => commands?.closeAutoPartsShop()}>Close shop</button></header>
     <p className="mt-3 text-xs text-white/60">100% condition, checked and ready to fit. Every part costs 5× its typical used Marketplace price (the midpoint of its used price range).</p>
     <p className="mt-3 flex justify-between"><span>Cash on hand</span><strong>{pesos(view.walletPhp)}</strong></p>
-    <p className="mt-2 text-xs text-white/50">Installation and supporting parts are separate. Bring your purchase next door to Mang Boy’s Performance tab.</p>
+    <p className="mt-2 text-xs text-white/50">Installation and supporting parts are separate. Bring your purchase next door to Tito Jun’s Performance tab.</p>
     {receipt && <p role="status" className="mt-3 border-l-2 border-teal-200 pl-3 text-teal-100">Bought {receipt.name} for {pesos(receipt.pricePhp)}. In your inventory at 100% condition—no inspection fee.</p>}
     {error && <p role="alert" className="mt-3 text-red-300">{error}</p>}
     <label className="mt-4 block text-xs text-white/60">Find a part<input aria-label="Find an auto part" value={search} onChange={e => setSearch(e.target.value)} placeholder="EFI harness, radiator, turbo…" className="mt-1 w-full border border-white/20 bg-neutral-900 p-2 text-sm text-white" /></label>

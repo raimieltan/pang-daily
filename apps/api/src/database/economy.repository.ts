@@ -24,6 +24,7 @@ import type { Prisma } from '../generated/prisma/client';
 import { DatabaseService } from './database.service';
 import { loadSocialState } from './social-state';
 import { progressSocial } from './social-progression';
+import { CHAPTER_ONE, STARTER_ORIGINS } from '@pang-daily/game-core/progression/chapter';
 import { advanceChapter } from './chapter-state';
 import { runPlayerCommand } from './player-command';
 import { resolvePlayer } from './player-context';
@@ -91,7 +92,23 @@ export class EconomyRepository {
         return transaction;
       };
       const a = command.action;
+      const chapter = await tx.chapterProgress.findUniqueOrThrow({ where: { playerId_chapterId: { playerId, chapterId: CHAPTER_ONE.id } }, include: { markers: true } });
+      if (chapter.currentBeatId === 'choose_origin' && a.type !== 'starter_origin' && a.type !== 'chapter_continue') refuse('ORIGIN_REQUIRED', 'Choose how you got your daily first.');
+      if (a.type === 'job_start' && a.definitionId === CHAPTER_ONE.firstJobId && !chapter.markers.some(m => m.markerId === 'meet_mang_boy')) refuse('JOB_LOCKED', 'Talk to Tito Jun at the talyer first.');
+      if (a.type === 'race_start' && [CHAPTER_ONE.firstRaceId, 'pahuway_descent'].includes(a.definitionId) && !chapter.markers.some(m => m.markerId === 'meet_casey')) refuse('RACE_LOCKED', 'Help the talyer, meet the KYO regulars, and talk to Casey first.');
+      if (a.type === 'social_introduce' && a.dialogueId === 'kyo_order' && !chapter.markers.some(m => m.markerId === 'complete_first_job')) refuse('SCENE_LOCKED', 'Help Tito Jun with the oil & coolant errand before joining the KYO scene.');
       switch (a.type) {
+        case 'starter_origin': {
+          const existing = chapter.markers.find(m => m.markerId === 'choose_origin');
+          if (existing) { if (existing.sourceReference !== a.originId) refuse('ORIGIN_ALREADY_CHOSEN', 'Your starter origin is already saved.'); break; }
+          if (chapter.currentBeatId !== 'choose_origin') refuse('ORIGIN_ALREADY_CHOSEN', 'Your starter origin is already saved.');
+          const origin = STARTER_ORIGINS.find(o => o.id === a.originId)!;
+          const car = await tx.vehicle.findFirstOrThrow({ where: { playerId, acquisitionKey: 'starter_vehicle' } });
+          await pay(php(origin.cashPhp) - wallet.balanceCentavos, 'STARTER_ORIGIN', 'starter_origin', origin.id, `Starter: ${origin.name}`, car.id);
+          await tx.vehicleCondition.update({ where: { vehicleId: car.id }, data: { brakes: origin.brakes, revision: { increment: 1 } } });
+          await tx.chapterMarker.create({ data: { playerId, chapterId: CHAPTER_ONE.id, markerId: 'choose_origin', sourceReference: origin.id } });
+          receipt.resourceId = origin.id; break;
+        }
         case 'social_introduce': case 'social_choice': break;
         case 'chapter_continue': {
           await advanceChapter(tx, playerId, command.key, a.beatId); receipt.resourceId = a.chapterId; break;
@@ -150,6 +167,7 @@ export class EconomyRepository {
         }
         case 'vehicle_sell': {
           const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
+          if (vehicle.acquisitionKey === 'starter_vehicle' && chapter.currentBeatId !== null) refuse('CHAPTER_CAR_REQUIRED', 'Keep your starter daily through Chapter 1. You can sell it after recognition at KYO.');
           if (player.activeVehicleId === vehicle.id) refuse('ACTIVE_VEHICLE', 'Select another vehicle before selling this one.');
           if (await tx.installedPart.count({ where: { vehicleId: vehicle.id } })) refuse('PARTS_INSTALLED', 'Remove installed parts before selling this vehicle.');
           if (await tx.raceResult.count({ where: { vehicleId: vehicle.id, outcome: 'started' } })) refuse('RACE_ACTIVE', 'Finish this vehicle’s race before selling it.');

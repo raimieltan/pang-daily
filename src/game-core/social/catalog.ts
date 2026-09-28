@@ -8,7 +8,9 @@ import { SELLERS } from '../marketplace/sellers';
 /** Authored identities and stable references from the hub, dialogue, and race content. */
 export const SOCIAL_CONTENT: SocialContent = {
  npcs: [
-  { id: 'mang_boy', name: 'Mang Boy', roles: ['mechanic', 'mentor'], homeInteractionId: 'talyer_bay_1', homeLocationId: 'talyer', dialogueEntryId: 'talyer_mang_boy' },
+  { id: 'sean', name: 'Sean', roles: ['friend'], homeInteractionId: 'kyo_counter', homeLocationId: 'coffee_shop', dialogueEntryId: 'sean_tambay' },
+  { id: 'michael', name: 'Michael', roles: ['friend', 'mentor'], homeInteractionId: 'kyo_counter', homeLocationId: 'coffee_shop', dialogueEntryId: 'michael_tambay' },
+  { id: 'mang_boy', name: 'Tito Jun', roles: ['mechanic', 'mentor'], homeInteractionId: 'talyer_bay_1', homeLocationId: 'talyer', dialogueEntryId: 'talyer_mang_boy' },
   { id: 'casey', name: 'Casey', roles: ['rival'], homeInteractionId: 'casey_corner', homeLocationId: 'coffee_shop', dialogueEntryId: 'casey_intro', crewId: 'kyo_regulars', vehicleBuildId: 'casey_kidlat_rs' },
   { id: 'kyo_barista', name: 'Kyo Barista', roles: ['friend', 'seller'], homeInteractionId: 'kyo_counter', homeLocationId: 'coffee_shop', dialogueEntryId: 'kyo_order' },
   { id: 'jun_surplus', name: 'Jun Surplus Parts', roles: ['seller'], homeInteractionId: 'marketplace:seller:jun_surplus', homeLocationId: 'marketplace', dialogueEntryId: 'seller_jun_surplus' },
@@ -29,6 +31,9 @@ export const SOCIAL_CONTENT: SocialContent = {
   { id: 'mang_boy_recovery', npcId: 'mang_boy', jobId: 'talyer_battery_drop', recoveryFor: 'mang_boy_parts_help' },
  ],
  relationshipFlags: [
+  { id: 'brake_setback', npcId: 'mang_boy' },
+  { id: 'daily_recovered', npcId: 'kyo_barista' },
+  { id: 'saved_parking', npcId: 'kyo_barista', establishes: 'friend' },
   { id: 'rival', npcId: 'casey' },
   { id: 'trusted_friend', npcId: 'casey', establishes: 'friend' },
   { id: 'hostile', npcId: 'casey', establishes: 'hostile' },
@@ -37,7 +42,7 @@ export const SOCIAL_CONTENT: SocialContent = {
   { id: 'apology_offered', npcId: 'mang_boy' },
   { id: 'introduced_mang_boy', npcId: 'kyo_barista', establishes: 'friend' },
  ],
- unlocks: [{ id: 'talyer_favor', sourceEventId: 'met_at_talyer' }, ...SOCIAL_OPPORTUNITIES.map(rule => ({ id: rule.id, sourceEventId: rule.benefit.kind === 'race' || rule.benefit.kind === 'crew' ? 'met_casey_at_kyo' : 'met_at_talyer' }))],
+ unlocks: [{ id: 'met_kyo_regulars', sourceEventId: 'met_kyo_barista' }, { id: 'chapter_1_recognition', sourceEventId: 'met_kyo_barista' }, { id: 'talyer_favor', sourceEventId: 'met_at_talyer' }, ...SOCIAL_OPPORTUNITIES.map(rule => ({ id: rule.id, sourceEventId: rule.benefit.kind === 'race' || rule.benefit.kind === 'crew' ? 'met_casey_at_kyo' : 'met_at_talyer' }))],
  references: {
   interactionIds: ['talyer_bay_1', 'casey_corner', 'kyo_counter', 'marketplace:seller:jun_surplus'],
   locationIds: ['talyer', 'coffee_shop', 'marketplace'],

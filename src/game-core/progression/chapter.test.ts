@@ -1,15 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { CHAPTER_ONE, chapterBeatSatisfied, nextChapterBeat } from './chapter';
+import { CHAPTER_ONE, chapterBeatSatisfied, chapterBeatStates, nextChapterBeat, type ChapterFacts } from './chapter';
+const empty: ChapterFacts = { metMechanic: false, completedJob: false, metRival: false, finishedRace: false };
 describe('chapter sequence', () => {
- it('continues every durable prefix and rejects gaps or unknown IDs', () => {
-  for (let i = 0; i <= CHAPTER_ONE.beats.length; i++) expect(nextChapterBeat(CHAPTER_ONE.beats.slice(0,i))).toBe(CHAPTER_ONE.beats[i] ?? null);
-  expect(() => nextChapterBeat(['meet_casey'])).toThrow('sequence');
-  expect(() => nextChapterBeat(['ghost'])).toThrow('Unknown');
-  expect(() => nextChapterBeat(['meet_mang_boy', 'meet_mang_boy'])).toThrow('sequence');
+ it('restores every durable prefix, independent of database row ordering, and rejects gaps', () => {
+  for (let i = 0; i <= CHAPTER_ONE.beats.length; i++) {
+   const saved = JSON.parse(JSON.stringify(CHAPTER_ONE.beats.slice(0, i))).reverse();
+   expect(nextChapterBeat(saved)).toBe(CHAPTER_ONE.beats[i] ?? null);
+  }
+  for (const invalid of [['meet_casey'], ['ghost'], ['choose_origin','choose_origin']]) expect(() => nextChapterBeat(invalid)).toThrow();
  });
- it('requires the matching gameplay evidence', () => {
-  const facts = { metMechanic: true, completedJob: false, metRival: false, finishedRace: false };
-  expect(chapterBeatSatisfied('meet_mang_boy', facts)).toBe(true);
-  for (const id of ['complete_first_job','meet_casey','finish_first_race','ghost']) expect(chapterBeatSatisfied(id, facts)).toBe(false);
+ it('requires the exact authored shared evidence for each milestone', () => {
+  for (const id of CHAPTER_ONE.beats) expect(chapterBeatSatisfied(id, empty)).toBe(false);
+  expect(chapterBeatSatisfied('meet_casey', { ...empty, metRival: true })).toBe(false);
+  expect(chapterBeatSatisfied('meet_casey', { ...empty, metRival: true, metRegulars: true })).toBe(true);
+  expect(chapterBeatSatisfied('repair_daily', { ...empty, setbackApplied: true })).toBe(false);
+  expect(chapterBeatSatisfied('ghost', empty)).toBe(false);
+ });
+ it('projects active attempts, recoverable failures, locked successors and completion', () => {
+  const opening = CHAPTER_ONE.beats.slice(0, 2);
+  expect(chapterBeatStates(opening, { ...empty, activeJob: true })[2].status).toBe('active');
+  expect(chapterBeatStates(opening, { ...empty, failedJob: true })[2].status).toBe('recoverable');
+  expect(chapterBeatStates(opening, empty)[3].status).toBe('locked');
+  expect(chapterBeatStates(CHAPTER_ONE.beats.slice(0, 6), empty)[6].status).toBe('recoverable');
+  expect(chapterBeatStates(CHAPTER_ONE.beats, empty).every(beat => beat.status === 'completed')).toBe(true);
  });
 });

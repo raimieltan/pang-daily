@@ -232,8 +232,8 @@ export const HUB_JOBS: readonly JobDefinition[] = [
   {
     "id": "talyer_oil_errand",
     "type": "errand",
-    "title": "Oil & coolant for Mang Boy",
-    "description": "Mang Boy is out of 20W-50 and coolant. Pick up the order he called in at the Bahandi Fuels kiosk and bring it to the bay.",
+    "title": "Oil & coolant for Tito Jun",
+    "description": "Tito Jun is out of 20W-50 and coolant. Pick up the order he called in at the Bahandi Fuels kiosk and bring it to the bay.",
     "offeredAt": [
       "talyer_job_board"
     ],
@@ -255,9 +255,9 @@ export const HUB_JOBS: readonly JobDefinition[] = [
       },
       {
         "id": "dropoff",
-        "label": "Hand it to Mang Boy",
+        "label": "Hand it to Tito Jun",
         "prompt": "Hand over the parts",
-        "locationName": "Talyer ni Mang Boy",
+        "locationName": "Talyer ni Tito Jun",
         "area": {
           "x": 20,
           "z": 153,
@@ -279,7 +279,7 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "id": "talyer_battery_drop",
     "type": "errand",
     "title": "Battery for a stalled suki",
-    "description": "One of Mang Boy's regulars died on the shoulder out by the mountain road. Take a charged battery to them before they give up and call a tow.",
+    "description": "One of Tito Jun's regulars died on the shoulder out by the mountain road. Take a charged battery to them before they give up and call a tow.",
     "offeredAt": [
       "talyer_job_board"
     ],
@@ -291,7 +291,7 @@ export const HUB_JOBS: readonly JobDefinition[] = [
         "id": "pickup",
         "label": "Load the battery at the talyer",
         "prompt": "Load the battery",
-        "locationName": "Talyer ni Mang Boy",
+        "locationName": "Talyer ni Tito Jun",
         "area": {
           "x": 22,
           "z": 147.5,
@@ -328,7 +328,7 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "id": "talyer_alternator_drop",
     "type": "delivery",
     "title": "Alternator to Alimodian",
-    "description": "Mang Boy rebuilt an alternator for a suki just past the Alimodian sign. Park on the shoulder and walk it to the gate.",
+    "description": "Tito Jun rebuilt an alternator for a suki just past the Alimodian sign. Park on the shoulder and walk it to the gate.",
     "offeredAt": [
       "talyer_job_board"
     ],
@@ -340,7 +340,7 @@ export const HUB_JOBS: readonly JobDefinition[] = [
         "id": "pickup",
         "label": "Load the alternator at the talyer",
         "prompt": "Load the alternator",
-        "locationName": "Talyer ni Mang Boy",
+        "locationName": "Talyer ni Tito Jun",
         "area": {
           "x": 22,
           "z": 147.5,
@@ -390,7 +390,7 @@ export const HUB_JOBS: readonly JobDefinition[] = [
     "id": "talyer_rims_pickup",
     "type": "pickup",
     "title": "Rims from the terraces",
-    "description": "A farmer up at the vegetable terraces is selling a set of used rims. Mang Boy already paid. Go fetch them.",
+    "description": "A farmer up at the vegetable terraces is selling a set of used rims. Tito Jun already paid. Go fetch them.",
     "offeredAt": [
       "talyer_job_board"
     ],
@@ -416,7 +416,7 @@ export const HUB_JOBS: readonly JobDefinition[] = [
         "id": "dropoff",
         "label": "Bring them to the talyer",
         "prompt": "Unload the rims",
-        "locationName": "Talyer ni Mang Boy",
+        "locationName": "Talyer ni Tito Jun",
         "area": {
           "x": 22,
           "z": 147.5,

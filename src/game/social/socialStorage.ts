@@ -5,7 +5,7 @@ import type { PersistentIntent, PersistentReceipt } from '@/game-core/persistenc
 import { SocialSession } from '@/game-core/social/SocialSession';
 
 export const SOCIAL_SESSION_KEY = 'pang-daily.social-session.v1';
-export type SocialStoragePort = Pick<Storage, 'getItem' | 'setItem'> & { executeSocial?: (intent: PersistentIntent) => Promise<PersistentReceipt> };
+export type SocialStoragePort = Pick<Storage, 'getItem' | 'setItem'> & { chapters?: () => import('@/game-core/persistence/RuntimeBootstrap').RuntimeBootstrap['chapters']; executeSocial?: (intent: PersistentIntent) => Promise<PersistentReceipt> };
 
 /** A single write contains the new state and its consumed-event ledger. */
 export function loadSocialSession(storage: SocialStoragePort): SocialSession {

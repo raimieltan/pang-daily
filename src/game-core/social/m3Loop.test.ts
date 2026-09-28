@@ -11,7 +11,7 @@ describe('first playable social loop', () => {
   const session = new SocialSession(SOCIAL_CONTENT, undefined, next => { saved = next; });
   expect(SOCIAL_CONTENT.npcs.find(npc => npc.id === 'kyo_barista')?.roles).toContain('friend');
   session.applyEvent({ type: 'dialogue', eventId: 'intro:kyo', sourceId: 'kyo_order', npcId: 'kyo_barista', dialogueId: 'kyo_order' });
-  expect(resolveConversation('kyo_order', session.snapshot()).node.id).toBe('kyo_familiar');
+  expect(resolveConversation('kyo_order', session.snapshot()).node.id).toBe('kyo_scene');
   expect(session.chooseConversation('kyo_order', 'kyo_familiar', 'introduce_mang_boy').status).toBe('applied');
   const restored = new SocialSession(SOCIAL_CONTENT, saved);
   expect(restored.snapshot().npcs.kyo_barista.relationshipFlags).toContain('introduced_mang_boy');

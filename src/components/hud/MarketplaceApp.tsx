@@ -82,8 +82,8 @@ function Wallet() {
 function Notice() {
   const { purchase, inspection, error } = useMarketStore();
   if (error) return <p role="alert" className="border-t border-red-300/30 bg-red-950/60 px-4 py-2 text-xs text-red-200">{error}</p>;
-  if (purchase) return <p role="status" className="border-t border-emerald-300/30 bg-emerald-950/50 px-4 py-2 text-xs text-emerald-200">Paid {pesos(purchase.pricePhp)} · {purchase.part.title} is in your trunk. Have Mang Boy check it.</p>;
-  if (inspection) return <p role="status" className="border-t border-white/10 px-4 py-2 text-xs text-white/70">Mang Boy checked your {inspection.part.title} · {pesos(inspection.feePhp)}</p>;
+  if (purchase) return <p role="status" className="border-t border-emerald-300/30 bg-emerald-950/50 px-4 py-2 text-xs text-emerald-200">Paid {pesos(purchase.pricePhp)} · {purchase.part.title} is in your trunk. Have Tito Jun check it.</p>;
+  if (inspection) return <p role="status" className="border-t border-white/10 px-4 py-2 text-xs text-white/70">Tito Jun checked your {inspection.part.title} · {pesos(inspection.feePhp)}</p>;
   return null;
 }
 
@@ -139,8 +139,8 @@ function OwnedParts({ parts, feePhp }: { parts: OwnedPartView[]; feePhp: number 
       {part.category === 'wheels' && <WheelControls part={part} />}
       {part.category === 'body' && <BodyPartControls part={part} />}
       {part.actual
-        ? <p className="mt-2 text-xs"><span className="text-white/60">Mang Boy: </span><strong data-testid="actual-condition" className="text-white">{part.actual.label}</strong> {part.actual.verdict && <span className={VERDICT[part.actual.verdict].tone}>{VERDICT[part.actual.verdict].text}</span>}</p>
-        : <button type="button" className="mt-2 rounded-md border border-amber-200/40 px-3 py-1.5 text-xs text-amber-100" onClick={() => commands?.inspectPart(part.id)}>Have Mang Boy inspect · {pesos(feePhp)}</button>}
+        ? <p className="mt-2 text-xs"><span className="text-white/60">Tito Jun: </span><strong data-testid="actual-condition" className="text-white">{part.actual.label}</strong> {part.actual.verdict && <span className={VERDICT[part.actual.verdict].tone}>{VERDICT[part.actual.verdict].text}</span>}</p>
+        : <button type="button" className="mt-2 rounded-md border border-amber-200/40 px-3 py-1.5 text-xs text-amber-100" onClick={() => commands?.inspectPart(part.id)}>Have Tito Jun inspect · {pesos(feePhp)}</button>}
     </li>)}
     <li className="px-4 py-3 text-[11px] text-white/35">Inspection needs your car at the talyer, parked, with you on foot.</li>
   </ul>;

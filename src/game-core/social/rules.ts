@@ -1,6 +1,7 @@
 import { EARLY_ECONOMY } from '../economy/balance';
 import type { RaceValidation } from './raceOutcomes';
 export type SocialEventInput =
+ | { type: 'milestone'; eventId: string; sourceId: string; npcId: 'kyo_barista' | 'mang_boy'; milestoneId: 'brake_setback' | 'daily_recovered' | 'saved_parking' }
  | { type: 'dialogue'; eventId: string; sourceId: string; npcId: string; dialogueId: string; choiceId?: 'promise_help' | 'apologize' | 'congratulate_casey' | 'insult_casey' }
  | { type: 'favor'; eventId: string; sourceId: string; npcId: string; favorId: string; phase: 'offered' | 'accepted' | 'completed' | 'failed' | 'abandoned'; jobId?: string; runId?: string; jobStatus?: string; dialogueId?: string }
  | { type: 'race_attempt'; eventId: string; sourceId: string; attemptId: string; npcId: string; raceId: string; vehicleId: string; totalCheckpoints: number }

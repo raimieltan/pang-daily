@@ -23,11 +23,17 @@ try {
   await page.getByLabel('Username', { exact: true }).fill(name);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'An old daily. Yours.' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'An old daily. Yours.' })).toBeVisible();
+  await page.getByRole('button', { name: /Family hand-me-down/ }).click();
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('FINDING SIGNAL', { exact: true })).toHaveCount(0, { timeout: 60000 });
   await expect(page.getByText(/Failed to start:/)).toHaveCount(0);
+ await expect(page.getByTestId('chapter-note')).toContainText('Something is wrong');
+ if (process.env.CHAPTER_BROWSER_SCREENSHOT) await page.screenshot({ path: '/tmp/pang-chapter-hud.png' });
   const bootstrap = await page.evaluate(async () => (await fetch('/api/player/bootstrap', { cache: 'no-store' })).json());
-  expect(bootstrap.economy.balanceCentavos).toBe('500000');
+  expect(bootstrap.economy.balanceCentavos).toBe('120000');
   expect(bootstrap.saveVersion).toBe(2);
   expect(bootstrap.profile.displayName).toBe(name);
   const cookie = (await context.cookies()).find(cookie => cookie.name === 'pang_session');
@@ -37,7 +43,7 @@ try {
   const returning = await page.evaluate(async () => (await fetch('/api/player/bootstrap', { cache: 'no-store' })).json());
   expect(returning.profile.id).toBe(bootstrap.profile.id);
   expect(returning.vehicles[0].id).toBe(bootstrap.vehicles[0].id);
-  expect(returning.economy.balanceCentavos).toBe('500000');
+  expect(returning.economy.balanceCentavos).toBe('120000');
   await page.getByRole('button', { name: `Sign out ${name}` }).click();
   await expect(page.getByRole('heading', { name: 'Continue your daily' })).toBeVisible();
   expect(await page.evaluate(async () => (await fetch('/api/player/bootstrap')).status)).toBe(401);

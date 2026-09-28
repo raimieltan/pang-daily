@@ -9,8 +9,8 @@ import type { PlayerMode } from '../player/PlayerMode';
 
 export function autoPartsShopRejection(visit: { mode: PlayerMode; position: { x: number; y: number; z: number }; racing: boolean }, zones: readonly Interactable[]): string | null {
   if (visit.racing) return 'Finish or cancel the race before shopping.';
-  if (visit.mode !== 'walking') return 'Get out and walk to the auto-parts counter beside Mang Boy’s talyer.';
-  if (Math.abs(visit.position.y) > 2 || !zones.some(z => z.action === 'browse_auto_parts' && areaContains(z.area, visit.position.x, visit.position.z))) return 'Visit the Banwa Auto Supply counter beside Mang Boy’s talyer.';
+  if (visit.mode !== 'walking') return 'Get out and walk to the auto-parts counter beside Tito Jun’s talyer.';
+  if (Math.abs(visit.position.y) > 2 || !zones.some(z => z.action === 'browse_auto_parts' && areaContains(z.area, visit.position.x, visit.position.z))) return 'Visit the Banwa Auto Supply counter beside Tito Jun’s talyer.';
   return null;
 }
 export type AutoPartsShopView = { name: string; walletPhp: number; products: AutoPartsProduct[] };

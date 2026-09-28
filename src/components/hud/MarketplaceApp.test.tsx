@@ -58,10 +58,10 @@ it('buys after confirmation, then reveals true condition at the talyer', () => {
   expect(container.querySelector('[role="status"]')?.textContent).toContain('in your trunk');
   click(button('Your parts'));
   expect(container.querySelectorAll('[data-testid="owned-part"]')).toHaveLength(1);
-  click(button('Have Mang Boy inspect'));
+    click(button('Have Tito Jun inspect'));
   expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/talyer/);
   release.push(service.useWorkshop({ rejection: () => null }));
-  click(button('Have Mang Boy inspect'));
+    click(button('Have Tito Jun inspect'));
   expect(container.querySelector('[data-testid="actual-condition"]')?.textContent).toMatch(/^\d+%$/);
   expect(wallet.snapshot().walletPhp).toBe(5000 - target.price - 150);
   click(container.querySelector('[aria-label="Close marketplace"]')!);

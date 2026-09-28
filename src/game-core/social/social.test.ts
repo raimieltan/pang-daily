@@ -8,7 +8,7 @@ import { SELLERS } from '@/game-core/marketplace/sellers';
 
 describe('social content and state', () => {
  it('reuses the mechanic, rival, and seller identities with real references', () => {
-  expect(SOCIAL_CONTENT.npcs.find((npc) => npc.id === 'mang_boy')).toMatchObject({ name: 'Mang Boy', roles: ['mechanic', 'mentor'], homeInteractionId: 'talyer_bay_1', dialogueEntryId: 'talyer_mang_boy' });
+  expect(SOCIAL_CONTENT.npcs.find((npc) => npc.id === 'mang_boy')).toMatchObject({ name: 'Tito Jun', roles: ['mechanic', 'mentor'], homeInteractionId: 'talyer_bay_1', dialogueEntryId: 'talyer_mang_boy' });
   expect(SOCIAL_CONTENT.npcs.find((npc) => npc.id === 'casey')).toMatchObject({ name: 'Casey', roles: ['rival'], vehicleBuildId: 'casey_kidlat_rs' });
   expect(validateSocialContent(SOCIAL_CONTENT)).toEqual([]);
   const zones = HUB_LAYOUT.chunks.flatMap((chunk) => chunk.zones);
@@ -18,7 +18,7 @@ describe('social content and state', () => {
     expect(SELLERS.some((seller) => `marketplace:seller:${seller.id}` === npc.homeInteractionId)).toBe(true);
    } else {
     expect(HUB_LAYOUT.locations.some((location) => location.id === npc.homeLocationId)).toBe(true);
-    expect(zones.some((zone) => zone.id === npc.homeInteractionId && zone.locationId === npc.homeLocationId && zone.interaction?.dialogueId === npc.dialogueEntryId)).toBe(true);
+    expect(zones.some((zone) => zone.id === npc.homeInteractionId && zone.locationId === npc.homeLocationId && (zone.interaction?.dialogueId === npc.dialogueEntryId || (['sean', 'michael'].includes(npc.id) && zone.interaction?.dialogueId === 'kyo_order')))).toBe(true);
    }
   }
   for (const favor of SOCIAL_CONTENT.favors) expect(HUB_JOBS.some((job) => job.id === favor.jobId)).toBe(true);
