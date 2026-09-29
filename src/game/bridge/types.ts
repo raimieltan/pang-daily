@@ -1,3 +1,5 @@
+import type { ControlTelemetry } from "../vehicles/handling/DriverAssistance";
+import type { WheelState } from "../vehicles/handling/FourWheelDynamics";
 import type { InteractionAction, InteractionId } from "../interaction/Interaction";
 import type { PlayerMode } from "../player/PlayerMode";
 
@@ -27,6 +29,11 @@ export type VehicleSummary = {
  * summary; values are rounded for display, not for replaying the simulation.
  */
 export type VehicleTelemetry = {
+  mechanics?: {
+    headingDeg: number; velocityHeadingDeg: number; yawRateDeg: number; drifting: boolean;
+    controls: ControlTelemetry; wheels: WheelState[]; engineRpm: number; gear: number; clutch: number;
+    differentialLock: number; tcs: string; esc: boolean;
+  };
   speedKmh: number;
   /** Road-wheel angle and the speed-limited lock it can reach right now, degrees. */
   steerDeg: number;

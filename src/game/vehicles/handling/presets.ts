@@ -1,3 +1,4 @@
+import { STOCK_MECHANICAL } from "./MechanicalConfig";
 import type { HandlingPreset } from "./HandlingConfig";
 
 /**
@@ -134,13 +135,29 @@ export const HANDLING_PRESETS = {
     description: "Longitudinal turbo four and a live rear axle. Balanced turn-in with progressive power oversteer.",
     extends: "fwd_worn_sedan",
     overrides: {
+      mechanical: STOCK_MECHANICAL,
+      pedals: { throttleRise: 3.8, throttleFall: 6, brakeRise: 7, brakeFall: 9 },
       chassis: { massKg: 1090, wheelbaseM: 2.5, frontWeight: .53, cgHeightM: .49, trackWidthM: 1.456, yawInertiaScale: 1.05 },
       drive: { drivetrain: "RWD", accelerationMps2: 5.2, topSpeedKmh: 190, engineBrakingMps2: 1.1 },
       brakes: { decelerationMps2: 8.2, frontBias: .64 },
-      tires: { frontGrip: 1.02, rearGrip: 1, frontPeakSlipDeg: 7, rearPeakSlipDeg: 7 },
+      tires: { frontGrip: .9, rearGrip: 1, frontPeakSlipDeg: 10, rearPeakSlipDeg: 6 },
       balance: { understeer: .12, rearSlideFalloff: .18, liftOffRotation: .04 },
-      assists: { traction: .12, stability: .25 },
+      assists: { traction: 0, stability: 0 },
     },
+  },
+  rwd_street: {
+    name: 'RWD street / LSD', description: '250 hp, street LSD and 42-degree steering.', extends: 'rwd_box_turbo',
+    overrides: { mechanical: { engine: { torqueNm: 350, clutchTorqueNm: 500 }, differential: { type: 'lsd', lock: .4, preloadNm: 40 },
+      steering: { roadAngleDeg: 38, driftAngleDeg: 42 } } },
+  },
+  rwd_drift: {
+    name: 'RWD drift build', description: '380 hp, high-lock LSD and 55-degree angle kit.', extends: 'rwd_street',
+    overrides: { mechanical: { engine: { torqueNm: 510, clutchTorqueNm: 700 }, differential: { type: 'lsd', lock: .7, preloadNm: 70 },
+      steering: { roadAngleDeg: 34, driftAngleDeg: 55 }, suspension: { rearSpring: 32000, rearAntiRoll: 14000 } } },
+  },
+  rwd_high_power: {
+    name: 'RWD high power / welded', description: '550+ hp, welded diff; throttle discipline matters.', extends: 'rwd_drift',
+    overrides: { mechanical: { engine: { torqueNm: 750, clutchTorqueNm: 950 }, differential: { type: 'welded', lock: 1 } } },
   },
 } satisfies Record<string, HandlingPreset>;
 

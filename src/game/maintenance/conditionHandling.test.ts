@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
-import { BANWA_DALAGAN_1996, PRISTINE_CONDITION } from '../../game-core/vehicles';
-import { conditionHandling } from './conditionHandling';
+import { BANWA_DALAGAN_1996, BANWA_SILAK_1983, PRISTINE_CONDITION } from '../../game-core/vehicles';
+import { calculateVehiclePerformance } from '../../game-core/performance/calculator';
+import { conditionHandling, performanceHandling } from './conditionHandling';
 import { resolveHandlingPreset } from '../vehicles/handling/HandlingConfig';
 import { HANDLING_PRESETS } from '../vehicles/handling/presets';
 import { ArcadeHandlingModel } from '../vehicles/handling/ArcadeHandlingModel';
@@ -34,4 +35,24 @@ it('scales handling from base tuning and restores healthy performance without co
   expect(worn.brakes.decelerationMps2).toBeLessThan(base.brakes.decelerationMps2);
   expect(conditionHandling(base, BANWA_DALAGAN_1996, PRISTINE_CONDITION)).toEqual(original);
   expect(base).toEqual(original);
+});
+
+it('installed RWD drivetrain hardware reaches the physical torque solver', () => {
+  const base = resolveHandlingPreset(HANDLING_PRESETS, 'rwd_box_turbo');
+  const healthy = calculateVehiclePerformance(BANWA_SILAK_1983).stats;
+  const built = calculateVehiclePerformance(BANWA_SILAK_1983, [
+    { id: 'lsd', partId: 'used_lsd', condition: .8 },
+    { id: 'box', partId: 'close_ratio_gearbox', condition: 1 },
+    { id: 'clutch', partId: 'uprated_clutch', condition: 1 },
+    { id: 'exhaust', partId: 'talyer_exhaust', condition: 1 },
+  ]);
+  expect(built.compatibility.issues).toEqual([]);
+  const config = performanceHandling(base, healthy, built.stats);
+  expect(config.mechanical!.differential.type).toBe('lsd');
+  expect(config.mechanical!.differential.lock).toBeCloseTo(.32);
+  expect(config.mechanical!.engine.gearRatios).toEqual([2.8, 1.9, 1.4, 1.12, .92]);
+  expect(config.mechanical!.engine.clutchTorqueNm).toBeGreaterThan(base.mechanical!.engine.clutchTorqueNm);
+  expect(config.mechanical!.engine.torqueNm).toBeGreaterThan(base.mechanical!.engine.torqueNm);
+  expect(config.chassis.massKg).toBeGreaterThan(base.chassis.massKg);
+  expect(performanceHandling(base, healthy, healthy)).toEqual(base);
 });

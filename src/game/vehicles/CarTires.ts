@@ -2,7 +2,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { ArcadeHandlingModel } from "./handling/ArcadeHandlingModel";
 import {
-  CORNER_IDS, STOCK_SETUP, impactPuncture, isFlat, newAssembly, pressureRatio, stepAssembly, tireResponse,
+  CORNER_IDS, STOCK_SETUP, SURFACE_TIRE, impactPuncture, isFlat, newAssembly, pressureRatio, stepAssembly, tireResponse,
   type WheelSetup, type CornerId, type TireAssembly, type TireEvent, type TireSession, type TireSurface,
 } from "@/game-core/tires";
 
@@ -21,6 +21,7 @@ type WheelVisual = { readonly id: string; readonly socket: TransformNode };
 export class CarTires {
   readonly surfaces: TireSurface[] = ["asphalt", "asphalt", "asphalt", "asphalt"];
   private surfaceAge = Infinity;
+  private readonly fittedIds: (string | null)[] = [null, null, null, null];
   private readonly tmp = new Vector3();
 
   constructor(
@@ -51,6 +52,11 @@ export class CarTires {
     CORNER_IDS.forEach((corner, i) => {
       const tire = this.mounted(corner);
       if (!tire) return;
+      if (this.model.config.mechanical) {
+        const state = this.model.mechanics.wheels[i];
+        tire.temperatureC = state.temperature;
+        tire.thermalWear = state.wear;
+      }
       const speed = this.model.corners[i].grounded ? this.model.corners[i].wheelSpeed : 0;
       const events = stepAssembly(tire, dt, speed, this.surfaces[i], this.random());
       if (events.length) out.push({ corner, tire, events });
@@ -67,7 +73,17 @@ export class CarTires {
       const input = this.model.tires[i];
       input.installed = !!tire;
       input.raised = car.jacked === corner;
-      if (tire) Object.assign(input, tireResponse(tire, this.surfaces[i], this.setup()));
+      if (tire) {
+        Object.assign(input, tireResponse(tire, this.surfaces[i], this.setup()), {
+          surfaceGrip: SURFACE_TIRE[this.surfaces[i]].grip, pressurePsi: tire.pressureKpa / 6.89476,
+        });
+        if (this.fittedIds[i] !== tire.id && this.model.config.mechanical) {
+          const state = this.model.mechanics.wheels[i];
+          state.temperature = tire.temperatureC ?? this.model.config.mechanical.tire.ambientC;
+          state.wear = tire.thermalWear ?? 0;
+        }
+      }
+      this.fittedIds[i] = tire?.id ?? null;
     });
   }
 
@@ -105,7 +121,8 @@ export class CarTires {
       wheel.socket.setEnabled(!!tire);
       const squash = !tire ? 1 : isFlat(tire) ? 0.84 : 1 - 0.1 * Math.max(0, 0.8 - pressureRatio(tire));
       const donut = tire?.spec === "donut";
-      wheel.socket.scaling.set(donut ? 0.6 : 1, squash * (donut ? 0.86 : 1), donut ? 0.86 : 1);
+      const treadRadius = 1 - (tire?.thermalWear ?? 0) * .015;
+      wheel.socket.scaling.set(donut ? 0.6 : 1, squash * (donut ? 0.86 : treadRadius), donut ? 0.86 : treadRadius);
     });
   }
 

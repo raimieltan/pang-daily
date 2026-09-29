@@ -17,17 +17,19 @@ export const TIRE_SPECS = {
 export type TireSpecId = keyof typeof TIRE_SPECS;
 export const TIRE_SPEC_IDS = Object.keys(TIRE_SPECS) as TireSpecId[];
 
-export const TIRE_SURFACES = ['asphalt', 'concrete', 'tile', 'dirt', 'grass', 'gravel'] as const;
+export const TIRE_SURFACES = ['asphalt', 'concrete', 'tile', 'dirt', 'grass', 'gravel', 'wet_asphalt', 'mud'] as const;
 export type TireSurface = (typeof TIRE_SURFACES)[number];
 
 /** Friction, extra rolling drag (share of load) and puncture risk per km for each surface. */
 export const SURFACE_TIRE: Record<TireSurface, { grip: number; rolling: number; hazardPerKm: number }> = {
   asphalt: { grip: 1, rolling: 0, hazardPerKm: 0 },
+  wet_asphalt: { grip: .70, rolling: 0, hazardPerKm: 0 },
+  mud: { grip: .25, rolling: .04, hazardPerKm: .005 },
   concrete: { grip: 1, rolling: 0, hazardPerKm: 0 },
   tile: { grip: .9, rolling: 0, hazardPerKm: 0 },
-  dirt: { grip: .8, rolling: .01, hazardPerKm: .01 },
-  grass: { grip: .68, rolling: .02, hazardPerKm: .004 },
-  gravel: { grip: .74, rolling: .015, hazardPerKm: .03 },
+  dirt: { grip: .55, rolling: .01, hazardPerKm: .01 },
+  grass: { grip: .35, rolling: .02, hazardPerKm: .004 },
+  gravel: { grip: .45, rolling: .015, hazardPerKm: .03 },
 };
 
 /** Grip lost at bald tread: the definition's `tires → grip` condition hooks, now applied per tire. */

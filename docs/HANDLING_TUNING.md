@@ -255,3 +255,9 @@ and a fixed 1/120 s step; at 180 km/h the car moves 0.42 m per step, well within
 
 Change one parameter at a time, check it on the skidpad and the hill, then write the new
 baseline number and its reason in §5.
+
+## RWD mechanical presets (`mechanical` config)
+
+Presets with a `mechanical` block (`rwd_box_turbo`, `rwd_street`, `rwd_drift`, `rwd_high_power`) run `FourWheelDynamics`: four wheels, engine → clutch → gearbox → differential, and per-tire friction ellipses. `DriverAssistance` is the keyboard/controller virtual driver. It can only set rack and pedal requests. Legacy arcade terms such as `balance.*`, `drive.engineBrakingMps2` and `lowSpeed` steering are not used on this path. Engine braking comes from pumping losses and reaches the wheels only through the clutch.
+
+**Limit balance.** When both axles saturate, static weight distribution cancels the yaw moment (`Wf·a = Wr·b`). Scrub deceleration then moves load forward and turns this into oversteer. With equal front/rear tire data, the stock car spun on a constant 1.7° rack at 100 km/h. Road cars need the front to be the weaker axle, so the stock preset uses `frontGrip .9`, `frontPeakSlipDeg 10` and `rearPeakSlipDeg 6`. That stands in for steering compliance and toe. Drift builds get their rotation from rear roll stiffness, diff lock and power, not from a weaker rear. `FourWheelDynamics.test.ts` guards this: constant AI steer must not spin, and W+A at 60 km/h in the stock car must settle.

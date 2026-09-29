@@ -11,6 +11,7 @@ import { VehicleModel } from "./VehicleModel";
  */
 export class VehicleVisual {
   private spin = 0;
+  private readonly wheelSpins = [0, 0, 0, 0];
 
   private constructor(readonly model: VehicleModel) {}
 
@@ -33,13 +34,14 @@ export class VehicleVisual {
   }
 
   /** `steerAngle` in rad (right +), `forwardSpeed` in m/s along the car. */
-  update(dt: number, steerAngle: number, forwardSpeed: number): void {
+  update(dt: number, steerAngle: number, forwardSpeed: number, angularVelocities?: readonly number[]): void {
     const { wheels } = this.model;
     // All wheels share one spin angle; they share a radius on every car so far.
     this.spin = (this.spin + (forwardSpeed / wheels[0].radius) * dt) % (Math.PI * 2);
-    for (const wheel of wheels) {
-      Quaternion.RotationYawPitchRollToRef(wheel.front ? steerAngle : 0, this.spin, 0, wheel.hub.rotationQuaternion!);
-    }
+    wheels.forEach((wheel, i) => {
+      this.wheelSpins[i] = angularVelocities ? (this.wheelSpins[i] + angularVelocities[i] * dt) % (Math.PI * 2) : this.spin;
+      Quaternion.RotationYawPitchRollToRef(wheel.front ? steerAngle : 0, this.wheelSpins[i], 0, wheel.hub.rotationQuaternion!);
+    });
   }
 
   dispose(): void {

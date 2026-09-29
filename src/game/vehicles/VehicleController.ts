@@ -1,6 +1,7 @@
 import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { PhysicsWorld } from "../physics/PhysicsWorld";
 import { ArcadeHandlingModel, type DriverInput } from "./handling/ArcadeHandlingModel";
+import type { VehicleControlInput } from "./handling/DriverAssistance";
 import type { HandlingConfig } from "./handling/HandlingConfig";
 import type { VehicleBody } from "./VehicleBody";
 import type { PerformanceStats } from '../../game-core/performance/calculator';
@@ -11,7 +12,7 @@ const HOLD_ANCHOR_RATE = 10;
 
 /** Anything that can say what the driver wants this step (keyboard/gamepad, AI, replay, tests). */
 export interface DriverInputSource {
-  read(): DriverInput;
+  read(): DriverInput | VehicleControlInput;
 }
 
 /**
@@ -59,7 +60,9 @@ export class VehicleController {
 
     const vUp = Vector3.Dot(linear, up);
     model.syncMotion(Vector3.Dot(linear, forward), Vector3.Dot(linear, right), Vector3.Dot(angular, up));
-    model.step(dt, { ...this.input.read(), engineAvailable: this.fuelAvailable && this.engineOperational }, vehicle.contact);
+    const raw = this.input.read();
+    const controls = 'steering' in raw ? { ...raw, steer: raw.steering } : raw;
+    model.step(dt, { ...controls, engineAvailable: this.fuelAvailable && this.engineOperational }, vehicle.contact);
     if (this.pushSpeedMps > 0 && Math.max(vehicle.contact.front, vehicle.contact.rear) > 0) {
       model.state.vx = Math.max(model.state.vx, this.pushSpeedMps);
       model.state.vy = 0;

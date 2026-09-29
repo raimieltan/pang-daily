@@ -47,6 +47,7 @@ export class DriverControls implements GameSystem, DriverInputSource, ChaseCamer
       this.enterExitPressed = false;
       return;
     }
+    this.current.device = input.drivingDevice;
     this.current.throttle = input.axis("throttle");
     this.current.brake = input.axis("brake");
     this.current.steer = input.axis("steer");

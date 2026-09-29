@@ -10,6 +10,8 @@ export type FailureState = (typeof FAILURE_STATES)[number];
 
 export const assemblySchema = z.object({
   id: z.string().min(1),
+  temperatureC: z.number().optional(),
+  thermalWear: z.number().min(0).max(1).optional(),
   spec: z.enum(['standard', 'donut']),
   pressureKpa: z.number().min(0),
   /** Carcass and tread, 1 = new. 0 = destroyed. */

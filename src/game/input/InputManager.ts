@@ -33,6 +33,7 @@ export class InputManager implements GameSystem {
   private readonly down = new Set<ButtonAction>();
   private readonly justPressed = new Set<ButtonAction>();
   private suspended = false;
+  drivingDevice: "keyboard" | "controller" = "keyboard";
   private context: 'gameplay' | 'dialogue' = 'gameplay';
   private readonly blockedKeys = new Set<string>();
   private readonly blockedPadButtons = new Set<number>();
@@ -100,6 +101,16 @@ export class InputManager implements GameSystem {
     for (const action of Object.keys(AXIS_ACTIONS) as AxisAction[]) {
       const value = this.context === 'dialogue' ? 0 : readAxis(axes[action], activeKeys, pad, deadzones);
       this.axes.set(action, AXIS_ACTIONS[action] === "unit" ? clamp(value, 0, 1) : clamp(value, -1, 1));
+    }
+
+    if (this.context === 'gameplay') {
+      // Remember the device after release so automatic countersteering keeps the right profile.
+      for (const action of ['steer', 'throttle', 'brake'] as const) {
+        const keyboard = readAxis(axes[action], activeKeys, null, deadzones);
+        const controller = readAxis(axes[action], new Set(), pad, deadzones);
+        if (Math.abs(controller) > Math.abs(keyboard) && Math.abs(controller) > .01) this.drivingDevice = 'controller';
+        else if (Math.abs(keyboard) > .01) this.drivingDevice = 'keyboard';
+      }
     }
 
     for (const action of BUTTON_ACTIONS) {

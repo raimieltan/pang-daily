@@ -5,7 +5,8 @@ import { ChapterExperience } from './ChapterExperience';
 import { ContactsApp } from './ContactsApp';
 import { SocialFeedback } from './SocialFeedback';
 import { useSocialStore } from '@/state/socialStore';
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { HandlingDebugPanel } from "./HandlingDebugPanel";
 import { useHudStore } from "@/state/hudStore";
 import { useGraphicsStore } from "@/state/graphicsStore";
 import { RaceIntro } from "./RaceIntro";
@@ -38,6 +39,8 @@ export function HudOverlay() {
   const failure = usePersistenceStore(s => s.failure);
   const saved = usePersistenceStore(s => s.saved);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const handlingDebug = useSyncExternalStore(subscribeDebugUrl,
+    () => new URLSearchParams(window.location.search).get('handlingDebug') === '1', () => false);
   const [resumeOnClose, setResumeOnClose] = useState(false);
   const intro = useHudStore(s => s.raceIntro);
   const settings = useGraphicsStore(s => s.settings);
@@ -61,6 +64,9 @@ export function HudOverlay() {
 
   return (
     <div className={`tape-hud pointer-events-none absolute inset-0 flex flex-col justify-between ${settings?.reducedMotion ? "is-steady" : ""}`}>
+      {handlingDebug && !toolsOpen && status === 'ready' && <aside className="pointer-events-auto absolute top-4 right-4 z-40 max-h-[85vh] w-[min(32rem,95vw)] overflow-y-auto bg-black/80">
+        <HandlingDebugPanel />
+      </aside>}
       {status === "ready" && !intro && <DrivingAtmosphere />}
       {status === "ready" && !intro && <DriftCallout />}
       {offline && <p role="status" className="absolute bottom-14 left-3 rounded bg-black/90 p-3 text-sm text-amber-200">Offline. Progress requires a connection to save. Reconnect and retry any failed action.</p>}
@@ -111,4 +117,9 @@ export function HudOverlay() {
       <RaceIntro />
     </div>
   );
+}
+
+function subscribeDebugUrl(onChange: () => void) {
+  window.addEventListener('popstate', onChange);
+  return () => window.removeEventListener('popstate', onChange);
 }

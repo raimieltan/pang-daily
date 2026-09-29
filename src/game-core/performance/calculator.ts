@@ -1,9 +1,10 @@
 import type { VehicleCondition, VehicleDefinition } from '../vehicles/VehicleDefinition';
 import { NO_MODIFIERS, PRISTINE_CONDITION, resolveVehicleStats, type StatModifiers, type VehicleStats } from '../vehicles/vehicleStats';
 import { checkPerformanceCompatibility, stockEngine, type CompatibilityState } from './compatibility';
-import type { InstalledPerformancePart, PerformancePart, FuelSystem } from './schema';
+import type { InstalledPerformancePart, PerformancePart, FuelSystem, MechanicalPartEffects } from './schema';
 
 export type PerformanceStats = VehicleStats & {
+  mechanical?: MechanicalPartEffects;
   throttleResponse: number; turboLagSeconds: number; heatRate: number; coolingRate: number;
   /** Multiplier on the economy's stock liters/km. */
   fuelConsumption: number; fuelSystem: FuelSystem; tuneability: number; boostBar: number;
@@ -41,6 +42,12 @@ export function calculateVehiclePerformance(vehicle: VehicleDefinition, installe
   let powerFraction = 0, torqueFraction = 0;
   for (const { item, part } of active) {
     const c = health(item.condition ?? 0), effect = part.effects;
+    if (part.mechanical) {
+      stats.mechanical = { ...stats.mechanical, ...part.mechanical,
+        ...(part.mechanical.differential ? { differential: { ...part.mechanical.differential,
+          lock: part.mechanical.differential.lock * c, preloadNm: part.mechanical.differential.preloadNm * c } } : {}),
+      };
+    }
     powerFraction += (effect.powerFraction ?? 0) * c;
     torqueFraction += (effect.torqueFraction ?? 0) * c;
     // Mass and liabilities do not vanish when a used part wears out. Benefits diminish.

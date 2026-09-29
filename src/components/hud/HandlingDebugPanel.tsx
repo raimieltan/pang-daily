@@ -51,6 +51,14 @@ export function HandlingDebugPanel() {
             </select>
             {preset && <span className="text-white/55">{preset.description}</span>}
           </label>
+          {telemetry?.mechanics && <label className="flex flex-col gap-1">
+            Driver assistance
+            <select aria-label="Driver assistance" className="rounded border border-white/30 bg-black px-1 py-0.5"
+              value={telemetry.mechanics.controls.profile}
+              onChange={e => { commands?.setDriverAssistance(e.target.value); e.currentTarget.blur(); }}>
+              {['assisted', 'standard', 'simulation', 'raw'].map(profile => <option key={profile} value={profile}>{profile}</option>)}
+            </select>
+          </label>}
           <div className="flex flex-wrap gap-1">
             <button type="button" className={buttonClass} onClick={() => commands?.resetVehicle()}>
               Reset (R)
@@ -89,6 +97,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
       <Row label="g long/lat" value={`${t.longAccelG.toFixed(2)} / ${t.latAccelG.toFixed(2)}`} />
       <Row label="load shift F/L" value={`${(t.loadShift * 100).toFixed(1)}% / ${(t.lateralLoadShift * 100).toFixed(1)}%`} />
       <Row label="stability" value={t.stabilityYaw.toFixed(2)} />
+      {t.mechanics && <MechanicalReadout m={t.mechanics} />}
       {state && <span className="text-white/90">{state}</span>}
     </div>
   );
@@ -118,4 +127,30 @@ export function Bar({ label, value, signed = false, hint }: { label: string; val
       <span className="w-9 text-right">{value.toFixed(2)}</span>
     </div>
   );
+}
+
+function MechanicalReadout({ m }: { m: NonNullable<VehicleTelemetry['mechanics']> }) {
+  const c = m.controls, degrees = (value: number) => (value * 180 / Math.PI).toFixed(1);
+  return <div className="mt-2 flex flex-col gap-1" data-testid="mechanical-telemetry">
+    <Row label="heading / velocity" value={`${m.headingDeg.toFixed(1)}° / ${m.velocityHeadingDeg.toFixed(1)}°`} />
+    <Row label="yaw / drift" value={`${m.yawRateDeg.toFixed(1)}°/s · ${m.drifting ? 'DRIFT' : 'road'}`} />
+    <Row label="device / steer input" value={`${c.device} / ${c.steeringInput.toFixed(2)}`} />
+    <Row label="player / counter target" value={`${degrees(c.playerTarget)}° / ${degrees(c.counterTarget)}°`} />
+    <Row label="target / actual rack" value={`${degrees(c.finalTarget)}° / ${degrees(c.actualSteering)}°`} />
+    <Row label="rack velocity" value={`${degrees(c.steeringVelocity)}°/s`} />
+    <Row label="throttle raw / ramp / assist" value={`${c.throttleRaw.toFixed(2)} / ${c.throttleFiltered.toFixed(2)} / ${c.throttleAssisted.toFixed(2)}`} />
+    <Row label="RPM / gear / clutch" value={`${Math.round(m.engineRpm)} / ${m.gear} / ${m.clutch.toFixed(2)}`} />
+    <Row label="diff / TCS / ESC" value={`${m.differentialLock.toFixed(2)} / ${m.tcs} / ${m.esc ? 'on' : 'off'}`} />
+    <div className="overflow-x-auto">
+      <table className="w-full text-right text-[10px]" aria-label="Individual tire telemetry">
+        <thead><tr><th>Wheel</th><th>α°</th><th>κ</th><th>RPM</th><th>Load N</th><th>Grip</th><th>°C</th><th>Wear</th><th>PSI</th></tr></thead>
+        <tbody>{m.wheels.map((w, i) => <tr key={i}>
+          <th>{['FL', 'FR', 'RL', 'RR'][i]}{w.isLocked ? ' LOCK' : w.isSpinning ? ' SPIN' : ''}</th>
+          <td>{degrees(w.slipAngle)}</td><td>{w.slipRatio.toFixed(2)}</td><td>{Math.round(w.wheelRPM)}</td>
+          <td>{Math.round(w.verticalLoad)}</td><td>{w.surfaceGrip.toFixed(2)}</td><td>{w.temperature.toFixed(0)}</td>
+          <td>{(w.wear * 100).toFixed(1)}%</td><td>{w.pressure.toFixed(1)}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+  </div>;
 }

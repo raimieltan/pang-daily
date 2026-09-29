@@ -1,3 +1,5 @@
+import { FourWheelDynamics } from "./FourWheelDynamics";
+import type { ControlDevice, VehicleControlInput } from "./DriverAssistance";
 import type { HandlingConfig } from "./HandlingConfig";
 
 /**
@@ -41,7 +43,9 @@ export type DriverInput = {
   /** -1 (left) .. 1 (right) */
   steer: number;
   /** Held = rear loosens for rotation. Absent = released. */
-  handbrake?: boolean;
+  handbrake?: boolean | number;
+  clutch?: number;
+  device?: ControlDevice;
 };
 
 /**
@@ -59,6 +63,8 @@ export type WheelCorner = (typeof CORNERS)[number];
  * Neutral values (1, 1, 0, installed, not raised) reproduce the plain axle model exactly.
  */
 export type CornerTire = {
+  surfaceGrip?: number;
+  pressurePsi?: number;
   /** Friction scale from tire spec, pressure, health and surface. */
   grip: number;
   /** Extra scale on braking/traction friction only (compound bias); the friction ellipse's long axis. */
@@ -199,6 +205,8 @@ export function createHandlingState(): HandlingState {
 }
 
 export class ArcadeHandlingModel {
+  /** Shared by keyboard, analog, wheel and AI inputs whenever the preset enables wheel dynamics. */
+  readonly mechanics = new FourWheelDynamics(this);
   readonly state: HandlingState = createHandlingState();
   readonly diagnostics: HandlingDiagnostics = {
     maxSteerAngle: 0,
@@ -249,6 +257,7 @@ export class ArcadeHandlingModel {
   }
 
   reset(): void {
+    this.mechanics.reset();
     Object.assign(this.state, createHandlingState());
     this.frontLatDemand = this.rearLatDemand = 0;
     this.stoppedBrakeTime = 0;
@@ -261,7 +270,14 @@ export class ArcadeHandlingModel {
     this.state.yawRate = yawRate;
   }
 
+  /** Normalized device-independent API for AI, controllers and future steering wheels. */
+  stepControls(dt: number, input: VehicleControlInput, contact: AxleContact): void {
+    this.step(dt, { steer: input.steering, throttle: input.throttle, brake: input.brake,
+      handbrake: input.handbrake, clutch: input.clutch, device: input.device }, contact);
+  }
+
   step(dt: number, input: DriverInput, contact: AxleContact): void {
+    if (this.c.mechanical) { this.mechanics.step(dt, input, contact); return; }
     const { c, d, state: s, diagnostics: diag } = this;
     const speed = Math.abs(s.vx);
     const grounded = Math.max(contact.front, contact.rear) > 0;

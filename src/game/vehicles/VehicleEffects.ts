@@ -116,10 +116,12 @@ export class VehicleEffects {
       this.emit('engine', this.point, up.scale(.9).addInPlace(forward.scale(-.22)), .2, 1.65);
     }
 
-    const sliding = moving && Math.abs(state.vx) > 5 && this.body.contact.rear > 0 &&
+    const mechanical = !!handling.config.mechanical;
+    const wheelIntensity = handling.mechanics.wheels.map(w => w.isGrounded ? Math.max(0, Math.min(1, (w.slipEnergy - 800) / 14000)) : 0);
+    const sliding = mechanical ? wheelIntensity.some(value => value > 0) : moving && Math.abs(state.vx) > 5 && this.body.contact.rear > 0 &&
       (Math.abs(diagnostics.rearSlip) > .15 || Math.abs(diagnostics.bodySlip) > .2 || diagnostics.handbrakeEffect > .35) &&
       (diagnostics.rearGripUse > .65 || diagnostics.handbrakeEffect > .35);
-    const intensity = sliding ? Math.min(1, Math.max(
+    const intensity = mechanical ? (handling.mechanics.detector.drifting ? Math.max(...wheelIntensity) : 0) : sliding ? Math.min(1, Math.max(
       Math.abs(diagnostics.bodySlip) * 1.4,
       Math.abs(diagnostics.rearSlip) * 1.25,
       diagnostics.handbrakeEffect * .8,
@@ -129,7 +131,9 @@ export class VehicleEffects {
     this.skidTimer = sliding ? this.skidTimer + dt : 0;
     if (sliding) {
       for (const wheel of this.model.wheels) {
-        if (wheel.front) continue;
+        const index = this.model.wheels.indexOf(wheel);
+        const tireIntensity = mechanical ? wheelIntensity[index] : intensity;
+        if ((!mechanical && wheel.front) || tireIntensity <= 0) { this.lastTirePoint.delete(wheel.id); continue; }
         if (!this.body.wheels.find(w => w.id === wheel.id)?.grounded) {
           this.lastTirePoint.delete(wheel.id);
           continue;
@@ -137,7 +141,7 @@ export class VehicleEffects {
         this.point.copyFrom(wheel.hub.getAbsolutePosition()).subtractInPlace(up.scale(wheel.radius - .025));
         const previous = this.lastTirePoint.get(wheel.id);
         if (previous) {
-          const strokes = inkStrokeSegments(previous, this.point, intensity, this.strokeSeed++);
+          const strokes = inkStrokeSegments(previous, this.point, tireIntensity, this.strokeSeed++);
           for (const stroke of strokes) this.mark(new Vector3(stroke.x, this.point.y, stroke.z), stroke.yaw, stroke.length, stroke.width);
         }
         this.lastTirePoint.set(wheel.id, this.point.clone());

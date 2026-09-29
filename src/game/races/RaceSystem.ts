@@ -217,7 +217,10 @@ export class RaceSystem implements GameSystem {
       const tires = this.rivalTires && CORNER_IDS.map(c => this.rivalTires!.mounted(c)?.failure ?? 'DESTROYED');
       if (snapshot) this.bridge.emit('aiTelemetry', { driverId: this.selected.rival?.name ?? 'rival', ...snapshot, tires });
     }
-    (this.current ?? this.visual)?.update(dt, 0, this.root.isEnabled() ? this.race.rival.speed : 0);
+    const rivalModel = this.rivalController?.model;
+    (this.current ?? this.visual)?.update(dt, rivalModel?.state.steerAngle ?? 0,
+      this.root.isEnabled() ? this.race.rival.speed : 0,
+      rivalModel?.config.mechanical ? rivalModel.mechanics.wheels.map(w => w.angularVelocity) : undefined);
     this.gates.filter(g=>g.metadata.routeId===this.selected.id).forEach((gate, i) => { gate.material = this.materials[i < this.race.player.next ? 2 : i === this.race.player.next ? 0 : 1]; });
     if (this.race.phase === "RUNNING" && this.lastStanding !== this.race.position) {
       this.lastStanding = this.race.position; this.bridge.emit("raceStandingChanged", this.standing());

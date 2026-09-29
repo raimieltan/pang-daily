@@ -26,6 +26,21 @@ function setup(config: InputConfig = DEFAULT_INPUT_CONFIG) {
 }
 
 describe("InputManager keyboard", () => {
+  it('remembers the driving device after release and changes it on new device input', () => {
+    const { input, key, connectPad } = setup();
+    key('keydown', 'KeyA'); input.update();
+    expect(input.drivingDevice).toBe('keyboard');
+    key('keyup', 'KeyA'); input.update();
+    expect(input.drivingDevice).toBe('keyboard');
+    const pad = connectPad(); pad.axes[PadAxis.LEFT_X] = .7; input.update();
+    expect(input.drivingDevice).toBe('controller');
+    pad.axes[PadAxis.LEFT_X] = 0; input.update();
+    expect(input.drivingDevice).toBe('controller');
+    key('keydown', 'KeyW'); input.update();
+    expect(input.drivingDevice).toBe('keyboard');
+    input.dispose();
+  });
+
   it('clears gameplay while phone owns input and blocks held controls until released', () => {
     const { input, key, connectPad } = setup();
     const pad = connectPad();

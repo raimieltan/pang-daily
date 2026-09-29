@@ -1,0 +1,14 @@
+import { createRoot } from 'react-dom/client';
+import { createGame, type VehicleTelemetry } from '@/game';
+import { HandlingDebugPanel } from '@/components/hud/HandlingDebugPanel';
+import { bindVehicleDebugStore } from '@/state/vehicleDebugStore';
+import { bindGameUiStore } from '@/state/gameUiStore';
+const game = createGame(document.getElementById('game') as HTMLCanvasElement, { initialScene: 'driving' });
+bindGameUiStore(game); bindVehicleDebugStore(game.events);
+let telemetry: VehicleTelemetry | null = null;
+const errors: string[] = [];
+game.events.on('vehicleTelemetry', value => { telemetry = value; });
+game.events.on('error', value => errors.push(value.message));
+createRoot(document.getElementById('root')!).render(<HandlingDebugPanel />);
+Object.assign(window, { rwdTest: { sample: () => telemetry, errors: () => errors, commands: game.commands } });
+game.start();

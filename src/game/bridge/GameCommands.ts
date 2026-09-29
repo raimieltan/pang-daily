@@ -46,6 +46,7 @@ export type GameCommandMap = {
   resetRace: void;
   abandonRace: void;
   setHandlingPreset: { presetId: string };
+  setDriverAssistance: { profile: string };
   /** Applies `quality`'s preset (if given), then any individual overrides. */
   setGraphics: Partial<GraphicsSettings>;
   /** Measures frame cost with post effects off, then on, for `seconds` each (default 4). */
@@ -168,6 +169,7 @@ export interface GameCommands {
   resetRace(): void;
   abandonRace(): void;
   setHandlingPreset(presetId: string): void;
+  setDriverAssistance(profile: string): void;
   setGraphics(settings: Partial<GraphicsSettings>): void;
   runGraphicsBenchmark(seconds?: number): void;
   setTimeOfDay(time: TimeOfDay): void;
@@ -228,6 +230,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     abandonRace: () => dispatch("abandonRace"),
     resetVehicle: () => dispatch("resetVehicle"),
     setHandlingPreset: (presetId) => dispatch("setHandlingPreset", { presetId }),
+    setDriverAssistance: (profile) => dispatch("setDriverAssistance", { profile }),
     setGraphics: (settings) => dispatch("setGraphics", settings),
     runGraphicsBenchmark: (seconds) => dispatch("runGraphicsBenchmark", { seconds }),
     setWeather: (weather) => dispatch("setWeather", { weather }),

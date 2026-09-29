@@ -33,6 +33,18 @@ export const partEffectsSchema = z.strictObject({
   fuelConsumption: z.number().optional(), tuneability: z.number().optional(),
   clutchCapacityNm: z.number().optional(), transmissionCapacityNm: z.number().optional(),
 });
+/** Optional mechanical hardware delivered by an installed part, independent of the runtime solver. */
+export const mechanicalPartSchema = z.strictObject({
+  differential: z.strictObject({ type: z.enum(['open', 'lsd', 'welded']), lock: unit, preloadNm: z.number().nonnegative() }).optional(),
+  gearRatios: z.array(positive).min(1).optional(),
+  steering: z.strictObject({ roadAngleDeg: z.number().min(5).max(65).optional(), driftAngleDeg: z.number().min(5).max(65).optional(), rackRate: positive.optional() }).optional(),
+  suspension: z.strictObject({ frontSpring: positive.optional(), rearSpring: positive.optional(), damping: positive.optional(),
+    frontAntiRoll: z.number().nonnegative().optional(), rearAntiRoll: z.number().nonnegative().optional(),
+    rideHeightOffsetM: z.number().min(-.2).max(.2).optional(), camberDeg: z.number().min(-10).max(10).optional(),
+    toeDeg: z.number().min(-3).max(3).optional(), casterDeg: z.number().min(0).max(15).optional() }).optional(),
+});
+export type MechanicalPartEffects = z.infer<typeof mechanicalPartSchema>;
+
 export const performancePartSchema = z.strictObject({
   id: z.string().min(1), name: z.string().min(1), category: z.enum(PERFORMANCE_CATEGORIES),
   /** Supporting mods occupy named slots so several different supports can coexist. */
@@ -41,7 +53,8 @@ export const performancePartSchema = z.strictObject({
   requiredParts: z.array(z.string()), incompatibleParts: z.array(z.string()), requirements: z.array(installRequirementSchema),
   /** Equivalent replacements can satisfy supporting-part requirements across used/new variants. */
   satisfiesParts: z.array(z.string()).default([]),
-  effects: partEffectsSchema, sketchiness: unit,
+  effects: partEffectsSchema,
+  mechanical: mechanicalPartSchema.optional(), sketchiness: unit,
   engine: engineDefinitionSchema.optional(), fuelSystem: z.enum(FUEL_SYSTEMS).optional(),
   turbo: z.strictObject({ boostBar: z.number().min(0).max(2), spoolSeconds: z.number().nonnegative(), supportedFuelSystems: z.array(z.enum(FUEL_SYSTEMS)).min(1) }).optional(),
 }).superRefine((p, ctx) => {

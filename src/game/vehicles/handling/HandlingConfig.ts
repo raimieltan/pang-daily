@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mechanicalConfigSchema } from "./MechanicalConfig";
 
 /**
  * Data-driven tuning for the arcade handling model (TECH_ARCHITECTURE §9–10).
@@ -14,6 +15,8 @@ const positive = z.number().positive();
 const nonNegative = z.number().min(0);
 
 export const handlingConfigSchema = z.strictObject({
+  /** Four-wheel torque solver; absent preserves older preset tuning. */
+  mechanical: mechanicalConfigSchema.optional(),
   chassis: z.strictObject({
     massKg: positive,
     wheelbaseM: positive,
@@ -153,7 +156,7 @@ export const handlingConfigSchema = z.strictObject({
 
 export type HandlingConfig = z.infer<typeof handlingConfigSchema>;
 
-type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
+type DeepPartial<T> = { [K in keyof T]?: NonNullable<T[K]> extends readonly unknown[] ? T[K] : NonNullable<T[K]> extends object ? DeepPartial<NonNullable<T[K]>> : T[K] };
 
 export type HandlingOverrides = DeepPartial<HandlingConfig>;
 
@@ -193,7 +196,7 @@ function deepMerge<T extends object>(base: T, overrides: DeepPartial<T>): T {
     if (value === undefined) continue;
     const current = out[key];
     out[key] =
-      typeof value === "object" && value !== null && typeof current === "object" && current !== null
+      typeof value === "object" && value !== null && !Array.isArray(value) && typeof current === "object" && current !== null
         ? deepMerge(current, value)
         : value;
   }

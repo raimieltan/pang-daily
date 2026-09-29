@@ -1,3 +1,4 @@
+import { assistanceProfileSchema } from "./handling/MechanicalConfig";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import {
@@ -63,7 +64,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private presetId: HandlingPresetId;
   private spawnId: SpawnPointId;
   private readonly hud: SummaryPublisher<VehicleSummary>;
-  private readonly telemetry: SummaryPublisher<VehicleTelemetry>;
+  private telemetryAge = 0;
   /** Runs after `place`, e.g. to snap the camera. */
   onPlaced?: () => void;
   /** Runs after a wheel or body part swap, e.g. to re-light the new meshes. */
@@ -141,10 +142,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     });
     this.releaseImpact = () => impacts.remove(observer);
     this.hud = new SummaryPublisher((summary) => bridge.emit("vehicleStateUpdated", summary));
-    this.telemetry = new SummaryPublisher(
-      (sample) => bridge.emit("vehicleTelemetry", sample),
-      TELEMETRY_INTERVAL_SECONDS,
-    );
+
 
     bridge.handle("spawnAt", ({ spawnPointId }) => {
       if (this.canReposition?.() === false) return { rejected: "Reset the race before teleporting" };
@@ -155,6 +153,13 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     });
     bridge.handle("resetVehicle", () => {
       if (!this.reset()) return { rejected: "No road under the spawn point" };
+    });
+    bridge.handle("setDriverAssistance", ({ profile }) => {
+      const parsed = assistanceProfileSchema.safeParse(profile);
+      if (!parsed.success) return { rejected: "Unknown assistance profile" };
+      if (!this.baseConfig.mechanical) return { rejected: "This preset uses legacy handling" };
+      this.baseConfig = { ...this.baseConfig, mechanical: { ...this.baseConfig.mechanical, assistance: parsed.data } };
+      this.setCondition(this.condition);
     });
     bridge.handle("setHandlingPreset", ({ presetId }) => {
       if (!isHandlingPresetId(presetId)) return { rejected: `Unknown handling preset "${presetId}"` };
@@ -248,10 +253,12 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   get speedKmh(): number { return Math.abs(this.speed) * 3.6; }
   get gear(): number {
+    if (this.controller.model.config.mechanical) return this.controller.model.state.reversing ? -1 : this.controller.model.mechanics.powertrain.gear;
     return this.controller.model.state.reversing ? -1 : this.options.definition.gearThresholdsKmh.filter(kmh => this.speedKmh >= kmh).length;
   }
   /** Presentation RPM estimate: this arcade drivetrain has no simulated engine RPM. */
   get recordingMotion(): { rpm: number; suspension: number } {
+    if (this.controller.model.config.mechanical) return { rpm: this.controller.model.mechanics.powertrain.engineRpm, suspension: this.controller.model.state.loadShift };
     const thresholds = this.options.definition.gearThresholdsKmh;
     const lower = thresholds[Math.max(0, this.gear - 1)] ?? 0;
     const upper = thresholds[this.gear] ?? lower + 45;
@@ -262,10 +269,14 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   update(dt: number): void {
     this.impactCooldown = Math.max(0, this.impactCooldown - dt);
     const { state } = this.controller.model;
-    this.visual.update(dt, state.steerAngle, state.vx);
+    this.visual.update(dt, state.steerAngle, state.vx, this.controller.model.config.mechanical ? this.controller.model.mechanics.wheels.map(w => w.angularVelocity) : undefined);
     this.effects.update(dt, this.controller.model, this.condition.engine);
     this.hud.tick(dt, () => this.summarize());
-    this.telemetry.tick(dt, () => this.sample());
+    this.telemetryAge += dt;
+    if (this.telemetryAge >= TELEMETRY_INTERVAL_SECONDS) {
+      this.telemetryAge %= TELEMETRY_INTERVAL_SECONDS;
+      this.bridge.emit("vehicleTelemetry", this.sample());
+    }
   }
 
   setFuelAvailable(available: boolean): void { this.controller.fuelAvailable = available; }
@@ -284,6 +295,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     const physics = calculateVehiclePerformance(this.definition.spec, this.performanceParts, { ...this.condition, tires: 1 },
       { modifiers: combineModifiers(physicalWheelModifiers(this.wheelEffects), this.bodyEffects.modifiers) }).stats;
     this.controller.setPerformance(this.baseConfig, calculateVehiclePerformance(this.definition.spec).stats, physics);
+    this.body.setMass(this.controller.model.config.chassis.massKg);
   }
 
   /** The wheel part on the car (null = stock wheels). */
@@ -389,13 +401,25 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     const speedKmh = Math.round(Math.abs(state.vx) * 3.6);
     const pose = { x: this.body.position.x, z: this.body.position.z, headingRad: Math.atan2(this.body.forward.x, this.body.forward.z) };
     if (state.reversing) return { speedKmh, gear: -1, ...pose };
-    return { speedKmh, gear: this.options.definition.gearThresholdsKmh.filter((kmh) => speedKmh >= kmh).length, ...pose };
+    return { speedKmh, gear: this.gear, ...pose };
   }
 
   private sample(): VehicleTelemetry {
     const { state: s, diagnostics: d } = this.controller.model;
     return {
-      speedKmh: round(Math.abs(s.vx) * 3.6, 0),
+      ...(this.controller.model.config.mechanical ? { mechanics: {
+        headingDeg: Math.atan2(this.forward.x, this.forward.z) * DEG,
+        velocityHeadingDeg: Math.atan2(
+          Math.sin(Math.atan2(this.forward.x, this.forward.z) + d.bodySlip),
+          Math.cos(Math.atan2(this.forward.x, this.forward.z) + d.bodySlip)) * DEG,
+        yawRateDeg: s.yawRate * DEG,
+        drifting: this.controller.model.mechanics.detector.drifting,
+        controls: { ...this.controller.model.mechanics.assistance.telemetry },
+        wheels: this.controller.model.mechanics.wheels.map(w => ({ ...w })),
+        ...this.controller.model.mechanics.powertrain,
+        tcs: this.controller.model.config.mechanical.tcs, esc: this.controller.model.config.mechanical.esc,
+      } } : {}),
+      speedKmh: round(Math.hypot(s.vx, s.vy) * 3.6, 0),
       steerDeg: round(s.steerAngle * DEG, 1),
       maxSteerDeg: round(d.maxSteerAngle * DEG, 1),
       throttle: round(s.throttle, 2),
