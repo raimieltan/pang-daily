@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SURFACE_TIRE, TIRE_SPECS, type TireSpecId, type TireSurface } from './specs';
+import { stockTireForWheel, temperatureGripMultiplier, tireDefinition, wearGripMultiplier } from './compounds';
 
 /**
  * One wheel + tire assembly: a persistent object that keeps its pressure, damage and history
@@ -23,6 +24,10 @@ export const assemblySchema = z.object({
   rimDamage: z.number().min(0).max(1),
   /** Metres driven below the flat threshold. */
   flatDistanceM: z.number().min(0),
+  /** Product id, not a vehicle-wide grip modifier. Old saves become stock road tyres. */
+  definitionId: z.string().optional(),
+  mileageKm: z.number().min(0).default(0),
+  heatCycles: z.number().int().nonnegative().default(0),
 });
 export type TireAssembly = z.infer<typeof assemblySchema>;
 
@@ -32,8 +37,8 @@ export const FLAT_KPA = 30;
 export const LOW_PRESSURE_RATIO = .8;
 const RIM_CONTACT_KPA = 8;
 
-export function newAssembly(id: string, spec: TireSpecId = 'standard'): TireAssembly {
-  return { id, spec, pressureKpa: TIRE_SPECS[spec].nominalKpa, health: 1, failure: 'HEALTHY', leakKpaPerMin: 0, rimDamage: 0, flatDistanceM: 0 };
+export function newAssembly(id: string, spec: TireSpecId = 'standard', definitionId = stockTireForWheel().id): TireAssembly {
+  return { id, spec, definitionId, mileageKm: 0, heatCycles: 0, temperatureC: 25, thermalWear: 0, pressureKpa: TIRE_SPECS[spec].nominalKpa, health: 1, failure: 'HEALTHY', leakKpaPerMin: 0, rimDamage: 0, flatDistanceM: 0 };
 }
 
 export function pressureRatio(tire: TireAssembly) { return tire.pressureKpa / TIRE_SPECS[tire.spec].nominalKpa; }
@@ -64,15 +69,20 @@ export function tireResponse(tire: TireAssembly, surface: TireSurface, setup: Wh
     return { grip: .32 * ground.grip, longitudinalGrip: 1, slipScale: 2.2, rollingResistance: .09 + ground.rolling };
   }
   const rim = 1 - BENT_RIM_GRIP_LOSS * Math.max(tire.rimDamage, road ? setup.rimWear : 0);
+  const product = tireDefinition(tire.definitionId) ?? stockTireForWheel();
+  const wet = surface === 'wet_asphalt';
+  const surfaceCompoundGrip = wet ? product.lateralGrip * product.wetGrip / product.dryGrip : product.lateralGrip;
+  const compoundGrip = surfaceCompoundGrip * temperatureGripMultiplier(product, tire.temperatureC ?? 25)
+    * wearGripMultiplier(tire.health * (1 - (tire.thermalWear ?? 0) * .45), wet);
   const set = road ? setup.gripScale * (1 - setup.treadGripLoss * (1 - Math.min(1, Math.max(0, setup.tread)))) : 1;
   // Over-inflated: a slightly smaller patch. Under-inflated: soft, draggy, loses grip fast once flat.
   const pressureGrip = p >= 1 ? 1 - .25 * (p - 1) ** 2 : p >= .6 ? 1 - .12 * (1 - p) / .4 : .88 - .38 * (.6 - Math.max(0, p)) / .6;
   const soft = Math.max(0, .95 - p);
   return {
-    grip: spec.gripScale * ground.grip * pressureGrip * (.8 + .2 * tire.health) * rim * set,
-    longitudinalGrip: road ? setup.longitudinalScale : 1,
-    slipScale: spec.slipScale * (1 + 1.3 * soft),
-    rollingResistance: spec.rollingResistance + ground.rolling + .09 * soft ** 1.5,
+    grip: spec.gripScale * ground.grip * pressureGrip * rim * set * compoundGrip,
+    longitudinalGrip: (road ? setup.longitudinalScale : 1) * product.longitudinalGrip,
+    slipScale: spec.slipScale * (1 + 1.3 * soft) * (1.22 - product.breakawaySharpness * .32) / product.sidewallStiffness,
+    rollingResistance: spec.rollingResistance + ground.rolling + .09 * soft ** 1.5 + (product.rollingResistance - 1) * .012,
   };
 }
 
@@ -113,6 +123,7 @@ export function stepAssembly(tire: TireAssembly, dt: number, speedMps: number, s
   const spec = TIRE_SPECS[tire.spec];
   const wasLow = isLowPressure(tire);
   const metres = Math.abs(speedMps) * dt;
+  tire.mileageKm += metres / 1000;
   if (tire.leakKpaPerMin > 0) tire.pressureKpa = Math.max(0, tire.pressureKpa - tire.leakKpaPerMin * dt / 60);
   if (!wasLow && isLowPressure(tire)) events.push({ kind: 'low_pressure' });
 

@@ -15,6 +15,7 @@ const mountainPoints = ROAD.filter((_, index) => index % 12 === 0 || index === R
 export function DrivingAtmosphere() {
   const vehicle = useHudStore(state => state.vehicle);
   const mode = useHudStore(state => state.playerMode);
+  const interaction = useHudStore(state => state.interaction);
   const scene = useGameUiStore(state => state.activeScene);
   const paused = useGameUiStore(state => state.paused);
   if (mode !== 'driving' || !vehicle || paused) return null;
@@ -30,7 +31,7 @@ export function DrivingAtmosphere() {
   const point = (x: number, z: number) => `${x - bounds.minX},${bounds.maxZ - z}`;
 
   return <>
-    {view && <aside className="driving-minimap" aria-label={`${mountain ? 'Mountain' : 'Neighborhood'} minimap`}>
+    {view && <aside className={`driving-minimap${interaction?.action === 'start_race' ? ' has-race-prompt' : ''}`} aria-label={`${mountain ? 'Mountain' : 'Neighborhood'} minimap`}>
       <div className="driving-minimap-head"><span>ROUTE / {mountain ? 'UPLAND' : 'ILOILO'}</span><span>● LIVE</span></div>
       <svg viewBox={`${view.x} ${view.y} ${view.size} ${view.size}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Roads and current vehicle position">
         <rect x={view.x} y={view.y} width={view.size} height={view.size} fill="#0a1a19" />

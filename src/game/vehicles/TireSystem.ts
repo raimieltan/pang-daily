@@ -12,7 +12,7 @@ import type { PlayerModes } from "../player/PlayerModes";
 import type { PlayerVehicle } from "./PlayerVehicle";
 import { CarTires } from "./CarTires";
 import {
-  CORNER_IDS, CORNER_NAMES, applyTireService, tireServiceLines, type TireServiceLine, TIRE_SPECS, isFlat, isLowPressure, loadTireSession, nextCornerStep, performStep,
+  CORNER_IDS, CORNER_NAMES, applyTireService, catalogueTires, purchaseTires, tireDefinition, tireServiceLines, tireSize, stockTireForWheel, type TireDefinition, type TireServiceLine, TIRE_SPECS, isFlat, isLowPressure, loadTireSession, nextCornerStep, performStep,
   pressureRatio, puncture, stepLabel, type CornerId, type FailureState, type TireAssembly,
   type TireEvent, type TireSession, type TireSurface, type WheelChangeStep,
 } from "@/game-core/tires";
@@ -30,7 +30,8 @@ export type TireStatus = {
   held: string | null;
   driveBlock: string | null;
 };
-export type TireShopState = { lines: TireServiceLine[]; walletPhp: number; rejection: string | null; receipt: string | null };
+export type TireShopState = { lines: TireServiceLine[]; walletPhp: number; rejection: string | null; receipt: string | null;
+  catalogue: readonly TireDefinition[]; wheelSize: string; wheelWidthMm: number; current: { corner: CornerId; definitionId: string; health: number; temperatureC: number; pressurePsi: number }[]; dialogue: string };
 /** Wallet the talyer charges; the same `VehicleSession` the repair bench uses. */
 export type TireShopWallet = {
   spend(amountPhp: number, source: { kind: string; description: string; source: string; relatedEntityId?: string | null }): { rejected: string } | object;
@@ -102,6 +103,13 @@ export class TireSystem implements GameSystem {
     this.session = storage && "vehicle" in storage ? storage : loadTireSession(storage as StoragePort | undefined);
     this.sim = new CarTires(this.session, () => player.id, player.body, player.controller.model, surfaceAt, seed, () => player.tireSetup);
     this.session.vehicle(player.id);
+    // Give legacy and freshly issued stock assemblies the actual diameter currently on this car.
+    const size = this.player.wheelPart?.tireSize ?? this.player.definition.spec.grip.tireSize;
+    const diameter = Number(size.match(/R(\d+)$/)?.[1] ?? 13);
+    for (const corner of CORNER_IDS) {
+      const tire = this.session.mounted(player.id, corner);
+      if (tire && (!tire.definitionId || tire.definitionId === 'stock_155_70r13')) tire.definitionId = stockTireForWheel(diameter).id;
+    }
     this.releases.push(player.onImpact((strength, point) => this.impact(strength, point)));
     this.releases.push(bridge.handle("debugPuncture", ({ corner, failure }) => this.fail(corner, failure)));
     this.releases.push(bridge.handle("debugResetTires", () => this.resetVehicle()));
@@ -143,10 +151,22 @@ export class TireSystem implements GameSystem {
   useShop(wallet: TireShopWallet, rejection: () => string | null): void {
     const publish = (receipt: string | null = null) => {
       const blocked = rejection();
+      const wheel = this.player.visual.model.wheels[0].fit;
+      const wheelSize = this.player.wheelPart?.tireSize ?? this.player.definition.spec.grip.tireSize;
+      const wheelDiameterIn = Number(wheelSize.match(/R(\d+)$/)?.[1] ?? 13);
+      const current = CORNER_IDS.flatMap(corner => {
+        const tire = this.session.mounted(this.player.id, corner);
+        return tire ? [{ corner, definitionId: tire.definitionId ?? 'stock_155_70r13', health: tire.health, temperatureC: tire.temperatureC ?? 25, pressurePsi: tire.pressureKpa / 6.89476 }] : [];
+      });
+      const lowest = Math.min(...current.map(t => t.health));
+      const dialogue = lowest < .25 ? "Ubos na tread nito. Palit ka na bago ka maabutan ng ulan."
+        : "Daily lang? Street tire ka na. Pero pera mo 'yan, boss.";
       this.bridge.emit("tireShopState", { lines: blocked ? [] : tireServiceLines(this.session, this.player.id),
-        walletPhp: wallet.summary(this.player.definition.spec).walletPhp, rejection: blocked, receipt });
+        walletPhp: wallet.summary(this.player.definition.spec).walletPhp, rejection: blocked, receipt,
+        catalogue: catalogueTires(wheelDiameterIn, wheel.widthM * 1000, { fitsOnly: true }), wheelSize, wheelWidthMm: Math.round(wheel.widthM * 1000), current, dialogue });
     };
     this.releases.push(this.bridge.handle("quoteTireService", () => publish()));
+    this.releases.push(this.bridge.handle("quoteTireCatalogue", () => publish()));
     this.releases.push(this.bridge.handle("buyTireService", ({ lineId }) => {
       const blocked = rejection();
       if (blocked) return { rejected: blocked };
@@ -168,6 +188,30 @@ export class TireSystem implements GameSystem {
       this.apply();
       this.bridge.emit("tireEvent", { corner: null, kind: "service", text: result.line.label });
       publish(`Paid ₱${result.line.costPhp.toLocaleString("en-PH")}: ${result.line.label}`);
+    }));
+    this.releases.push(this.bridge.handle('buyTires', ({ definitionId, quantity, install, corners }) => {
+      const blocked = rejection();
+      if (blocked) return { rejected: blocked };
+      const selected = tireDefinition(definitionId);
+      if (!selected) return { rejected: 'Unknown tyre product' };
+      if (this.session.persistent) return this.session.purchase(this.player.id, definitionId, quantity, install, corners).then((receipt) => {
+        this.apply();
+        const cost = typeof receipt.details.costPhp === 'number' ? receipt.details.costPhp : 0;
+        this.bridge.emit('tireEvent', { corner: null, kind: 'service', text: `${selected.name} fitted` });
+        publish(`WORK ORDER PAID ₱${cost.toLocaleString('en-PH')}: ${quantity}× ${selected.name} ${tireSize(selected)}`);
+      }, (error: unknown) => { publish(); return { rejected: error instanceof Error ? error.message : String(error) }; });
+      const wheelSize = this.player.wheelPart?.tireSize ?? this.player.definition.spec.grip.tireSize;
+      const wheelDiameterIn = Number(wheelSize.match(/R(\d+)$/)?.[1] ?? 13);
+      const fit = catalogueTires(wheelDiameterIn, this.player.visual.model.wheels[0].fit.widthM * 1000, { fitsOnly: true }).some(t => t.id === definitionId);
+      if (!fit) return { rejected: `INCOMPATIBLE WITH CURRENT WHEEL (${wheelSize})` };
+      const result = purchaseTires(this.session, this.player.id, { definitionId, quantity, install, corners }, (costPhp, description) => {
+        const paid = wallet.spend(costPhp, { kind: 'tire_purchase', source: 'tito_juns', description, relatedEntityId: this.player.id });
+        return 'rejected' in paid ? { rejected: String(paid.rejected) } : undefined;
+      });
+      if ('rejected' in result) { publish(); return result; }
+      this.apply();
+      this.bridge.emit('tireEvent', { corner: null, kind: 'service', text: `${result.definition.name} fitted to ${result.installed.join(', ')}` });
+      publish(`WORK ORDER PAID ₱${result.costPhp.toLocaleString('en-PH')}: ${quantity}× ${result.definition.name} ${tireSize(result.definition)}`);
     }));
   }
 

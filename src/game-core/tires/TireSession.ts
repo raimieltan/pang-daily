@@ -154,6 +154,16 @@ export class TireSession {
     return receipt;
   }
 
+  /** Server-priced catalogue work order; the server creates the physical assemblies. */
+  async purchase(vehicleId: string, definitionId: string, quantity: 1 | 2 | 4, install: 'front' | 'rear' | 'all' | 'individual', corners?: import('./corners').CornerId[]) {
+    if (!this.remote) throw new Error('Server persistence is not configured.');
+    await this.flush();
+    const receipt = await this.remote.execute({ type: 'tire_purchase', vehicleId, definitionId, quantity, install, corners });
+    this.confirm(vehicleId, receipt.details);
+    this.listeners.forEach(l => l());
+    return receipt;
+  }
+
   /** Sends any unsaved tire state now (scene exit, before a service). */
   flush(): Promise<void> {
     if (!this.remote) return Promise.resolve();

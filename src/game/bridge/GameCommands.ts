@@ -26,6 +26,9 @@ export type GameCommandMap = {
   /** Ask the talyer what tire, rim and tool work the car needs (answers with `tireShopState`). */
   quoteTireService: void;
   buyTireService: { lineId: string };
+  /** Tito Jun's catalogue and work-order purchase flow. */
+  quoteTireCatalogue: void;
+  buyTires: { definitionId: string; quantity: 1 | 2 | 4; install: import('../../game-core/tires').TireInstallTarget; corners?: import('../../game-core/tires').CornerId[] };
   openAutoPartsShop: void;
   closeAutoPartsShop: void;
   quoteAutoPart: { partId: string };
@@ -156,6 +159,8 @@ export interface GameCommands {
   debugResetTires(): void;
   quoteTireService(): void;
   buyTireService(lineId: string): void;
+  quoteTireCatalogue(): void;
+  buyTires(definitionId: string, quantity: 1 | 2 | 4, install: import('../../game-core/tires').TireInstallTarget, corners?: import('../../game-core/tires').CornerId[]): void;
   openAutoPartsShop(): void;
   closeAutoPartsShop(): void;
   quoteAutoPart(partId: string): void;
@@ -220,8 +225,10 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     towVehicle: () => dispatch('towVehicle'),
     debugPuncture: (corner, failure) => dispatch('debugPuncture', { corner, failure }),
     debugResetTires: () => dispatch('debugResetTires'),
-    quoteTireService: () => dispatch('quoteTireService'),
-    buyTireService: (lineId) => dispatch('buyTireService', { lineId }),
+  quoteTireService: () => dispatch('quoteTireService'),
+  buyTireService: (lineId) => dispatch('buyTireService', { lineId }),
+  quoteTireCatalogue: () => dispatch('quoteTireCatalogue'),
+  buyTires: (definitionId, quantity, install, corners) => dispatch('buyTires', { definitionId, quantity, install, corners }),
     openAutoPartsShop: () => dispatch('openAutoPartsShop'),
     closeAutoPartsShop: () => dispatch('closeAutoPartsShop'),
     quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),

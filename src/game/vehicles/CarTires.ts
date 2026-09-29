@@ -3,7 +3,7 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { ArcadeHandlingModel } from "./handling/ArcadeHandlingModel";
 import {
   CORNER_IDS, STOCK_SETUP, SURFACE_TIRE, impactPuncture, isFlat, newAssembly, pressureRatio, stepAssembly, tireResponse,
-  type WheelSetup, type CornerId, type TireAssembly, type TireEvent, type TireSession, type TireSurface,
+  tireDefinition, stockTireForWheel, type WheelSetup, type CornerId, type TireAssembly, type TireEvent, type TireSession, type TireSurface,
 } from "@/game-core/tires";
 
 const SURFACE_INTERVAL = 0.1;
@@ -54,8 +54,19 @@ export class CarTires {
       if (!tire) return;
       if (this.model.config.mechanical) {
         const state = this.model.mechanics.wheels[i];
-        tire.temperatureC = state.temperature;
+        const definition = tireDefinition(tire.definitionId) ?? stockTireForWheel();
+        // The wheel solver provides the slip energy; the product decides how quickly it becomes heat and rubber loss.
+        tire.temperatureC = state.temperature + Math.min(8, state.slipEnergy / 4200 * definition.heatGenerationRate);
         tire.thermalWear = state.wear;
+        if (state.temperature > definition.optimalTemperatureMaxC) tire.thermalWear = Math.min(1, tire.thermalWear + dt * .00035 * definition.wearRate);
+      } else {
+        const definition = tireDefinition(tire.definitionId) ?? stockTireForWheel();
+        const corner = this.model.corners[i];
+        const slip = Math.abs(corner.slipAngle) * Math.max(.2, Math.abs(corner.wheelSpeed));
+        const ambient = 25;
+        const temperature = tire.temperatureC ?? ambient;
+        tire.temperatureC = Math.max(ambient, temperature + (slip * definition.heatGenerationRate * .18 - (temperature - ambient) * definition.coolingRate * .015) * dt);
+        tire.thermalWear = Math.min(1, (tire.thermalWear ?? 0) + slip * definition.wearRate * 0.000002 * dt);
       }
       const speed = this.model.corners[i].grounded ? this.model.corners[i].wheelSpeed : 0;
       const events = stepAssembly(tire, dt, speed, this.surfaces[i], this.random());

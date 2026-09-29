@@ -1,5 +1,6 @@
 import { CORNER_IDS, type CornerId } from './corners';
 import { newAssembly, pressureRatio, type TireAssembly } from './assembly';
+import { TIRE_CATALOG, tireDefinition, tireSize, type TireCompound, type TireDefinition, type TireUse } from './compounds';
 import { TIRE_SPECS } from './specs';
 import { CORNER_NAMES, type TireSession } from './TireSession';
 
@@ -14,6 +15,41 @@ const STRAIGHTENABLE_RIM = .5;
 
 export type TireServiceKind = 'air' | 'patch' | 'tire' | 'rim' | 'spare' | 'jack' | 'wrench';
 export type TireServiceLine = { id: string; kind: TireServiceKind; label: string; detail: string; costPhp: number };
+export type TireInstallTarget = 'front' | 'rear' | 'all' | 'individual';
+export type TirePurchase = { definitionId: string; quantity: 1 | 2 | 4; install: TireInstallTarget; corners?: readonly CornerId[] };
+export type TireCatalogueFilters = { compound?: TireCompound | 'ALL'; use?: TireUse; fitsOnly?: boolean };
+export const TIRE_MOUNTING_PHP = 150;
+export const TIRE_BALANCING_PHP = 100;
+
+export function catalogueTires(wheelDiameterIn: number, wheelWidthMm: number, filters: TireCatalogueFilters = {}): TireDefinition[] {
+  return TIRE_CATALOG.filter(t => (!filters.fitsOnly || (t.wheelDiameterIn === wheelDiameterIn && t.widthMm >= wheelWidthMm - 25 && t.widthMm <= wheelWidthMm + 25))
+    && (!filters.compound || filters.compound === 'ALL' || t.compound === filters.compound)
+    && (!filters.use || t.intendedUse.includes(filters.use)));
+}
+
+export function purchaseTires(tires: TireSession, vehicleId: string, order: TirePurchase,
+  pay: (costPhp: number, description: string) => { rejected: string } | void): { rejected: string } | { costPhp: number; installed: CornerId[]; definition: TireDefinition } {
+  const definition = tireDefinition(order.definitionId);
+  if (!definition) return { rejected: 'That tyre is no longer in Tito Jun\'s catalogue' };
+  const car = tires.vehicle(vehicleId);
+  if (car.jacked || car.loosened.length || car.held) return { rejected: 'Finish the roadside wheel change first' };
+  const destinations: CornerId[] = order.install === 'front' ? ['FL', 'FR'] : order.install === 'rear' ? ['RL', 'RR']
+    : order.install === 'all' ? [...CORNER_IDS] : [...(order.corners ?? [])];
+  if (!destinations.length || destinations.length !== order.quantity) return { rejected: 'Choose the same number of tyres and installation positions' };
+  if (new Set(destinations).size !== destinations.length) return { rejected: 'A wheel can only receive one tyre' };
+  const costPhp = definition.price * order.quantity + (TIRE_MOUNTING_PHP + TIRE_BALANCING_PHP) * destinations.length;
+  const paid = pay(costPhp, `${order.quantity}× ${definition.name} ${tireSize(definition)}`);
+  if (paid) return paid;
+  tires.mutate(vehicleId, c => {
+    for (const corner of destinations) {
+      const previous = c.corners[corner];
+      const fresh = newAssembly(tires.nextAssemblyId(vehicleId), 'standard', definition.id);
+      tires.adopt(fresh); c.corners[corner] = fresh.id;
+      if (previous) c.trunk.push(previous);
+    }
+  });
+  return { costPhp, installed: destinations, definition };
+}
 
 /** Every assembly the car owns, with where it sits, for pricing. */
 function owned(tires: TireSession, vehicleId: string): { tire: TireAssembly; where: string }[] {

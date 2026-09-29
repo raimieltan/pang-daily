@@ -107,6 +107,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   }
   readonly bodyParts: BodyPartSwapper;
   private readonly effects: VehicleEffects;
+  /** Legacy presets do not have the four-wheel suspension solver, but every car still visibly moves on its springs. */
+  private visualAttitude = { pitch: 0, roll: 0 };
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -271,7 +273,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.impactCooldown = Math.max(0, this.impactCooldown - dt);
     const { state } = this.controller.model;
     const mechanics = this.controller.model.config.mechanical ? this.controller.model.mechanics : null;
-    this.visual.update(dt, state.steerAngle, state.vx, mechanics?.wheels.map(w => w.angularVelocity), mechanics?.bodyAttitude());
+    const attitude = mechanics?.bodyAttitude() ?? this.legacyBodyAttitude(dt);
+    this.visual.update(dt, state.steerAngle, state.vx, mechanics?.wheels.map(w => w.angularVelocity), attitude);
     this.effects.update(dt, this.controller.model, this.condition.engine);
     this.hud.tick(dt, () => this.summarize());
     this.telemetryAge += dt;
@@ -279,6 +282,21 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       this.telemetryAge %= TELEMETRY_INTERVAL_SECONDS;
       this.bridge.emit("vehicleTelemetry", this.sample());
     }
+  }
+
+  /** Shared visual suspension for every non-mechanical car. Worn suspension leans and dives more. */
+  private legacyBodyAttitude(dt: number): { pitch: number; roll: number } {
+    const { chassis } = this.controller.model.config;
+    const health = Math.max(.2, this.condition.suspension);
+    const quality = 1 / health;
+    const target = {
+      pitch: Math.max(-.09, Math.min(.09, -this.controller.model.state.longAccel * chassis.cgHeightM / 95 * quality)),
+      roll: Math.max(-.15, Math.min(.15, -this.controller.model.state.latAccel * chassis.cgHeightM / (chassis.trackWidthM * 32) * quality)),
+    };
+    const blend = Math.min(1, dt * (7 / quality));
+    this.visualAttitude.pitch += (target.pitch - this.visualAttitude.pitch) * blend;
+    this.visualAttitude.roll += (target.roll - this.visualAttitude.roll) * blend;
+    return this.visualAttitude;
   }
 
   setFuelAvailable(available: boolean): void { this.controller.fuelAvailable = available; }

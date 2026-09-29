@@ -76,6 +76,7 @@ export const playerCommandSchema = z.strictObject({
     // Driving and roadside wheel work: validated against the saved tires so nothing heals or appears.
     z.strictObject({ type: z.literal('vehicle_tires'), vehicleId: id, revision: exactInteger, state: vehicleTireStateSchema }),
     z.strictObject({ type: z.literal('tire_service'), vehicleId: id, lineId: z.string().min(1).max(120) }),
+    z.strictObject({ type: z.literal('tire_purchase'), vehicleId: id, definitionId: contentId, quantity: z.union([z.literal(1), z.literal(2), z.literal(4)]), install: z.enum(['front', 'rear', 'all', 'individual']), corners: z.array(z.enum(['FL', 'FR', 'RL', 'RR'])).min(1).max(4).optional() }),
     z.strictObject({ type: z.literal('job_start'), definitionId: contentId }),
     z.strictObject({ type: z.literal('job_begin'), runId: contentId }),
     z.strictObject({ type: z.literal('job_objective'), runId: contentId, objectiveId: contentId, elapsedMs: millisecond, cargoDamage: fraction }),

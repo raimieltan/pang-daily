@@ -23,7 +23,7 @@ import { LocationToast } from "./LocationToast";
 import { InteractionPrompt } from "./InteractionPrompt";
 import { SoundButton } from "./AudioPanel";
 import { FuelPanel } from "./FuelPanel";
-import { ConditionHud, RepairPanel } from "./RepairPanel";
+import { FuelHud, RepairPanel } from "./RepairPanel";
 import { JobBoardPanel, JobTracker } from "./JobPanels";
 import { MarketplaceApp } from "./MarketplaceApp";
 import { AutoPartsShopPanel } from './AutoPartsShopPanel';
@@ -70,9 +70,10 @@ export function HudOverlay() {
       </aside>}
       {status === "ready" && !intro && <DrivingAtmosphere />}
       {status === "ready" && !intro && <DriftCallout />}
+      {status === "ready" && !intro && <FuelHud />}
       {offline && <p role="status" className="absolute bottom-14 left-3 rounded bg-black/90 p-3 text-sm text-amber-200">Offline. Progress requires a connection to save. Reconnect and retry any failed action.</p>}
-      {saving && <p role="status" className="absolute top-10 left-3 text-xs text-white/70">Saving progress…</p>}
-      {saved && !saving && !saveError && <p role="status" className="absolute top-10 left-3 text-xs text-emerald-200">Progress saved</p>}
+      {saving && <p role="status" className="absolute top-3 left-3 z-30 text-xs text-white/70">Saving progress…</p>}
+      {saved && !saving && !saveError && <p role="status" className="absolute top-3 left-3 z-30 text-xs text-emerald-200">Progress saved</p>}
       {saveError && <div role="alert" className="pointer-events-auto absolute top-14 left-3 right-3 z-50 rounded border border-red-400/50 bg-black/90 p-3 text-sm text-red-200">
         <p>{failure?.kind === 'authentication' ? 'Session expired' : failure?.kind === 'incompatible' ? 'Save needs attention' : failure?.kind === 'rejection' ? 'Change rejected' : 'Progress could not be saved'}: {failure?.message ?? saveError}</p>
         {failure?.requestId && <p className="mt-1 text-xs text-white/60">Support reference: {failure.requestId}</p>}
@@ -110,7 +111,7 @@ export function HudOverlay() {
 
       {status === "ready" && toolsOpen && <PauseSettings onClose={closeSettings} />}
       {status === "ready" && !paused && !intro && <div className="flex flex-col gap-3">
-        <LocationToast /><CommandNotice /><TireHud /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
+        <LocationToast /><CommandNotice /><TireHud /><DialogueBox /><JobTracker /><DrivingHud /><InteractionPrompt />
       </div>}
       {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /><MarketplaceApp /><AutoPartsShopPanel /><CarDealerPanel /></>}
       <ContactsApp />

@@ -26,7 +26,7 @@ import { DatabaseService } from './database.service';
 import { loadSocialState } from './social-state';
 import { towCostPhp } from '@pang-daily/game-core/maintenance/towing';
 import { TireSession, stockVehicleTires, tireCheckpointRejection, vehicleTireStateSchema, type VehicleTireState } from '@pang-daily/game-core/tires/TireSession';
-import { applyTireService } from '@pang-daily/game-core/tires/tireShop';
+import { applyTireService, purchaseTires } from '@pang-daily/game-core/tires/tireShop';
 import { progressSocial } from './social-progression';
 import { CHAPTER_ONE, STARTER_ORIGINS } from '@pang-daily/game-core/progression/chapter';
 import { advanceChapter } from './chapter-state';
@@ -328,6 +328,21 @@ export class EconomyRepository {
           const result = applyTireService(session, vehicle.definitionId, a.lineId, line => { cost = line.costPhp; });
           if ('rejected' in result) refuse('TIRE_SERVICE_UNAVAILABLE', result.rejected);
           await pay(-php(cost), 'TIRE_SERVICE', 'talyer', command.key, result.line.label, vehicle.id);
+          const state = session.exportVehicle(vehicle.definitionId);
+          receipt.resourceId = vehicle.id;
+          receipt.details = { costPhp: cost, tireRevision: await this.saveTires(tx, vehicle.id, saved.revision, state), tires: JSON.stringify(state) };
+          break;
+        }
+        case 'tire_purchase': {
+          const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
+          const saved = await this.tires(tx, vehicle.id, vehicle.definitionId);
+          // Product, quantity, price and the newly-created assembly ids are all resolved on the server; never trust the work-order total from the client.
+          const session = new TireSession();
+          session.importVehicle(vehicle.definitionId, saved.state);
+          let cost = 0;
+          const result = purchaseTires(session, vehicle.definitionId, a, (costPhp) => { cost = costPhp; });
+          if ('rejected' in result) refuse('TIRE_PURCHASE_UNAVAILABLE', result.rejected);
+          await pay(-php(cost), 'TIRE_PURCHASE', 'tito_juns', command.key, `${a.quantity}× ${result.definition.name}`, vehicle.id);
           const state = session.exportVehicle(vehicle.definitionId);
           receipt.resourceId = vehicle.id;
           receipt.details = { costPhp: cost, tireRevision: await this.saveTires(tx, vehicle.id, saved.revision, state), tires: JSON.stringify(state) };
