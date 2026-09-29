@@ -1,16 +1,17 @@
 # Banwa Dalagan 1996 — modular low-poly sedan
 
-A rebuilt, intentionally faceted four-door sedan based on the supplied Lancer-era references and low-poly screenshot. No badges or logos. Created directly as mesh geometry and exported as glTF 2.0 binary; Blender is not required and no `.blend` file is included.
+A faceted Lancer “pizza” reference remake authored and exported in Blender. Rounded bumper profiles, a crowned roof, swept lamps, triangular rear clusters, five-spoke wheels and a raised factory-style wing retain the low-poly design. No badges or logos.
 
 ## Deliverables
 
 - `banwa_dalagan_1996_modular.glb`: assembled car, with independently removable parts.
 - `mounting_interfaces.json`: versioned attachment frames and ordered panel edge loops in vehicle/world coordinates.
 - `validation.json`: geometry and re-import checks.
-- `previews/`: nine views rendered from the exported and re-imported GLB, plus a contact sheet.
-- `tools/vehicles/rebuild_banwa_dalagan_1996.py` in the package root: repeatable geometry builder, GLB exporter, validation, and software preview renderer.
+- `previews/`: eleven views rendered from the exported and re-imported GLB, plus a contact sheet.
+- `banwa_dalagan_1996_modular.blend`: editable Blender scene, with separate named parts and attachment parents.
+- `scripts/vehicles/remake-lancer-pizza.py`: repeatable Blender builder, GLB export, validation and render setup.
 
-The original uploaded GLB is unchanged. Its axle positions, wheelbase, track, and wheel radius were retained; the exterior, wheels, and internal structure were rebuilt.
+The production GLB has been replaced. The baseline in `scripts/vehicles/source/dalagan_modular_baseline.glb` supplies the retained structural shell and engine. Axle positions, wheelbase, track, wheel radius, attachment frames and panel mating boundaries are retained. Aftermarket body assets are regenerated against the remake.
 
 ## Dimensions and axes
 
@@ -29,7 +30,7 @@ The original uploaded GLB is unchanged. Its axle positions, wheelbase, track, an
 | Tire contact plane | Y = 0 |
 | Front axle | Z = 1.280 m |
 | Rear axle | Z = −1.220 m |
-| Full assembled triangle count | 19,732 |
+| Full assembled triangle count | 17,808 |
 
 Left/right naming is deliberate: FL and RL are on +X. The uploaded asset used the opposite labels. Match vehicle-controller wheel bindings to the convention above.
 
@@ -63,7 +64,7 @@ Wheel nodes: `wheel_fl`, `wheel_fr`, `wheel_rl`, `wheel_rr`. Each wheel contains
 - All nodes have identity rotation and unit scale. Attachment nodes carry translations; replaceable mesh vertices are expressed relative to their attachment parent.
 - Load a replacement under the corresponding attachment node with local position `(0,0,0)`, identity rotation and scale one.
 - Preserve the ordered mating boundaries of the stock part. `mounting_interfaces.json` records skin perimeters and bumper upper seam loops in world coordinates. Subtract the attachment translation to convert these to slot-local coordinates.
-- For multi-component parts such as spoilers, use the stock GLB feet and its mounting frame as the precise template. A perimeter loop alone does not describe every mount surface.
+- For multi-component parts such as spoilers, use the stock GLB feet and its mounting frame as the precise template. The interface file records the remake's raised wing outline. A perimeter loop alone does not describe every mount surface.
 - Hood pivot is at its rear edge. Rotation around local X can be used for opening, with clearance checked in your animation system.
 - Keep the permanent shell in place when removing cosmetics. Rockers, inner wheel housings and bumper supports remain visible.
 - Chin and lip are independent add-ons at distinct heights. Hide these too for an unobstructed bumper-support view. A future bumper variant must retain their interface or supply compatible variants.
@@ -76,21 +77,23 @@ The exterior color is entirely in the `paint` material's base color; no baked co
 
 ## Validation and visual review
 
-The builder checks every closed component for zero-area triangles, duplicate indexed triangles and non-manifold edges. GLB is then read back from disk; required nodes and wheel bounds are checked. `validation.json` records measured dimensions and the conservative engine-to-hood clearance. The complete engine mesh is below even the lowest point of the hood skin; ancillary bay components also remain under the hood.
+The builder re-imports the delivered GLB and checks zero-area triangles, welded non-manifold edges, attachment parentage, attachment translations, wheel radii and triangle budget. `validation.json` records these results and measured dimensions. The engine and its accessories retain their original positions below the bonnet.
 
-Previews include front-left, rear-left, left side, hood removed, both front fenders removed, front bumper removed, rear bumper removed, spoiler removed, and exploded. The exported GLB, rather than separate presentation geometry, supplies the car triangles in every preview. Camera, lighting, background and floor are not exported in the asset.
+Previews include front-left, rear-left, left side, hood removed, both front fenders removed, front bumper removed, rear bumper removed, spoiler removed, exploded, front and rear. The exported GLB supplies the car triangles in every preview. Camera, lighting, background and floor are not exported in the asset.
 
 The assembled and removal renders were inspected, and visible lamp clipping in the first iteration was corrected. Component-level manifold checks are not a proof that all independent solids are globally intersection-free; structural contacts and overlapping mount surfaces are intentional. This is a visual asset, with no collision mesh, LODs, UV atlas, rig, suspension model or in-game integration. Bumper vents are dark inset-style faces with grille detail, not through-openings. Check appearance under the game's own lighting and renderer before replacing the production vehicle.
 
 ## Rebuild
 
-From the package root, with Python 3, NumPy and Pillow installed:
+From the package root, with Blender installed:
 
 ```sh
-python tools/vehicles/rebuild_banwa_dalagan_1996.py
+blender --background --factory-startup --python scripts/vehicles/remake-lancer-pizza.py
+node scripts/build-body-part-models.mjs
+python3 scripts/vehicles/pizza-contact-sheet.py
 ```
 
-The script writes GLB, interface metadata, validation and previews under `assets/vehicles/banwa_dalagan_1996/`. It does not read or overwrite the uploaded source model. Adjust the dimensions and panel definitions in the source, then rerun to produce consistent replacements.
+The Blender script writes the GLB, `.blend`, validation and previews under `public/model/`. It reads the baseline, preserves attachment frames and panel mating loops, and updates the spoiler outline in `mounting_interfaces.json`. The contact-sheet script requires Pillow. Run the body-part builder after geometry changes to keep replacement panels synchronized.
 
 ## Game integration
 
@@ -99,9 +102,7 @@ asset's +X-left coordinates to the game's +X-right coordinates; the supplied
 wheel and panel names are retained.
 
 The rear spoiler and `attach_spoiler_rear` have been moved 0.18 m rearward.
-Its mount is now `[0, 0.845, -1.88]`; `mounting_interfaces.json` and the
-embedded asset in `banwa_dalagan_viewer.html` use this corrected position.
-The supplied preview images show the original position.
+Its mount remains `[0, 0.845, -1.88]`; the Blender remake and previews use this position.
 
 Stock panels are hidden when their aftermarket replacements are installed.
 Paired skirts and mirrors are handled together. Replacement hood, fender,

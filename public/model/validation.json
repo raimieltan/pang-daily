@@ -1,43 +1,158 @@
 {
-  "triangles": 19732,
-  "bounds_min": [
-    -0.913,
-    0.0,
-    -2.2
+  "generator": "Blender 5.2.2 LTS",
+  "source": "remake-lancer-pizza.py",
+  "triangles": 17808,
+  "nodes": 65,
+  "materials": 14,
+  "dimensions": [
+    1.8259999752044678,
+    1.3949999809265137,
+    4.389000177383423
   ],
-  "bounds_max": [
-    0.913,
-    1.3947551020408164,
-    2.1889999999999996
-  ],
-  "dimensions_xyz": [
-    1.826,
-    1.3947551020408164,
-    4.388999999999999
-  ],
-  "wheelbase": 2.5,
-  "track": 1.456,
-  "wheel_radius": 0.3,
-  "left": "+X",
-  "issues": [],
-  "required_nodes_present": true,
-  "export_reimport_bounds_match": true,
-  "mesh_nodes": 52,
-  "attachment_nodes": [
-    "attach_fender_fr",
-    "attach_sideskirt_r",
-    "attach_fender_fl",
-    "attach_sideskirt_l",
-    "attach_hood",
-    "attach_trunk",
-    "attach_bumper_front",
-    "attach_bumper_rear",
-    "attach_chin_front",
-    "attach_lip_front",
-    "attach_spoiler_rear",
-    "attach_engine"
-  ],
-  "engine_max_y": 0.6650000095367432,
-  "hood_min_y": 0.7810000032186508,
-  "engine_clearance_conservative": 0.11599999368190761
+  "slots": {
+    "hood": {
+      "translation": [
+        0.0,
+        0.875,
+        0.6840000152587891
+      ],
+      "part": "hood_stock",
+      "valid": true
+    },
+    "fender_fl": {
+      "translation": [
+        0.6840000152587891,
+        0.8600000143051147,
+        0.6639999747276306
+      ],
+      "part": "fender_fl_stock",
+      "valid": true
+    },
+    "fender_fr": {
+      "translation": [
+        -0.6840000152587891,
+        0.8600000143051147,
+        0.6639999747276306
+      ],
+      "part": "fender_fr_stock",
+      "valid": true
+    },
+    "bumper_front": {
+      "translation": [
+        0.0,
+        0.6510000228881836,
+        1.8270000219345093
+      ],
+      "part": "bumper_front_stock",
+      "valid": true
+    },
+    "bumper_rear": {
+      "translation": [
+        0.0,
+        0.6510000228881836,
+        -1.8270000219345093
+      ],
+      "part": "bumper_rear_stock",
+      "valid": true
+    },
+    "sideskirt_l": {
+      "translation": [
+        0.7900000214576721,
+        0.20000000298023224,
+        -0.0
+      ],
+      "part": "sideskirt_l_stock",
+      "valid": true
+    },
+    "sideskirt_r": {
+      "translation": [
+        -0.7900000214576721,
+        0.20000000298023224,
+        -0.0
+      ],
+      "part": "sideskirt_r_stock",
+      "valid": true
+    },
+    "chin_front": {
+      "translation": [
+        0.0,
+        0.17599999904632568,
+        2.119999885559082
+      ],
+      "part": "chin_front_stock",
+      "valid": true
+    },
+    "lip_front": {
+      "translation": [
+        0.0,
+        0.1469999998807907,
+        2.1670000553131104
+      ],
+      "part": "lip_front_stock",
+      "valid": true
+    },
+    "spoiler_rear": {
+      "translation": [
+        0.0,
+        0.8450000286102295,
+        -1.8799999952316284
+      ],
+      "part": "spoiler_rear_stock",
+      "valid": true
+    },
+    "engine": {
+      "translation": [
+        0.0,
+        0.30000001192092896,
+        1.2000000476837158
+      ],
+      "part": "engine_stock",
+      "valid": true
+    },
+    "trunk": {
+      "translation": [
+        0.0,
+        0.8849999904632568,
+        -1.0850000381469727
+      ],
+      "part": "trunk_stock",
+      "valid": true
+    }
+  },
+  "wheels": {
+    "wheel_fl": {
+      "origin": [
+        0.7279999852180481,
+        0.30000001192092896,
+        1.2799999713897705
+      ],
+      "radius": 0.30000001192092896
+    },
+    "wheel_fr": {
+      "origin": [
+        -0.7279999852180481,
+        0.30000001192092896,
+        1.2799999713897705
+      ],
+      "radius": 0.30000001192092896
+    },
+    "wheel_rl": {
+      "origin": [
+        0.7279999852180481,
+        0.30000001192092896,
+        -1.2200000286102295
+      ],
+      "radius": 0.30000001192092896
+    },
+    "wheel_rr": {
+      "origin": [
+        -0.7279999852180481,
+        0.30000001192092896,
+        -1.2200000286102295
+      ],
+      "radius": 0.30000001192092896
+    }
+  },
+  "zero_area_triangles": 0,
+  "non_manifold_edges": {}
 }
