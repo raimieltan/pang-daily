@@ -12,6 +12,7 @@ import { bindMaintenanceStore } from "@/state/maintenanceStore";
 import { bindPerformanceStore } from '@/state/performanceStore';
 import { bindAutoPartsStore } from '@/state/autoPartsStore';
 import { bindCarDealerStore } from '@/state/carDealerStore';
+import { bindTuningStore } from '@/state/tuningStore';
 import { bindJobStore } from "@/state/jobStore";
 import { bindMarketStore } from "@/state/marketStore";
 import { bindSocialStore } from "@/state/socialStore";
@@ -49,6 +50,7 @@ export function GameCanvas({ bootstrap, onBootstrapStale }: { bootstrap: Runtime
           bindPerformanceStore(game.events),
           bindAutoPartsStore(game.events),
           bindCarDealerStore(game.events),
+          bindTuningStore(game.events),
           // A bought car only parks at home once the runtime is rebuilt from the new save; wait
           // until the player leaves the lot so the receipt stays readable.
           bootstrapRefreshAfterPurchase(game.events, () => stale.current?.()),

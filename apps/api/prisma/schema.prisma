@@ -193,6 +193,7 @@ model Vehicle {
   paint               String            @db.VarChar(7)
   rideHeightM         Decimal           @default(0) @db.Decimal(5, 3)
   stockSpoilerRemoved Boolean           @default(false)
+  tune                String            @default("street") @db.VarChar(16)
   updatedAt           DateTime          @updatedAt @db.Timestamptz(3)
   player              PlayerProfile     @relation("OwnedVehicles", fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   condition           VehicleCondition?

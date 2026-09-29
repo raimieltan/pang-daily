@@ -62,6 +62,7 @@ import { TireSystem } from "../vehicles/TireSystem";
 import { surfaceResolver } from "../world/surfaceAt";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
+import { TuningSystem } from "../vehicles/TuningSystem";
 import { PLAYER_CARS, STARTER_SEDAN, parkedPlayerCars, playerCar } from "../vehicles/VehicleDefinition";
 import { VehicleModel } from "../vehicles/VehicleModel";
 import { HomeGarage } from "../vehicles/HomeGarage";
@@ -250,6 +251,7 @@ export const hubScene: SceneDefinition = {
     }));
     addSystem(jobSystem);
     addSystem(new CustomizationSystem(bridge, inventory, maintainedCar, talyer));
+    addSystem(new TuningSystem(bridge, inventory, session, maintainedCar, talyer));
     addSystem(new WheelSystem(bridge, inventory, maintainedCar));
     tires.useShop(session, talyer);
   addSystem(new PerformanceSystem(inventory, maintainedCar));

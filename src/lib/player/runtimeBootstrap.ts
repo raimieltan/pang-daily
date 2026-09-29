@@ -3,6 +3,7 @@ import type { InventorySave, InventoryItem } from '@/game-core/inventory/Invento
 import type { JobSave } from '@/game-core/jobs/JobSession';
 import { centavos } from '@/game-core/economy/economy';
 import { partDefinition, type PartSlot } from '@/game-core/parts/parts';
+import { DEFAULT_TUNE } from '@/game-core/tuning/tunes';
 
 import type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
 export type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
@@ -65,7 +66,8 @@ export function runtimeBootstrap(dto: PlayerBootstrap): RuntimeBootstrap {
     inventory: { version: 1, serial: items.length, items, installed,
       retiredKeys: dto.inventory.parts.filter(part => part.retired).map(part => part.acquisitionKey),
       appearance: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, { paint: vehicle.paint, rideHeightM: vehicle.rideHeightM }])),
-      stockSpoilerRemoved: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, vehicle.stockSpoilerRemoved])) },
+      stockSpoilerRemoved: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, vehicle.stockSpoilerRemoved])),
+      tunes: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, vehicle.tune ?? DEFAULT_TUNE])) },
     jobs: { version: 1, serial: jobSerial, history, current: current ? { runId: current.runId, jobId: current.definitionId,
       status: current.status, objectiveIndex: current.objectiveIndex, elapsedSeconds: safeInteger(current.elapsedMs) / 1000,
       cargoLoaded: current.cargoLoaded, cargoDamage: current.cargoDamage, ...(current.reason ? { reason: current.reason } : {}) } : null },

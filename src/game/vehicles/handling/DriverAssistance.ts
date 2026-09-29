@@ -90,7 +90,9 @@ export class DriverAssistance {
     const risk = Math.max(smoothstep(.35, .75, Math.abs(motion.rearSlipRatio)),
       smoothstep(45 * DEG, 90 * DEG, Math.abs(motion.yawRate)) * forwardGate);
     const trim = keyboard ? profile.trim : device === 'controller' ? Math.min(.12, profile.trim) : 0;
-    t.throttleAssisted = t.throttleFiltered * (1 - risk * trim);
+    // A digital W through a road corner acts like a feathered pedal; once sliding it hands full throttle back.
+    const cornering = keyboard ? Math.abs(t.actualSteering) / max * (1 - drift) * smoothstep(5, 20, speed) : 0;
+    t.throttleAssisted = t.throttleFiltered * (1 - risk * trim) * (1 - (config.throttleFeather ?? 0) * cornering);
     t.brake = moveToward(t.brake, clamp(input.brake, 0, 1), (input.brake > t.brake ? 7 : 9) * dt);
     t.handbrake = moveToward(t.handbrake, clamp(input.handbrake, 0, 1), (input.handbrake > t.handbrake ? 12 : 18) * dt);
     return t;

@@ -27,7 +27,7 @@ it('drives a colliding Havok car through normal controller inputs', () => {
   const engine = new NullEngine(), scene = new Scene(engine);
   const world = new PhysicsWorld(scene, havok);
   const road = buildDebugRoad(scene);
-  const config = resolveHandlingPreset(HANDLING_PRESETS, STARTER_SEDAN.handlingPreset);
+  const config = resolveHandlingPreset(HANDLING_PRESETS, STARTER_SEDAN.tunes.street);
   const body = new VehicleBody(world, STARTER_SEDAN.collision, config.chassis.massKg, 'test-ai');
   const points = Array.from({ length: 100 }, (_, i) => ({ x: 0, y: 0, z: i * 4, speed: 23 }));
   const driver = new AIDriver(points, DRIVER_SKILLS[3], { aggression: .4, patience: .6,
@@ -62,7 +62,7 @@ it('drives on simulated tires: a front-left blowout slows the AI, pulls it, and 
     const engine = new NullEngine(), scene = new Scene(engine);
     const world = new PhysicsWorld(scene, havok);
     const road = buildDebugRoad(scene);
-    const config = resolveHandlingPreset(HANDLING_PRESETS, STARTER_SEDAN.handlingPreset);
+    const config = resolveHandlingPreset(HANDLING_PRESETS, STARTER_SEDAN.tunes.street);
     const body = new VehicleBody(world, STARTER_SEDAN.collision, config.chassis.massKg, 'test-ai-tires');
     const points = Array.from({ length: 100 }, (_, i) => ({ x: 0, y: 0, z: i * 4, speed: 23 }));
     const driver = new AIDriver(points, DRIVER_SKILLS[3], { aggression: .4, patience: .6,

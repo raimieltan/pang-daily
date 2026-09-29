@@ -130,12 +130,34 @@ export const HANDLING_PRESETS = {
       balance: { understeer: 0.38, liftOffRotation: 0.11 },
     },
   },
-  rwd_box_turbo: {
-    name: "'80s RWD turbo sedan",
-    description: "Longitudinal turbo four and a live rear axle. Balanced turn-in with progressive power oversteer.",
+  fwd_worn_sedan_drift: {
+    name: "Worn sedan · drift tune",
+    description: "Looser rear, stronger handbrake and less stability control. Swings the tail on a lift.",
     extends: "fwd_worn_sedan",
     overrides: {
-      mechanical: STOCK_MECHANICAL,
+      tires: { rearGrip: .94 },
+      balance: { understeer: .36, rearSlideFalloff: .2, liftOffRotation: .2 },
+      assists: { stability: .15 },
+      handbrake: { rearGripMultiplier: .38, rearBrakeMps2: 6.5 },
+    },
+  },
+  fwd_hatch_drift: {
+    name: "'90s FWD hot hatch · drift tune",
+    description: "Looser rear, stronger handbrake and less stability control. Rotates hard on a lift.",
+    extends: "fwd_hatch",
+    overrides: {
+      tires: { rearGrip: .97 },
+      balance: { understeer: .3, rearSlideFalloff: .22, liftOffRotation: .24 },
+      assists: { stability: .15 },
+      handbrake: { rearGripMultiplier: .38, rearBrakeMps2: 6.5 },
+    },
+  },
+  rwd_box_turbo: {
+    name: "'80s RWD turbo sedan · street tune",
+    description: "Longitudinal turbo four and a live rear axle. Feathered throttle and light TCS keep it planted; slides only on request.",
+    extends: "fwd_worn_sedan",
+    overrides: {
+      mechanical: { ...STOCK_MECHANICAL, engine: { ...STOCK_MECHANICAL.engine, boostRpm: 2600 }, tcs: 'sport', throttleFeather: .45 },
       pedals: { throttleRise: 3.8, throttleFall: 6, brakeRise: 7, brakeFall: 9 },
       chassis: { massKg: 1090, wheelbaseM: 2.5, frontWeight: .53, cgHeightM: .49, trackWidthM: 1.456, yawInertiaScale: 1.05 },
       drive: { drivetrain: "RWD", accelerationMps2: 5.2, topSpeedKmh: 190, engineBrakingMps2: 1.1 },
@@ -145,8 +167,18 @@ export const HANDLING_PRESETS = {
       assists: { traction: 0, stability: 0 },
     },
   },
+  rwd_box_drift: {
+    name: "'80s RWD turbo sedan · drift tune",
+    description: "Same engine; clutch-type diff, extra lock, TCS off and a sharp throttle. Holds angle on the gas.",
+    extends: "rwd_box_turbo",
+    overrides: {
+      mechanical: { tcs: 'off', throttleFeather: 0, differential: { type: 'lsd', lock: .45, preloadNm: 35 },
+        steering: { roadAngleDeg: 36, driftAngleDeg: 48 } },
+      pedals: { throttleRise: 5.5 },
+    },
+  },
   rwd_street: {
-    name: 'RWD street / LSD', description: '250 hp, street LSD and 42-degree steering.', extends: 'rwd_box_turbo',
+    name: 'RWD street / LSD', description: '250 hp, street LSD and 42-degree steering.', extends: 'rwd_box_drift',
     overrides: { mechanical: { engine: { torqueNm: 350, clutchTorqueNm: 500 }, differential: { type: 'lsd', lock: .4, preloadNm: 40 },
       steering: { roadAngleDeg: 38, driftAngleDeg: 42 } } },
   },

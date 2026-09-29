@@ -1,5 +1,6 @@
 import { BANWA_DALAGAN_1996, BANWA_SILAK_1983, HIRAYA_KIDLAT_1997, type VehicleDefinition } from "@/game-core/vehicles";
 import type { HandlingPresetId } from "./handling/presets";
+import type { TuneId } from "../../game-core/tuning/tunes";
 
 /**
  * Physics representation of a car, in car space (+z forward, +x right, y = 0 at the
@@ -32,7 +33,8 @@ export type VehicleCollisionConfig = {
  */
 export type VehicleRuntimeDefinition = {
   spec: VehicleDefinition;
-  handlingPreset: HandlingPresetId;
+  /** Handling preset per Tito Jun tune; `street` is how the car leaves the factory. */
+  tunes: Record<TuneId, HandlingPresetId>;
   collision: VehicleCollisionConfig;
   /** HUD-only gear readout: gear = number of thresholds passed. */
   gearThresholdsKmh: readonly number[];
@@ -40,7 +42,7 @@ export type VehicleRuntimeDefinition = {
 
 export const STARTER_SEDAN: VehicleRuntimeDefinition = {
   spec: BANWA_DALAGAN_1996,
-  handlingPreset: "fwd_worn_sedan",
+  tunes: { street: "fwd_worn_sedan", drift: "fwd_worn_sedan_drift" },
   collision: {
     // Matches banwa_dalagan_1996_modular.glb: body 1.69 × 4.33 m, roof at 1.40 m, wheels r 0.30 at ±0.728.
     body: { width: 1.66, height: 1.1, length: 4.3, bottomY: 0.25, centerZ: 0 },
@@ -56,7 +58,7 @@ export const STARTER_SEDAN: VehicleRuntimeDefinition = {
 
 export const STARTER_HATCH: VehicleRuntimeDefinition = {
   spec: HIRAYA_KIDLAT_1997,
-  handlingPreset: "fwd_hatch",
+  tunes: { street: "fwd_hatch", drift: "fwd_hatch_drift" },
   collision: {
     // Matches civic/ek_hatch_1997_modular.glb: body 1.71 × 4.23 m, roof at 1.37 m, wheels r 0.295 at ±0.74.
     body: { width: 1.68, height: 1.08, length: 4.2, bottomY: 0.25, centerZ: 0 },
@@ -72,7 +74,7 @@ export const STARTER_HATCH: VehicleRuntimeDefinition = {
 
 export const RWD_BOX_SEDAN: VehicleRuntimeDefinition = {
   spec: BANWA_SILAK_1983,
-  handlingPreset: "rwd_box_turbo",
+  tunes: { street: "rwd_box_turbo", drift: "rwd_box_drift" },
   collision: {
     body: { width: 1.68, height: 1.1, length: 4.34, bottomY: .25, centerZ: 0 },
     wheels: { halfTrack: .728, frontZ: 1.28, rearZ: -1.22, radius: .3 },

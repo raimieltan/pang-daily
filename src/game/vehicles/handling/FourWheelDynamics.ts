@@ -146,7 +146,9 @@ export class FourWheelDynamics {
     const torqueCurve = clamp(1 - .22 * (rpmFraction - 1) ** 2, .45, 1);
     const limiter = 1 - smoothstep(e.redlineRpm - 150, e.redlineRpm, this.powertrain.engineRpm);
     const idleTorque = clamp((e.idleRpm - this.powertrain.engineRpm) * .5, 0, e.torqueNm * .4);
-    const engineTorque = input.engineAvailable === false ? 0 : throttle * e.torqueNm * torqueCurve * limiter + idleTorque;
+    // Off boost a small turbo makes ~60% torque; it spools in on the way to peak torque.
+    const boost = e.boostRpm ? .6 + .4 * smoothstep(e.boostRpm, e.peakTorqueRpm, this.powertrain.engineRpm) : 1;
+    const engineTorque = input.engineAvailable === false ? 0 : throttle * e.torqueNm * torqueCurve * boost * limiter + idleTorque;
     // Closed-throttle pumping loss is the engine braking; it reaches the wheels only through the clutch.
     const frictionTorque = 8 + engineOmega * (.025 + .05 * (1 - throttle));
     this.powertrain.engineRpm = clamp((engineOmega + (engineTorque - coupling - frictionTorque) / e.inertia * dt) * 60 / TAU, 0, e.redlineRpm + 200);

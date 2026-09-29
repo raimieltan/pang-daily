@@ -13,7 +13,7 @@ describe('Lancer inspired modular RWD car', () => {
   it('selects a distinct RWD runtime with matching chassis and rear drive', () => {
     const car = playerCar('banwa_silak_1983');
     expect(car.spec).toBe(BANWA_SILAK_1983);
-    const config = resolveHandlingPreset(HANDLING_PRESETS, car.handlingPreset);
+    const config = resolveHandlingPreset(HANDLING_PRESETS, car.tunes.street);
     expect(config.drive.drivetrain).toBe('RWD');
     expect(config.chassis.frontWeight).toBe(car.spec.weight.frontWeightRatio);
     expect(config.chassis.massKg).toBe(car.spec.weight.curbKg);
@@ -21,7 +21,7 @@ describe('Lancer inspired modular RWD car', () => {
   });
 
   it('can accelerate on rear contact alone but not front contact alone', () => {
-    const config = resolveHandlingPreset(HANDLING_PRESETS, playerCar('banwa_silak_1983').handlingPreset);
+    const config = resolveHandlingPreset(HANDLING_PRESETS, playerCar('banwa_silak_1983').tunes.street);
     const rear = new ArcadeHandlingModel(config);
     const front = new ArcadeHandlingModel(config);
     for (let i = 0; i < 120; i++) {

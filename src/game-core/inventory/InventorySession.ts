@@ -7,6 +7,7 @@ import { performancePart } from '../performance/catalog';
 import { checkPerformanceCompatibility } from '../performance/compatibility';
 import type { InstallContext } from '../performance/schema';
 import type { VehicleDefinition } from '../vehicles/VehicleDefinition';
+import { DEFAULT_TUNE, tuneIdSchema, type TuneId } from '../tuning/tunes';
 
 /** How the true condition of an item came out. Installation and seller trust hook in here later. */
 export const REVEAL_METHODS = ['mechanic', 'known'] as const;
@@ -35,6 +36,8 @@ const inventorySaveSchema = z.object({ version: z.literal(1), serial: z.number()
   retiredKeys: z.array(z.string().min(1)).default([]),
   appearance: z.record(z.string().min(1), vehicleAppearanceSchema).default({}),
   stockSpoilerRemoved: z.record(z.string().min(1), z.boolean()).optional(),
+  /** Tito Jun's setup per car; absent = street. */
+  tunes: z.record(z.string().min(1), tuneIdSchema).optional(),
 })
   .refine(save => new Set(save.items.map(i => i.id)).size === save.items.length, 'duplicate item id')
   .refine(save => new Set(save.items.flatMap(i => i.key ? [i.key] : [])).size === save.items.filter(i => i.key).length, 'duplicate item key')
@@ -97,6 +100,17 @@ export class InventorySession {
       if (Object.keys(slots).length === 0) delete this.state.installed[vehicleId];
     }
     this.changed();
+  }
+
+  tune(vehicleId: string): TuneId { return this.state.tunes?.[vehicleId] ?? DEFAULT_TUNE; }
+
+  setTune(vehicleId: string, tune: TuneId): TuneId | Rejection {
+    if (this.remote) return { rejected: 'Inventory can only change through a server-confirmed action.' };
+    if (!vehicleId || !tuneIdSchema.safeParse(tune).success) return { rejected: 'Unknown tune.' };
+    if (this.tune(vehicleId) === tune) return tune;
+    (this.state.tunes ??= {})[vehicleId] = tune;
+    this.changed();
+    return tune;
   }
 
   appearance(vehicleId: string): VehicleAppearance | null {

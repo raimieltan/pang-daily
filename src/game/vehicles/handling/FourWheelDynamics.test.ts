@@ -248,6 +248,15 @@ describe('four-wheel mechanics', () => {
     expect(engaged.state.vx).toBeLessThan(open.state.vx - .5);
   });
 
+  it('street tune stays planted on keyboard W + full steer through town corners; drift tune slides', () => {
+    for (const kph of [25, 40, 60]) {
+      const street = drive(car(kph), 3, { ...neutral, throttle: 1, steer: -1 });
+      expect(street.angle, `street ${kph} km/h`).toBeLessThan(8 * Math.PI / 180);
+    }
+    const drift = drive(car(40, 'rwd_box_drift'), 3, { ...neutral, throttle: 1, steer: -1 });
+    expect(drift.angle).toBeGreaterThan(15 * Math.PI / 180);
+  });
+
   it('uses the same solver for AI, controller and wheel controls and any drivetrain', () => {
     for (const drivetrain of ['FWD', 'RWD', 'AWD'] as const) {
       const m = car(0, 'rwd_box_turbo', { drive: { drivetrain } });

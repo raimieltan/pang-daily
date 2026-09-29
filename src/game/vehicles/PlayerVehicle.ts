@@ -13,6 +13,7 @@ import type { GameSystem } from "../engine/types";
 import type { PhysicsWorld } from "../physics/PhysicsWorld";
 import { resolveHandlingPreset } from "./handling/HandlingConfig";
 import { HANDLING_PRESETS, isHandlingPresetId, type HandlingPresetId } from "./handling/presets";
+import type { TuneId } from "../../game-core/tuning/tunes";
 import { VehicleBody, type VehiclePose } from "./VehicleBody";
 import { VehicleController, type DriverInputSource } from "./VehicleController";
 import type { VehicleRuntimeDefinition } from "./VehicleDefinition";
@@ -176,7 +177,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     options: PlayerVehicleOptions,
   ): Promise<PlayerVehicle> {
     const { definition } = options;
-    const presetId = options.presetId ?? definition.handlingPreset;
+    const presetId = options.presetId ?? definition.tunes.street;
     const config = resolveHandlingPreset(HANDLING_PRESETS, presetId);
     const body = new VehicleBody(world, definition.collision, config.chassis.massKg, definition.spec.id);
     const controller = new VehicleController(world, body, config, input);
@@ -378,6 +379,14 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.releaseImpact();
     this.controller.dispose();
     this.body.dispose();
+  }
+
+  /** Tito Jun's saved setup. A `?handling=` debug preset keeps priority for testing. */
+  useTune(tune: TuneId): void {
+    const presetId = this.options.presetId ?? this.definition.tunes[tune];
+    if (presetId === this.presetId) return;
+    this.applyPreset(presetId);
+    this.publishDebugInfo();
   }
 
   private applyPreset(presetId: HandlingPresetId): void {

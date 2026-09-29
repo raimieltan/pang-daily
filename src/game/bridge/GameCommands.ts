@@ -31,6 +31,7 @@ export type GameCommandMap = {
   quoteAutoPart: { partId: string };
   buyAutoPart: { quoteId: string };
   openCarDealer: void;
+  setVehicleTune: { tune: import('../../game-core/tuning/tunes').TuneId };
   closeCarDealer: void;
   quoteCar: { definitionId: string };
   buyCar: { quoteId: string };
@@ -160,6 +161,7 @@ export interface GameCommands {
   quoteAutoPart(partId: string): void;
   buyAutoPart(quoteId: string): void;
   openCarDealer(): void;
+  setVehicleTune(tune: import('../../game-core/tuning/tunes').TuneId): void;
   closeCarDealer(): void;
   quoteCar(definitionId: string): void;
   buyCar(quoteId: string): void;
@@ -225,6 +227,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),
     buyAutoPart: quoteId => dispatch('buyAutoPart', { quoteId }),
     openCarDealer: () => dispatch('openCarDealer'),
+    setVehicleTune: tune => dispatch('setVehicleTune', { tune }),
     closeCarDealer: () => dispatch('closeCarDealer'),
     quoteCar: definitionId => dispatch('quoteCar', { definitionId }),
     buyCar: quoteId => dispatch('buyCar', { quoteId }),

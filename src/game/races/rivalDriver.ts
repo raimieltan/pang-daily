@@ -18,7 +18,7 @@ export const TIER_PACE: Readonly<Record<RaceTier, number>> = { 1: .8, 2: .85, 3:
 /** The rival's own build and tune; anonymous races run a stock Dalagan. */
 export function rivalCar(route: RaceDefinition) {
   const definition = playerCar(route.rival ? npcCarId(NPC_CAR_BUILDS[route.rival.build]) : null);
-  const base = resolveHandlingPreset(HANDLING_PRESETS, definition.handlingPreset);
+  const base = resolveHandlingPreset(HANDLING_PRESETS, definition.tunes.street);
   const stock = calculateVehiclePerformance(definition.spec).stats;
   // `config` is the car as a whole (line planning); `physics` drives it, with the wheel set's grip
   // left to the simulated tires (`wheels`) so it isn't counted twice.

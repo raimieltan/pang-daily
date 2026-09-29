@@ -13,6 +13,8 @@ export const mechanicalConfigSchema = z.strictObject({
     gearRatios: z.array(positive).min(1), reverseRatio: positive,
     finalDrive: positive, efficiency: unit, clutchTorqueNm: positive,
     shiftSeconds: positive,
+    /** Turbo spool: torque climbs from off-boost to full between this rpm and peak torque. */
+    boostRpm: positive.optional(),
   }),
   differential: z.strictObject({ type: z.enum(['open', 'lsd', 'welded']), lock: unit, preloadNm: z.number().nonnegative() }),
   wheel: z.strictObject({ radiusM: positive, inertia: positive }),
@@ -30,6 +32,8 @@ export const mechanicalConfigSchema = z.strictObject({
   }),
   steering: z.strictObject({ roadAngleDeg: z.number().min(5).max(65), driftAngleDeg: z.number().min(5).max(65), rackRate: positive, rackAcceleration: positive, returnRate: positive }),
   assistance: assistanceProfileSchema,
+  /** Keyboard only: share of throttle held back at full road lock (a feathered pedal). 0 = none. */
+  throttleFeather: unit.optional(),
   tcs: z.enum(['off', 'sport', 'on']),
   esc: z.boolean(),
   abs: z.boolean(),

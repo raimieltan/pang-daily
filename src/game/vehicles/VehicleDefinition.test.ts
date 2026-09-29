@@ -6,7 +6,7 @@ import { PLAYER_CARS, STARTER_SEDAN, playerCar } from "./VehicleDefinition";
 /** The game-core spec, the handling preset and the collision shapes describe one car; keep them agreeing. */
 describe.each(Object.values(PLAYER_CARS))("$spec.id runtime binding", (car) => {
   const { spec, collision } = car;
-  const handling = resolveHandlingPreset(HANDLING_PRESETS, car.handlingPreset);
+  const handling = resolveHandlingPreset(HANDLING_PRESETS, car.tunes.street);
 
   it("tunes handling from the spec's drivetrain, weight and brakes", () => {
     expect(handling.drive.drivetrain).toBe(spec.drivetrain.layout);

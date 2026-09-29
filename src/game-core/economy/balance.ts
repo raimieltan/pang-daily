@@ -163,3 +163,5 @@ export const PERFORMANCE_LABOR = {
   engine: 3500, fuel_system: 1800, intake: 250, exhaust: 600, turbo: 2500,
   cooling: 650, ecu: 800, clutch: 1500, transmission: 2500, differential: 1800, supporting_mod: 350,
 };
+/** Tito Jun re-aligns, re-maps and sets the diff for a street or drift tune. Flat per change. */
+export const TUNE_LABOR_PHP = 1200;

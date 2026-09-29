@@ -17,6 +17,7 @@ import { WheelSystem } from "../vehicles/WheelSystem";
 import { TireSystem } from "../vehicles/TireSystem";
 import { ExteriorSystem } from "../vehicles/ExteriorSystem";
 import { CustomizationSystem } from "../vehicles/CustomizationSystem";
+import { TuningSystem } from "../vehicles/TuningSystem";
 import { playerCar } from "../vehicles/VehicleDefinition";
 import { loadActiveCar } from "../vehicles/garageStorage";
 import { buildDebugRoad } from "../world/debugRoad";
@@ -81,6 +82,7 @@ export const drivingScene: SceneDefinition = {
     addSystem(player);
     addSystem(new MaintenanceSystem(bridge, session, player, () => controls.enabled));
     addSystem(new CustomizationSystem(bridge, inventory, player, () => 'Visit Tito Jun’s talyer for paint and suspension.'));
+    addSystem(new TuningSystem(bridge, inventory, session, player, () => 'Ask Tito Jun at the talyer to change your tune.'));
     addSystem(new WheelSystem(bridge, inventory, player));
     addSystem(new TireSystem(bridge, player, undefined, () => 'asphalt', tires ?? socialStorage));
   addSystem(new PerformanceSystem(inventory, player));

@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { randomUUID, randomBytes } from 'node:crypto';
 import { type PlayerCommand, type CommandReceipt, type TransactionHistory } from '@pang-daily/contracts';
 import { getVehicleDefinition } from '@pang-daily/game-core/vehicles/catalog';
+import { TUNES, TUNE_LABOR_PHP, type TuneId } from '@pang-daily/game-core/tuning/tunes';
 import type { VehicleCondition } from '@pang-daily/game-core/vehicles/VehicleDefinition';
 import { partDefinition } from '@pang-daily/game-core/parts/parts';
 import { InventorySession, type InventorySave } from '@pang-daily/game-core/inventory/InventorySession';
@@ -75,7 +76,8 @@ export class EconomyRepository {
     const defs = new Map(vehicles.map(v => [v.id, v.definitionId]));
     const save: InventorySave = { version: 1, serial: parts.length, retiredKeys: [], items: parts.map(p => ({ id: p.id, partId: p.partDefinitionId,
       key: p.acquisitionKey, condition: p.condition === null ? null : Number(p.condition), revealedBy: p.revealedBy, finish: p.finish, acquiredAt: p.acquiredAt.getTime(), origin: { kind: 'grant', reason: 'server-owned' } })),
-      installed: {}, appearance: Object.fromEntries(vehicles.map(v => [v.definitionId, { paint: v.paint, rideHeightM: Number(v.rideHeightM) }])) };
+      installed: {}, appearance: Object.fromEntries(vehicles.map(v => [v.definitionId, { paint: v.paint, rideHeightM: Number(v.rideHeightM) }])),
+      tunes: Object.fromEntries(vehicles.map(v => [v.definitionId, v.tune as TuneId])) };
     for (const install of installs) { const def = defs.get(install.vehicleId); if (!def) continue; save.installed[def] ??= {}; for (const slot of install.slots) save.installed[def][slot.slotId as keyof typeof save.installed[string]] = install.ownedPartId; }
     return new InventorySession(save);
   }
@@ -284,6 +286,13 @@ export class EconomyRepository {
           if (a.spoilerMode) { const slots = await tx.installedPartSlot.findMany({ where: { vehicleId: vehicle.id, slotId: 'spoiler' } }); for (const slot of slots) await this.removeInstallation(tx, playerId, slot.ownedPartId); }
           await tx.vehicle.update({ where: { id: vehicle.id }, data: { ...(a.paint !== undefined ? { paint: a.paint } : {}), ...(a.rideHeightM !== undefined ? { rideHeightM: a.rideHeightM } : {}), ...(a.spoilerMode ? { stockSpoilerRemoved: a.spoilerMode === 'none' } : {}) } }); receipt.resourceId = vehicle.id; break;
         }
+        case 'vehicle_tune': {
+          const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
+          if (vehicle.tune === a.tune) refuse('ALREADY_TUNED', `This car already runs the ${TUNES[a.tune].label.toLowerCase()} tune.`);
+          await pay(-php(TUNE_LABOR_PHP), 'TUNE_LABOR', 'talyer', command.key, `Tune: ${TUNES[a.tune].label}`, vehicle.id);
+          await tx.vehicle.update({ where: { id: vehicle.id }, data: { tune: a.tune } });
+          receipt.resourceId = vehicle.id; receipt.details = { tune: a.tune, laborPhp: TUNE_LABOR_PHP }; break;
+        }
         case 'vehicle_select': {
           const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
           await tx.playerProfile.update({ where: { id: playerId }, data: { activeVehicleId: vehicle.id } }); receipt.resourceId = vehicle.id; break;
@@ -435,7 +444,7 @@ export class EconomyRepository {
       }
       await progressSocial(tx, playerId, a, receipt);
       await advanceChapter(tx, playerId, receipt.resourceId ?? command.key);
-      if (['part_purchase','market_purchase','part_sell','part_install','part_remove','part_refinish','part_inspect','refund','vehicle_appearance'].includes(a.type)) await tx.inventory.update({ where: { playerId }, data: { revision: { increment: 1 } } });
+      if (['part_purchase','market_purchase','part_sell','part_install','part_remove','part_refinish','part_inspect','refund','vehicle_appearance','vehicle_tune'].includes(a.type)) await tx.inventory.update({ where: { playerId }, data: { revision: { increment: 1 } } });
       return receipt;
     });
     this.logger.log(JSON.stringify({ event: 'economy.command_completed', requestId, action: command.action.type, transactionId: result.transactionId, resourceId: result.resourceId, amountCentavos: result.amountCentavos }));

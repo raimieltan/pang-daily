@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { SocialState } from '@pang-daily/game-core/social/contract';
 import { vehicleTireStateSchema } from '@pang-daily/game-core/tires/TireSession';
+import { tuneIdSchema } from '@pang-daily/game-core/tuning/tunes';
 
 export const SAVE_VERSION = 2;
 export const CONTENT_VERSION = 'm3-content-1';
@@ -22,6 +23,8 @@ export const bootstrapSchema = z.object({
   vehicles: z.array(z.object({ id: z.string().uuid(), definitionId: z.string(), condition: vehicleCondition,
     conditionRevision: exactInteger, fuelLiters: z.number().nonnegative(), paint: z.string().regex(/^#[0-9a-f]{6}$/i),
     rideHeightM: z.number().min(-.15).max(.15), stockSpoilerRemoved: z.boolean(),
+    /** Tito Jun's setup; absent from older servers = street. */
+    tune: tuneIdSchema.optional(),
     /** Simulated wheel assemblies; `state` null = never saved (a stock set). */
     tires: z.object({ revision: exactInteger, state: vehicleTireStateSchema.nullable() }).optional() })).min(1),
   inventory: z.object({ revision: exactInteger,
@@ -67,6 +70,7 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('part_remove'), vehicleId: id, partId: id }),
     z.strictObject({ type: z.literal('part_refinish'), partId: id, finish }),
     z.strictObject({ type: z.literal('vehicle_appearance'), vehicleId: id, paint: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), rideHeightM: z.number().min(-.15).max(.15).optional(), spoilerMode: z.enum(['none','stock']).optional() }),
+    z.strictObject({ type: z.literal('vehicle_tune'), vehicleId: id, tune: tuneIdSchema }),
     z.strictObject({ type: z.literal('vehicle_select'), vehicleId: id }),
     z.strictObject({ type: z.literal('vehicle_checkpoint'), vehicleId: id, revision: exactInteger, conditionLoss: vehicleCondition, fuelConsumedMilliliters: z.number().int().min(0).max(45000), odometerDeltaMeters: z.number().int().min(0).max(100000) }),
     // Driving and roadside wheel work: validated against the saved tires so nothing heals or appears.
