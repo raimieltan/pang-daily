@@ -67,7 +67,8 @@ import { VehicleModel } from "../vehicles/VehicleModel";
 import { HomeGarage } from "../vehicles/HomeGarage";
 import { loadActiveCar, saveActiveCar } from "../vehicles/garageStorage";
 import { loadSocialSession } from '../social/socialStorage';
-import { HOME_PARKED_BAYS, HUB_LAYOUT, HUB_LOCATIONS } from "../world/hub/hubLayout";
+import { CAR_DEALER_DISPLAY_BAYS, HOME_PARKED_BAYS, HUB_LAYOUT, HUB_LOCATIONS } from "../world/hub/hubLayout";
+import { DisplayCar } from "../vehicles/DisplayCar";
 import { HubLocations, toVehiclePose } from "../world/hub/HubLocations";
 import { buildChunk, WorldKit } from "../world/WorldChunk";
 
@@ -163,6 +164,14 @@ export const hubScene: SceneDefinition = {
       if (signal.aborted) return garage.dispose();
       garages.push(garage);
       addSystem(garage);
+    }
+    // Banwa Motors shows the whole catalogue as stock, owned or not.
+    for (const [index, stock] of Object.values(PLAYER_CARS).entries()) {
+      const bay = CAR_DEALER_DISPLAY_BAYS[index];
+      if (!bay) break;
+      const display = await DisplayCar.create(scene, stock, toVehiclePose(bay));
+      if (signal.aborted) return display.dispose();
+      addSystem(display);
     }
     // NPC templates are keyed by their actual model, independently of account ownership.
     const templates: Record<string, VehicleModel> = { [driven.spec.id]: player.visual.model };

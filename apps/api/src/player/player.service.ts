@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { bootstrapSchema } from '@pang-daily/contracts';
-import { BANWA_DALAGAN_1996, HIRAYA_KIDLAT_1997 } from '@pang-daily/game-core/vehicles/catalog';
+import { VEHICLE_CATALOG } from '@pang-daily/game-core/vehicles/catalog';
 import { partDefinition, PART_SLOTS } from '@pang-daily/game-core/parts/parts';
 import { SOCIAL_CONTENT } from '@pang-daily/game-core/social/catalog';
 import { SocialSession } from '@pang-daily/game-core/social/SocialSession';
@@ -21,7 +21,7 @@ export class PlayerService {
     try {
       const dto = bootstrapSchema.parse(bootstrap);
       new SocialSession(SOCIAL_CONTENT, dto.social.state);
-      if (dto.vehicles.some(car => ![BANWA_DALAGAN_1996.id, HIRAYA_KIDLAT_1997.id].includes(car.definitionId)) ||
+      if (dto.vehicles.some(car => !Object.hasOwn(VEHICLE_CATALOG, car.definitionId)) ||
         dto.vehicles.some(car => car.fuelLiters > FUEL_CAPACITY_LITERS) ||
         dto.inventory.parts.some(part => !partDefinition(part.definitionId)) ||
         dto.inventory.installed.some(item => item.slots.some(slot => !(PART_SLOTS as readonly string[]).includes(slot)))) throw new Error('Unknown content reference');

@@ -131,6 +131,13 @@ export const HOME_PARKED_BAYS: readonly Pose[] = [
   { x: -74, z: 151.5, headingDeg: 180 },
 ];
 
+/** Banwa Motors stock, nosed toward the road in front of the kiosk (see `talyer()`). */
+export const CAR_DEALER_DISPLAY_BAYS: readonly Pose[] = [
+  { x: 74, z: 151, headingDeg: 200 },
+  { x: 79, z: 150.5, headingDeg: 180 },
+  { x: 84, z: 151, headingDeg: 160 },
+];
+
 export const HUB_LOCATIONS: readonly LocationData[] = [
   {
     id: "home",
@@ -360,8 +367,8 @@ function talyer() {
   a.zone({ id: 'auto_parts_counter', kind: 'interact', rect: rect(53, 149, 64, 152.5), locationId: 'talyer',
     interaction: { action: 'browse_auto_parts', label: 'Banwa Auto Supply · Brand-new parts', priority: 2 } });
 
-  // Second-hand car lot on the frontage east of the counter: a sales kiosk and bunting. Bought
-  // cars are delivered home, so the lot itself stays empty.
+  // Second-hand car lot on the frontage east of the counter: a sales kiosk, bunting and the stock
+  // out front (CAR_DEALER_DISPLAY_BAYS). Bought cars are delivered home.
   a.surface({ kind: 'concrete', center: [79, 154], size: [14, 16] });
   a.block({ center: [79, 1.4, 159.5], size: [6, 2.8, 3], color: WALL.cream, collide: true });
   a.block({ center: [79, 2.9, 159.2], size: [7, .2, 4], color: '#8a2f24' });
