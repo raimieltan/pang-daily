@@ -33,8 +33,10 @@ export class VehicleVisual {
     return new VehicleVisual(model);
   }
 
-  /** `steerAngle` in rad (right +), `forwardSpeed` in m/s along the car. */
-  update(dt: number, steerAngle: number, forwardSpeed: number, angularVelocities?: readonly number[]): void {
+  /** `steerAngle` in rad (right +), `forwardSpeed` in m/s along the car, `attitude` from the suspension. */
+  update(dt: number, steerAngle: number, forwardSpeed: number, angularVelocities?: readonly number[],
+    attitude?: { pitch: number; roll: number }): void {
+    if (attitude) this.model.setBodySway(attitude.pitch, attitude.roll);
     const { wheels } = this.model;
     // All wheels share one spin angle; they share a radius on every car so far.
     this.spin = (this.spin + (forwardSpeed / wheels[0].radius) * dt) % (Math.PI * 2);

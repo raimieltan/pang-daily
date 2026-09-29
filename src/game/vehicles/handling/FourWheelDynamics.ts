@@ -44,6 +44,7 @@ export class FourWheelDynamics {
   private initialized = false;
   private reverseTimer = 0;
   private shiftTimer = 0;
+  private upshifting = false;
   private frontTransfer = 0;
   private rearTransfer = 0;
   private rollVelocity = 0;
@@ -56,6 +57,19 @@ export class FourWheelDynamics {
     Object.assign(this.powertrain, { engineRpm: 850, gear: 1, clutch: 0, axleTorque: 0, differentialLock: 0 });
     this.initialized = false; this.reverseTimer = this.shiftTimer = this.frontTransfer = this.rearTransfer = 0;
     this.rollVelocity = this.pitchVelocity = this.previousHandbrake = 0;
+  }
+  /**
+   * Body pitch and roll (rad; +pitch nose down, +roll right side up) from the load transfer the
+   * suspension is carrying, over its spring and anti-roll rates. Soft cars lean more on their own.
+   */
+  bodyAttitude(): { pitch: number; roll: number } {
+    const c = this.model.config, p = c.mechanical!, s = this.model.state;
+    const L = c.chassis.wheelbaseM, a = L * (1 - c.chassis.frontWeight), b = L - a, track = c.chassis.trackWidthM;
+    const weight = c.chassis.massKg * G;
+    // loadShift and lateralLoadShift are shares of total weight, so each times weight × lever is the moment.
+    const pitchStiffness = 2 * (p.suspension.frontSpring * a * a + p.suspension.rearSpring * b * b);
+    const rollStiffness = (p.suspension.frontSpring + p.suspension.frontAntiRoll + p.suspension.rearSpring + p.suspension.rearAntiRoll) * track * track / 2;
+    return { pitch: s.loadShift * weight * L / pitchStiffness, roll: s.lateralLoadShift * weight * track / rollStiffness };
   }
   step(dt: number, input: DriverInput, contact: AxleContact): void {
     if (!Number.isFinite(dt) || dt <= 0) return;
@@ -91,7 +105,8 @@ export class FourWheelDynamics {
       brake: s.reversing ? rawThrottle : rawBrake,
       handbrake: c.handbrake.enabled ? Number(input.handbrake ?? 0) : 0,
       clutch: input.clutch, device: input.device,
-    }, { vx: s.vx, vy: s.vy, yawRate: yaw, rearSlipRatio: rearSlip, frontAxleM: a }, p, c.pedals.throttleRise, c.pedals.throttleFall);
+    }, { vx: s.vx, vy: s.vy, yawRate: yaw, rearSlipRatio: rearSlip, frontAxleM: a, rearAxleM: b }, p,
+      { ...c.pedals, handbrakeRise: c.handbrake.engageSmoothing, handbrakeFall: c.handbrake.releaseSmoothing });
     if (input.engineAvailable === false) controls.throttleAssisted = controls.throttleFiltered = 0;
     s.steerAngle = controls.actualSteering; s.throttle = controls.throttleAssisted; s.brake = controls.brake; s.handbrake = controls.handbrake;
     if (this.previousHandbrake > s.handbrake) for (const w of this.wheels.slice(2)) w.gripRecovery = Math.min(w.gripRecovery, 1 - this.previousHandbrake);
@@ -120,7 +135,12 @@ export class FourWheelDynamics {
     const drivenSpeed = (this.wheels[0].angularVelocity + this.wheels[1].angularVelocity) / 2 * frontDrive
       + (this.wheels[2].angularVelocity + this.wheels[3].angularVelocity) / 2 * (1 - frontDrive);
     const drivenSlip = frontDrive === 1 ? (Math.abs(this.wheels[0].slipRatio) + Math.abs(this.wheels[1].slipRatio)) / 2 : rearSlip;
-    const tractionTrim = p.tcs === 'off' ? 0 : smoothstep(.12, .5, drivenSlip) * (p.tcs === 'on' ? .9 : .35);
+    // TCS acts around the tire's peak slip, before the driven wheels break away; sport allows more.
+    // It watches the worst driven wheel, so an open diff's unloaded inside wheel cannot flare.
+    const peakSlip = p.tire.peakSlipRatio;
+    const worstSlip = Math.max(...this.wheels.filter((_, i) => i < 2 ? frontDrive > 0 : frontDrive < 1).map(w => Math.abs(w.slipRatio)));
+    const tractionTrim = p.tcs === 'off' ? 0 : p.tcs === 'on' ? smoothstep(peakSlip * .6, peakSlip * 1.6, worstSlip) * .95
+      : smoothstep(peakSlip, peakSlip * 4, worstSlip) * .35;
     let throttle = s.throttle * (1 - tractionTrim);
     // ESC requests one caliper and trims torque. It cannot directly produce a yaw acceleration.
     const wantedYaw = s.vx * Math.tan(s.steerAngle) / L;
@@ -132,8 +152,8 @@ export class FourWheelDynamics {
     this.powertrain.gear = clamp(this.powertrain.gear, 1, e.gearRatios.length);
     if (!s.reversing && this.shiftTimer === 0 && drivenSlip < .3) {
       const rpm = Math.abs(drivenSpeed) * e.gearRatios[this.powertrain.gear - 1] * e.finalDrive * 60 / TAU;
-      if (rpm > e.redlineRpm * .9 && this.powertrain.gear < e.gearRatios.length) { this.powertrain.gear++; this.shiftTimer = e.shiftSeconds; }
-      else if (rpm < 1800 && this.powertrain.gear > 1) { this.powertrain.gear--; this.shiftTimer = e.shiftSeconds; }
+      if (rpm > e.redlineRpm * .9 && this.powertrain.gear < e.gearRatios.length) { this.powertrain.gear++; this.shiftTimer = e.shiftSeconds; this.upshifting = true; }
+      else if (rpm < 1800 && this.powertrain.gear > 1) { this.powertrain.gear--; this.shiftTimer = e.shiftSeconds; this.upshifting = false; }
     }
     const ratio = (s.reversing ? -e.reverseRatio : e.gearRatios[this.powertrain.gear - 1]) * e.finalDrive;
     const engineOmega = this.powertrain.engineRpm * TAU / 60;
@@ -152,6 +172,12 @@ export class FourWheelDynamics {
     // Closed-throttle pumping loss is the engine braking; it reaches the wheels only through the clutch.
     const frictionTorque = 8 + engineOmega * (.025 + .05 * (1 - throttle));
     this.powertrain.engineRpm = clamp((engineOmega + (engineTorque - coupling - frictionTorque) / e.inertia * dt) * 60 / TAU, 0, e.redlineRpm + 200);
+    // Rev-matched shifts: the engine settles to the new gear while the clutch is open, so it never
+    // dumps a 6000 rpm flywheel into 2nd. Drift setups keep the kick.
+    if ((p.revMatch === 'all' || p.revMatch === 'upshift' && this.upshifting) && this.shiftTimer > 0 && !s.reversing) {
+      const matched = Math.abs(drivenSpeed * ratio) * 60 / TAU;
+      this.powertrain.engineRpm += (Math.max(e.idleRpm, matched) - this.powertrain.engineRpm) * (1 - Math.exp(-dt * 4 / e.shiftSeconds));
+    }
     let axleTorque = coupling * ratio * e.efficiency;
     if (input.engineAvailable === false) axleTorque = 0;
     this.powertrain.clutch = clutch; this.powertrain.axleTorque = axleTorque;
@@ -189,7 +215,7 @@ export class FourWheelDynamics {
         const kappa = (omega * radius - u) / Math.max(Math.abs(u), 1);
         const sx = kappa / p.tire.peakSlipRatio, sy = Math.tan(clamp(w.slipAngle, -1.5, 1.5)) / Math.tan(peakAngle);
         const demand = Math.hypot(sx, sy);
-        const saturation = (1 - Math.exp(-1.5 * demand)) * (1 - .22 * smoothstep(1, 5, demand));
+        const saturation = (1 - Math.exp(-1.5 * demand)) * (1 - (p.tire.breakaway ?? .22) * smoothstep(1, 5, demand));
         const scale = demand > 1e-9 ? saturation / demand : 1.5;
         return { fx: w.maxLongitudinalGrip * sx * scale, fy: -cap * sy * scale, kappa };
       };

@@ -26,6 +26,19 @@ describe('keyboard virtual driver', () => {
     expect(fast.playerTarget).toBeLessThan(low.playerTarget * .5);
     expect(slide.playerTarget).toBeGreaterThan(fast.playerTarget * 1.8);
   });
+  it('takes the high-speed taper, countersteer strength and pedal rates from the car', () => {
+    const stock = { ...STOCK_MECHANICAL, steering: { ...STOCK_MECHANICAL.steering, sensitivityStartKph: 35, sensitivityFullKph: 125, highSpeedAuthority: .42 },
+      counterSteer: { strength: .6, startAngleDeg: 6, fullAngleDeg: 25, gain: .72 } };
+    const fast = run(new DriverAssistance(), 1, { ...input, steering: 1 }, { ...rest, vx: 125 / 3.6 }, stock);
+    expect(fast.playerTarget).toBeCloseTo(34 * .42 * DEG, 3);
+    const slide = { ...rest, vy: 8, yawRate: -.4 };
+    expect(run(new DriverAssistance(), 1, input, slide, stock).counterTarget)
+      .toBeLessThan(run(new DriverAssistance(), 1, input, slide).counterTarget);
+    const a = new DriverAssistance();
+    a.step(1 / 120, { ...input, throttle: 1, brake: 1 }, rest, stock, { throttleRise: 3, throttleFall: 5, brakeRise: 5.5, brakeFall: 8 });
+    expect(a.telemetry.throttleFiltered).toBeCloseTo(3 / 120);
+    expect(a.telemetry.brake).toBeCloseTo(5.5 / 120);
+  });
   it('uses right countersteer for a left drift, and the player can override it', () => {
     const motion = { ...rest, vy: 8, yawRate: -.4 };
     const released = run(new DriverAssistance(), 1, input, motion);

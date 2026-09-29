@@ -270,7 +270,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   update(dt: number): void {
     this.impactCooldown = Math.max(0, this.impactCooldown - dt);
     const { state } = this.controller.model;
-    this.visual.update(dt, state.steerAngle, state.vx, this.controller.model.config.mechanical ? this.controller.model.mechanics.wheels.map(w => w.angularVelocity) : undefined);
+    const mechanics = this.controller.model.config.mechanical ? this.controller.model.mechanics : null;
+    this.visual.update(dt, state.steerAngle, state.vx, mechanics?.wheels.map(w => w.angularVelocity), mechanics?.bodyAttitude());
     this.effects.update(dt, this.controller.model, this.condition.engine);
     this.hud.tick(dt, () => this.summarize());
     this.telemetryAge += dt;

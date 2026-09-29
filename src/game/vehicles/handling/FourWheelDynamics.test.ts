@@ -5,7 +5,7 @@ import { HANDLING_PRESETS, type HandlingPresetId } from './presets';
 import { differentialTorques } from './FourWheelDynamics';
 const ground = { front: 1, rear: 1 };
 const neutral: DriverInput = { throttle: 0, brake: 0, steer: 0, device: 'keyboard' };
-function car(kph = 60, preset: HandlingPresetId = 'rwd_box_turbo', overrides: HandlingOverrides = {}) {
+function car(kph = 60, preset: HandlingPresetId = 'rwd_box_sedan', overrides: HandlingOverrides = {}) {
   const model = new ArcadeHandlingModel(applyHandlingOverrides(resolveHandlingPreset(HANDLING_PRESETS, preset), overrides));
   model.state.vx = kph / 3.6; return model;
 }
@@ -146,7 +146,7 @@ describe('four-wheel mechanics', () => {
     drive(stock, 2, { ...neutral, throttle: 1, brake: .8 });
     drive(powerful, 2, { ...neutral, throttle: 1, brake: .8 });
     expect(powerful.mechanics.wheels[2].angularVelocity).toBeGreaterThan(stock.mechanics.wheels[2].angularVelocity * 2);
-    const soft = car(60), stiff = car(60, 'rwd_box_turbo', { mechanical: { suspension: { rearAntiRoll: 60000 } } });
+    const soft = car(60), stiff = car(60, 'rwd_box_sedan', { mechanical: { suspension: { rearAntiRoll: 60000 } } });
     for (const m of [soft, stiff]) drive(m, .5, { ...neutral, steer: -.3 });
     const imbalance = (m: ArcadeHandlingModel) => Math.abs(m.mechanics.wheels[2].verticalLoad - m.mechanics.wheels[3].verticalLoad);
     expect(imbalance(stiff)).toBeGreaterThan(imbalance(soft));
@@ -171,9 +171,9 @@ describe('four-wheel mechanics', () => {
   });
 
   it('replaces gearbox arrays when applying upgrades and rejects invalid geometry', () => {
-    const m = car(0, 'rwd_box_turbo', { mechanical: { engine: { gearRatios: [3, 1.5] } } });
+    const m = car(0, 'rwd_box_sedan', { mechanical: { engine: { gearRatios: [3, 1.5] } } });
     expect(m.config.mechanical!.engine.gearRatios).toEqual([3, 1.5]);
-    expect(() => car(0, 'rwd_box_turbo', { mechanical: { wheel: { radiusM: 0 } } })).toThrow();
+    expect(() => car(0, 'rwd_box_sedan', { mechanical: { wheel: { radiusM: 0 } } })).toThrow();
   });
 
   it('holds a steady unassisted corner at road speeds instead of spinning (limit understeer)', () => {
@@ -227,11 +227,12 @@ describe('four-wheel mechanics', () => {
   });
 
   it('open diff spins the unloaded inside rear; LSD and welded couple it', () => {
-    const difference = (preset: HandlingPresetId) => {
-      const m = car(30, preset); drive(m, 1.2, { ...neutral, throttle: 1, steer: -1 });
+    const difference = (preset: HandlingPresetId, overrides: HandlingOverrides = {}) => {
+      const m = car(30, preset, overrides); drive(m, 1.2, { ...neutral, throttle: 1, steer: -1 });
       return Math.abs(m.mechanics.wheels[2].angularVelocity - m.mechanics.wheels[3].angularVelocity);
     };
-    const open = difference('rwd_box_turbo'), lsd = difference('rwd_drift'), welded = difference('rwd_high_power');
+    // Street TCS would catch the flaring inside wheel; this measures the bare differential.
+    const open = difference('rwd_box_sedan', { mechanical: { tcs: 'off', throttleFeather: 0 } }), lsd = difference('rwd_drift'), welded = difference('rwd_high_power');
     expect(lsd).toBeLessThan(open * .2);
     expect(welded).toBeLessThan(lsd);
   });
@@ -253,13 +254,93 @@ describe('four-wheel mechanics', () => {
       const street = drive(car(kph), 3, { ...neutral, throttle: 1, steer: -1 });
       expect(street.angle, `street ${kph} km/h`).toBeLessThan(8 * Math.PI / 180);
     }
-    const drift = drive(car(40, 'rwd_box_drift'), 3, { ...neutral, throttle: 1, steer: -1 });
+    const drift = drive(car(40, 'rwd_box_sedan_drift'), 3, { ...neutral, throttle: 1, steer: -1 });
     expect(drift.angle).toBeGreaterThan(15 * Math.PI / 180);
+  });
+
+  it('street tune launches and shifts through 3rd on full W without spinning the rears', () => {
+    const m = car(0);
+    let worst = 0, gear = 1;
+    for (let i = 0; i < 10 * 120; i++) {
+      m.step(1 / 120, { ...neutral, throttle: 1 }, ground);
+      if (i > 72) worst = Math.max(worst, ...m.mechanics.wheels.slice(2).map(w => Math.abs(w.slipRatio)));
+      gear = m.mechanics.powertrain.gear;
+    }
+    expect(gear).toBeGreaterThanOrEqual(3);
+    expect(worst).toBeLessThan(.14);
+  });
+
+  describe('stock RWD box sedan: RWD is where the power goes, not a drift mode', () => {
+    // Settle a moderate AI corner (fixed rack), then change one input; returns curvature gain after .7 s.
+    const corner = (then: Partial<DriverInput>) => {
+      const m = car(70), hold = { ...neutral, device: 'ai' as const, steer: -4 / 34, throttle: .3 };
+      drive(m, 2, hold); const before = Math.abs(m.state.yawRate / m.state.vx);
+      const result = drive(m, .7, { ...hold, ...then });
+      return { gain: Math.abs(m.state.yawRate / m.state.vx) / before, angle: result.angle };
+    };
+    it('does not power-oversteer on dry asphalt; the same W slides it on a wet road', () => {
+      const dry = car(60); drive(dry, 1.5, { ...neutral, throttle: .35, steer: -.3 });
+      expect(drive(dry, 1.5, { ...neutral, throttle: 1, steer: -.3 }).angle).toBeLessThan(6 * Math.PI / 180);
+      const wet = car(40); wet.surfaceGrip = .65; drive(wet, 1.5, { ...neutral, throttle: .35, steer: -.7 });
+      expect(drive(wet, 1.5, { ...neutral, throttle: 1, steer: -.7 }).angle).toBeGreaterThan(10 * Math.PI / 180);
+    });
+    it('spins the inside rear through the open diff in a tight 1st-gear corner without drifting', () => {
+      const m = car(20); drive(m, .6, { ...neutral, throttle: .35, steer: -1 });
+      let spin = 0;
+      for (let i = 0; i < 180; i++) {
+        m.step(1 / 120, { ...neutral, throttle: 1, steer: -1 }, ground);
+        spin = Math.max(spin, Math.abs(m.mechanics.wheels[2].angularVelocity - m.mechanics.wheels[3].angularVelocity) * .3 * 3.6);
+      }
+      expect(m.mechanics.powertrain.gear).toBe(1);
+      expect(spin).toBeGreaterThan(10);
+      expect(Math.abs(m.diagnostics.bodySlip)).toBeLessThan(5 * Math.PI / 180);
+    });
+    it('rotates on a lift or a trail brake, and only a little', () => {
+      const hold = corner({}), lift = corner({ throttle: 0 }), brake = corner({ throttle: 0, brake: .35 });
+      expect(hold.gain).toBeCloseTo(1, 1);
+      expect(lift.gain).toBeGreaterThan(1.05);
+      expect(brake.gain).toBeGreaterThan(lift.gain);
+      for (const r of [lift, brake]) expect(r.angle).toBeLessThan(5 * Math.PI / 180);
+    });
+    it('locks the fronts first without ABS, and locked fronts barely steer', () => {
+      const m = car(80); let front = 0, rear = 0;
+      for (let i = 0; i < 240; i++) {
+        m.step(1 / 120, { ...neutral, brake: 1 }, ground);
+        front ||= m.mechanics.wheels[0].isLocked ? i : 0; rear ||= m.mechanics.wheels[2].isLocked ? i : 0;
+      }
+      expect(front).toBeGreaterThan(0); expect(rear).toBe(0);
+      const yaw = (brake: number) => { const c = car(60); let peak = 0; for (let i = 0; i < 120; i++) { c.step(1 / 120, { ...neutral, brake, steer: -1 }, ground); peak = Math.max(peak, Math.abs(c.state.yawRate)); } return peak; };
+      expect(yaw(1)).toBeLessThan(yaw(.35) * .6);
+    });
+    it('is slow: 0–100 km/h takes longer than 12 s', () => {
+      const m = car(0); let t = 0;
+      while (m.state.vx < 100 / 3.6 && t < 20) { m.step(1 / 120, { ...neutral, throttle: 1 }, ground); t += 1 / 120; }
+      expect(t).toBeGreaterThan(12); expect(t).toBeLessThan(17);
+    });
+    it('leans on its soft springs: nose dives under braking, rolls to the outside, stiffer rolls less', () => {
+      const braking = car(80); drive(braking, .6, { ...neutral, brake: 1 });
+      expect(braking.mechanics.bodyAttitude().pitch).toBeGreaterThan(.01);
+      const soft = car(60), stiff = car(60, 'rwd_box_sedan', { mechanical: { suspension: { frontSpring: 42000, rearSpring: 34000 } } });
+      for (const m of [soft, stiff]) drive(m, 1, { ...neutral, throttle: .3, steer: -.3 });
+      expect(soft.mechanics.bodyAttitude().roll).toBeLessThan(-1.5 * Math.PI / 180);
+      expect(soft.mechanics.bodyAttitude().roll).toBeLessThan(stiff.mechanics.bodyAttitude().roll);
+    });
+    it('keyboard countersteer catches a slide with less than the drift tune, within 34° of lock', () => {
+      const counter = (preset: HandlingPresetId) => {
+        const m = car(55, preset); drive(m, .4, { ...neutral, throttle: .3, steer: -1 }); drive(m, .4, { ...neutral, steer: -1, handbrake: true });
+        let peak = 0; for (let i = 0; i < 60; i++) { m.step(1 / 120, neutral, ground); peak = Math.max(peak, m.mechanics.assistance.telemetry.counterTarget); }
+        return peak;
+      };
+      const stock = counter('rwd_box_sedan');
+      expect(stock).toBeGreaterThan(10 * Math.PI / 180);
+      expect(stock).toBeLessThanOrEqual(.6 * 34 * Math.PI / 180 + 1e-9);
+      expect(counter('rwd_box_sedan_drift')).toBeGreaterThan(stock);
+    });
   });
 
   it('uses the same solver for AI, controller and wheel controls and any drivetrain', () => {
     for (const drivetrain of ['FWD', 'RWD', 'AWD'] as const) {
-      const m = car(0, 'rwd_box_turbo', { drive: { drivetrain } });
+      const m = car(0, 'rwd_box_sedan', { drive: { drivetrain } });
       for (let i = 0; i < 120; i++) m.stepControls(1 / 120, { steering: 0, throttle: 1, brake: 0, handbrake: 0, device: 'ai' }, ground);
       expect(m.state.vx).toBeGreaterThan(1);
       if (drivetrain === 'FWD') expect(m.corners[2].driveN).toBe(0);

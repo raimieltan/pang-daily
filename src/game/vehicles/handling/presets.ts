@@ -152,13 +152,60 @@ export const HANDLING_PRESETS = {
       handbrake: { rearGripMultiplier: .38, rearBrakeMps2: 6.5 },
     },
   },
-  rwd_box_turbo: {
-    name: "'80s RWD turbo sedan · street tune",
-    description: "Longitudinal turbo four and a live rear axle. Feathered throttle and light TCS keep it planted; slides only on request.",
+  rwd_box_sedan: {
+    name: "'80s RWD box sedan · stock",
+    description: "940 kg, 85 hp carbureted 1.6, open diff and skinny 165s. Mild understeer; slides only when you use the weight.",
     extends: "fwd_worn_sedan",
     overrides: {
-      mechanical: { ...STOCK_MECHANICAL, engine: { ...STOCK_MECHANICAL.engine, boostRpm: 2600 }, tcs: 'sport', throttleFeather: .45 },
+      mechanical: {
+        ...STOCK_MECHANICAL,
+        // ~85 hp at 5400 rpm on the generic torque curve; not enough to overpower dry 165s past 1st.
+        engine: { torqueNm: 133, idleRpm: 850, redlineRpm: 6000, peakTorqueRpm: 3200, inertia: .2,
+          gearRatios: [3.2, 2, 1.36, 1, .84], reverseRatio: 3.3, finalDrive: 3.9, efficiency: .87, clutchTorqueNm: 180, shiftSeconds: .22 },
+        differential: { type: 'open', lock: 0, preloadNm: 0 },
+        wheel: { radiusM: .3, inertia: 1.1 },
+        // Tall sidewalls: force lags the slip angle and fades gently past the peak.
+        tire: { ...STOCK_MECHANICAL.tire, relaxationSeconds: .05, recoverySeconds: .25, breakaway: .12 },
+        suspension: { frontSpring: 21000, rearSpring: 17000, damping: .55, frontAntiRoll: 7000, rearAntiRoll: 3000,
+          rideHeightOffsetM: 0, camberDeg: -.5, toeDeg: .05, casterDeg: 4 },
+        steering: { roadAngleDeg: 34, driftAngleDeg: 34, rackRate: 5.2, highSpeedRackRate: 2.8, rackAcceleration: 18, returnRate: 4,
+          sensitivityStartKph: 35, sensitivityFullKph: 125, highSpeedAuthority: .42 },
+        // Catches oversteer rather than holding it; 34° of lock runs out on a big slide.
+        counterSteer: { strength: .6, startAngleDeg: 6, fullAngleDeg: 25, gain: .72 },
+        throttleFeather: 0, revMatch: 'upshift', tcs: 'off', esc: false, abs: false,
+      },
+      pedals: { throttleRise: 3, throttleFall: 5, brakeRise: 5.5, brakeFall: 8 },
+      handbrake: { engageSmoothing: 10, releaseSmoothing: 15 },
+      chassis: { massKg: 940, wheelbaseM: 2.5, frontWeight: .53, cgHeightM: .52, trackWidthM: 1.456, yawInertiaScale: 1.05 },
+      drive: { drivetrain: "RWD", accelerationMps2: 3.4, topSpeedKmh: 165, engineBrakingMps2: 1 },
+      brakes: { decelerationMps2: 7.8, frontBias: .72 },
+      tires: { frontGrip: .86, rearGrip: .98, frontPeakSlipDeg: 11, rearPeakSlipDeg: 6 },
+      balance: { understeer: .12, rearSlideFalloff: .18, liftOffRotation: .04 },
+      assists: { traction: 0, stability: 0 },
+    },
+  },
+  rwd_box_sedan_drift: {
+    name: "'80s RWD box sedan · drift tune",
+    description: "Stock engine; the diff is locked up, the steering stops opened and the throttle sharpened. Holds angle once it is sideways.",
+    extends: "rwd_box_sedan",
+    overrides: {
+      mechanical: { differential: { type: 'lsd', lock: .45, preloadNm: 35 }, revMatch: 'off',
+        steering: { roadAngleDeg: 36, driftAngleDeg: 48, rackRate: 7, highSpeedRackRate: 3.2, rackAcceleration: 22, returnRate: 5.5,
+          sensitivityStartKph: 35, sensitivityFullKph: 140, highSpeedAuthority: .4 },
+        counterSteer: { strength: .8, startAngleDeg: 5, fullAngleDeg: 22, gain: .95 },
+        suspension: { rearAntiRoll: 7000 } },
+      pedals: { throttleRise: 5.5, throttleFall: 6, brakeRise: 7, brakeFall: 9 },
+      handbrake: { engageSmoothing: 12, releaseSmoothing: 18 },
+    },
+  },
+  rwd_box_turbo: {
+    name: "'80s RWD turbo sedan · street tune",
+    description: "Longitudinal turbo four and a live rear axle. Feathered throttle and traction control keep it planted; slides only on request.",
+    extends: "fwd_worn_sedan",
+    overrides: {
+      mechanical: { ...STOCK_MECHANICAL, engine: { ...STOCK_MECHANICAL.engine, boostRpm: 2600 }, tcs: 'on', throttleFeather: .45, revMatch: 'all' },
       pedals: { throttleRise: 3.8, throttleFall: 6, brakeRise: 7, brakeFall: 9 },
+      handbrake: { engageSmoothing: 12, releaseSmoothing: 18 },
       chassis: { massKg: 1090, wheelbaseM: 2.5, frontWeight: .53, cgHeightM: .49, trackWidthM: 1.456, yawInertiaScale: 1.05 },
       drive: { drivetrain: "RWD", accelerationMps2: 5.2, topSpeedKmh: 190, engineBrakingMps2: 1.1 },
       brakes: { decelerationMps2: 8.2, frontBias: .64 },
@@ -167,18 +214,18 @@ export const HANDLING_PRESETS = {
       assists: { traction: 0, stability: 0 },
     },
   },
-  rwd_box_drift: {
+  rwd_box_turbo_drift: {
     name: "'80s RWD turbo sedan · drift tune",
-    description: "Same engine; clutch-type diff, extra lock, TCS off and a sharp throttle. Holds angle on the gas.",
+    description: "Turbo 1.8 swap; clutch-type diff, extra lock, TCS off and a sharp throttle. The base for the RWD builds.",
     extends: "rwd_box_turbo",
     overrides: {
-      mechanical: { tcs: 'off', throttleFeather: 0, differential: { type: 'lsd', lock: .45, preloadNm: 35 },
+      mechanical: { tcs: 'off', throttleFeather: 0, revMatch: 'off', differential: { type: 'lsd', lock: .45, preloadNm: 35 },
         steering: { roadAngleDeg: 36, driftAngleDeg: 48 } },
       pedals: { throttleRise: 5.5 },
     },
   },
   rwd_street: {
-    name: 'RWD street / LSD', description: '250 hp, street LSD and 42-degree steering.', extends: 'rwd_box_drift',
+    name: 'RWD street / LSD', description: '250 hp, street LSD and 42-degree steering.', extends: 'rwd_box_turbo_drift',
     overrides: { mechanical: { engine: { torqueNm: 350, clutchTorqueNm: 500 }, differential: { type: 'lsd', lock: .4, preloadNm: 40 },
       steering: { roadAngleDeg: 38, driftAngleDeg: 42 } } },
   },

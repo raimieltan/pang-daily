@@ -100,6 +100,8 @@ export class VehicleModel {
   /** Mean hub rise over stock across the four sockets; the body sits on it. */
   private tireLiftM = 0;
   private readonly jackOffset = new Vector3();
+  private jackRotation: Quaternion | null = null;
+  private readonly swayRotation = Quaternion.Identity();
   private readonly stockHubY: ReadonlyMap<WheelId, number>;
   private readonly stockRadius: ReadonlyMap<WheelId, number>;
 
@@ -209,9 +211,29 @@ export class VehicleModel {
    * the wheels stay where they are, like the suspension extending. `null` puts it back level.
    */
   setJackPose(rotation: Quaternion | null, offset?: Vector3): void {
-    this.chassis.rotationQuaternion = rotation ? rotation.clone() : null;
+    this.jackRotation = rotation ? rotation.clone() : null;
+    this.applyBodyRotation();
     this.jackOffset.copyFrom(offset ?? Vector3.ZeroReadOnly);
     this.setRideHeight(this.rideHeightM);
+  }
+
+  /**
+   * Suspension attitude while driving, in rad: +pitch drops the nose, +roll lifts the right side.
+   * Only the body moves; the wheels stay on the road.
+   */
+  setBodySway(pitch: number, roll: number): void {
+    Quaternion.RotationYawPitchRollToRef(0, pitch, roll, this.swayRotation);
+    this.applyBodyRotation();
+  }
+
+  private applyBodyRotation(): void {
+    if (!this.jackRotation && this.swayRotation.x === 0 && this.swayRotation.z === 0) {
+      this.chassis.rotationQuaternion = null;
+      return;
+    }
+    const target = this.chassis.rotationQuaternion ??= new Quaternion();
+    if (this.jackRotation) this.jackRotation.multiplyToRef(this.swayRotation, target);
+    else target.copyFrom(this.swayRotation);
   }
 
   /**

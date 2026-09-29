@@ -258,6 +258,23 @@ baseline number and its reason in §5.
 
 ## RWD mechanical presets (`mechanical` config)
 
-Presets with a `mechanical` block (`rwd_box_turbo`, `rwd_street`, `rwd_drift`, `rwd_high_power`) run `FourWheelDynamics`: four wheels, engine → clutch → gearbox → differential, and per-tire friction ellipses. `DriverAssistance` is the keyboard/controller virtual driver. It can only set rack and pedal requests. Legacy arcade terms such as `balance.*`, `drive.engineBrakingMps2` and `lowSpeed` steering are not used on this path. Engine braking comes from pumping losses and reaches the wheels only through the clutch.
+Presets with a `mechanical` block (`rwd_box_sedan`, `rwd_box_turbo`, `rwd_street`, `rwd_drift`, `rwd_high_power`) run `FourWheelDynamics`: four wheels, engine → clutch → gearbox → differential, and per-tire friction ellipses. `DriverAssistance` is the keyboard/controller virtual driver. It can only set rack and pedal requests. Legacy arcade terms such as `balance.*`, `drive.engineBrakingMps2` and `lowSpeed` steering are not used on this path. Engine braking comes from pumping losses and reaches the wheels only through the clutch.
 
-**Limit balance.** When both axles saturate, static weight distribution cancels the yaw moment (`Wf·a = Wr·b`). Scrub deceleration then moves load forward and turns this into oversteer. With equal front/rear tire data, the stock car spun on a constant 1.7° rack at 100 km/h. Road cars need the front to be the weaker axle, so the stock preset uses `frontGrip .9`, `frontPeakSlipDeg 10` and `rearPeakSlipDeg 6`. That stands in for steering compliance and toe. Drift builds get their rotation from rear roll stiffness, diff lock and power, not from a weaker rear. `FourWheelDynamics.test.ts` guards this: constant AI steer must not spin, and W+A at 60 km/h in the stock car must settle.
+**Limit balance.** When both axles saturate, static weight distribution cancels the yaw moment (`Wf·a = Wr·b`). Scrub deceleration then moves load forward and turns this into oversteer. With equal front/rear tire data, the stock car spun on a constant 1.7° rack at 100 km/h. Road cars need the front to be the weaker axle, so the turbo preset uses `frontGrip .9`, `frontPeakSlipDeg 10` and `rearPeakSlipDeg 6` (the stock sedan: `.86`, `11`, `6`). That stands in for steering compliance and toe. Drift builds get their rotation from rear roll stiffness, diff lock and power, not from a weaker rear. `FourWheelDynamics.test.ts` guards this: constant AI steer must not spin, and W+A at 60 km/h in the stock car must settle.
+
+### Stock box sedan (`rwd_box_sedan`, the Banwa Silak's street tune)
+
+A light, soft, 85 hp car that happens to be rear-wheel drive. It must not slide just because W is down; it goes sideways when the driver uses the weight. Nothing here is a drift switch. Every behavior comes from mechanical numbers:
+
+| Behavior | Where it comes from |
+| --- | --- |
+| No dry power oversteer past 1st gear | 133 Nm through a 3.2 first gear. 2nd delivers about 3 kN, below what the loaded rears carry mid-corner. No TCS, no throttle feather. |
+| Inside rear flares in tight 1st-gear corners, no sustained slide | Open diff: both rears get the same torque, so the unloaded inside wheel sets the limit. |
+| Mild understeer at the limit | `frontGrip .86` / `frontPeakSlipDeg 11` against `rearGrip .98` / `rearPeakSlipDeg 6`. Front roll stiffness is about 58% (rear bar 3000). |
+| Lift and trail-brake rotation | Pitch transfer through soft springs (`damping .55`, `cgHeightM .52`). Brakes are 72% front, so the fronts lock first (no ABS). |
+| Slow, old tire feel | `relaxationSeconds .05` (sidewall lag) and `breakaway .12` (gentle fade past the peak, so slides stay catchable). |
+| Countersteer catches, never holds | `counterSteer.strength .6` caps the assist at 60% of 34° lock. Big slides need the player's D, then fishtail back. |
+| Clean upshifts, draggy downshifts | `revMatch: 'upshift'`. |
+| Visible roll, dive and squat | `FourWheelDynamics.bodyAttitude()` turns load transfer into body angle over the spring and bar rates. At 0.5 g that is about 3° of roll. |
+
+Upgrades change these same numbers: `used_lsd` replaces the open diff, stiffer springs cut roll, engine parts raise torque. The drift tune (`rwd_box_sedan_drift`) locks the diff, opens the steering to 48° and adds a stiffer rear bar. The old 1.8 turbo car lives on as `rwd_box_turbo`, the base for the RWD build presets. `FourWheelDynamics.test.ts` › *stock RWD box sedan* guards the table above.

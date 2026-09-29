@@ -23,6 +23,8 @@ export const mechanicalConfigSchema = z.strictObject({
     relaxationSeconds: positive, recoverySeconds: positive,
     ambientC: z.number(), optimalC: positive, overheatC: positive,
     heatCapacity: positive, coolingRate: positive, wearPerJoule: z.number().nonnegative(),
+    /** Share of peak force lost deep past the limit. Old tall-sidewall street tires fade gently. Default .22. */
+    breakaway: unit.optional(),
   }),
   suspension: z.strictObject({
     frontSpring: positive, rearSpring: positive, damping: positive,
@@ -30,10 +32,24 @@ export const mechanicalConfigSchema = z.strictObject({
     rideHeightOffsetM: z.number().min(-.2).max(.2),
     camberDeg: z.number().min(-10).max(10), toeDeg: z.number().min(-3).max(3), casterDeg: z.number().min(0).max(15),
   }),
-  steering: z.strictObject({ roadAngleDeg: z.number().min(5).max(65), driftAngleDeg: z.number().min(5).max(65), rackRate: positive, rackAcceleration: positive, returnRate: positive }),
+  steering: z.strictObject({ roadAngleDeg: z.number().min(5).max(65), driftAngleDeg: z.number().min(5).max(65), rackRate: positive, rackAcceleration: positive, returnRate: positive,
+    /** Keyboard rack rate once fully into the high-speed band. Default: rackRate × 3.2/7. */
+    highSpeedRackRate: positive.optional(),
+    /** Speed band over which keyboard rate and authority taper. Default 35–140 km/h. */
+    sensitivityStartKph: z.number().nonnegative().optional(), sensitivityFullKph: positive.optional(),
+    /** Keyboard share of road lock left at the top of the band. Default .40. */
+    highSpeedAuthority: unit.optional(),
+  }),
   assistance: assistanceProfileSchema,
+  /** Per-car virtual-driver countersteer; replaces the profile's strength. Stock cars catch slides, drift cars hold them. */
+  counterSteer: z.strictObject({ strength: unit, startAngleDeg: positive, fullAngleDeg: positive, gain: positive }).optional(),
   /** Keyboard only: share of throttle held back at full road lock (a feathered pedal). 0 = none. */
   throttleFeather: unit.optional(),
+  /**
+   * Gearbox: the engine settles to the new gear during a shift. `upshift` is a driver lifting between
+   * gears (an unmatched downshift still drags the rears); `all` also blips downshifts. `off`/absent = every shift kicks.
+   */
+  revMatch: z.enum(['off', 'upshift', 'all']).optional(),
   tcs: z.enum(['off', 'sport', 'on']),
   esc: z.boolean(),
   abs: z.boolean(),

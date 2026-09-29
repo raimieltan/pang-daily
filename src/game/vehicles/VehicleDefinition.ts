@@ -74,7 +74,7 @@ export const STARTER_HATCH: VehicleRuntimeDefinition = {
 
 export const RWD_BOX_SEDAN: VehicleRuntimeDefinition = {
   spec: BANWA_SILAK_1983,
-  tunes: { street: "rwd_box_turbo", drift: "rwd_box_drift" },
+  tunes: { street: "rwd_box_sedan", drift: "rwd_box_sedan_drift" },
   collision: {
     body: { width: 1.68, height: 1.1, length: 4.34, bottomY: .25, centerZ: 0 },
     wheels: { halfTrack: .728, frontZ: 1.28, rearZ: -1.22, radius: .3 },

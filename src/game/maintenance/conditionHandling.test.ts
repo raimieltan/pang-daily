@@ -38,7 +38,7 @@ it('scales handling from base tuning and restores healthy performance without co
 });
 
 it('installed RWD drivetrain hardware reaches the physical torque solver', () => {
-  const base = resolveHandlingPreset(HANDLING_PRESETS, 'rwd_box_turbo');
+  const base = resolveHandlingPreset(HANDLING_PRESETS, 'rwd_box_sedan');
   const healthy = calculateVehiclePerformance(BANWA_SILAK_1983).stats;
   const built = calculateVehiclePerformance(BANWA_SILAK_1983, [
     { id: 'lsd', partId: 'used_lsd', condition: .8 },

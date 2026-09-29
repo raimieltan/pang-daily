@@ -17,7 +17,9 @@ export const ASSISTANCE_PROFILES: Record<AssistanceProfile, { counter: number; t
   simulation: { counter: .40, trim: .10, transition: 1.15 },
   raw: { counter: 0, trim: 0, transition: 1 },
 };
-export interface AssistanceMotion { vx: number; vy: number; yawRate: number; rearSlipRatio: number; frontAxleM: number }
+/** Pedal and lever slew rates, in full travel per second. */
+export interface PedalRates { throttleRise: number; throttleFall: number; brakeRise?: number; brakeFall?: number; handbrakeRise?: number; handbrakeFall?: number }
+export interface AssistanceMotion { vx: number; vy: number; yawRate: number; rearSlipRatio: number; frontAxleM: number; rearAxleM?: number }
 export interface ControlTelemetry {
   device: ControlDevice; profile: AssistanceProfile; steeringInput: number;
   playerTarget: number; counterTarget: number; finalTarget: number; actualSteering: number;
@@ -38,9 +40,9 @@ export class DriverAssistance {
     this.filteredAngle = this.previousIntent = this.transitionTime = 0;
   }
   step(dt: number, input: VehicleControlInput, motion: Readonly<AssistanceMotion>, config: MechanicalConfig,
-    throttleRise = 3.8, throttleFall = 6): ControlTelemetry {
+    pedals: PedalRates = { throttleRise: 3.8, throttleFall: 6 }): ControlTelemetry {
     const t = this.telemetry, device = input.device ?? 'ai', keyboard = device === 'keyboard';
-    const profile = ASSISTANCE_PROFILES[config.assistance];
+    const profile = ASSISTANCE_PROFILES[config.assistance], cs = config.counterSteer, st = config.steering;
     t.device = device; t.profile = config.assistance;
     const steer = clamp(input.steering, -1, 1), speed = Math.hypot(motion.vx, motion.vy) * 3.6;
     // Body frame: +forward/+right, positive yaw = right. Movement angle is right-positive,
@@ -50,16 +52,18 @@ export class DriverAssistance {
     this.filteredAngle += angleDelta * (1 - Math.exp(-dt / .07));
     const forwardGate = smoothstep(3, 15, speed) * (motion.vx > 0 ? 1 : 0);
     const predictedAngle = this.filteredAngle - motion.yawRate * .22;
-    const drift = smoothstep(5 * DEG, 22 * DEG, Math.abs(predictedAngle)) * forwardGate;
-    const speedT = clamp((speed - 35) / 105, 0, 1);
-    const roadMultiplier = lerp(1, keyboard ? .40 : .75, speedT);
+    const drift = smoothstep((cs?.startAngleDeg ?? 5) * DEG, (cs?.fullAngleDeg ?? 22) * DEG, Math.abs(predictedAngle)) * forwardGate;
+    const bandStart = st.sensitivityStartKph ?? 35;
+    const speedT = clamp((speed - bandStart) / Math.max(1, (st.sensitivityFullKph ?? 140) - bandStart), 0, 1);
+    const roadMultiplier = lerp(1, keyboard ? st.highSpeedAuthority ?? .40 : .75, speedT);
     const authority = device === 'wheel' || device === 'ai' ? 1 : lerp(roadMultiplier, .9, drift);
     const max = lerp(config.steering.roadAngleDeg, config.steering.driftAngleDeg, drift) * DEG;
-    const counterGain = keyboard ? profile.counter : device === 'controller' ? Math.min(.3, profile.counter) : 0;
+    const strength = cs?.strength ?? profile.counter;
+    const counterGain = keyboard ? strength : device === 'controller' ? Math.min(.3, strength) : 0;
     // Front contact-patch direction includes yaw velocity (caster/self-aligning tendency).
     const frontDirection = Math.atan2(motion.vy + motion.frontAxleM * motion.yawRate, Math.max(1, motion.vx));
     const caster = clamp(config.suspension.casterDeg / 15, 0, 1) * .15;
-    const counter = clamp(lerp(this.filteredAngle * .95 - motion.yawRate * .35, frontDirection, caster), -max, max) * counterGain * drift;
+    const counter = clamp(lerp(this.filteredAngle * (cs?.gain ?? .95) - motion.yawRate * .35, frontDirection, caster), -max, max) * counterGain * drift;
     const player = steer * max * authority;
     // Full opposed intent replaces the assist; agreeing input reinforces it. No locked angle.
     const target = clamp(player + counter * (1 - Math.abs(steer) * (player * counter < 0 ? 1 : .35)), -max, max);
@@ -68,9 +72,9 @@ export class DriverAssistance {
     if (keyboard && drift > .2 && steer * this.previousIntent < 0) this.transitionTime = .25;
     this.transitionTime = Math.max(0, this.transitionTime - dt);
     if (steer !== 0) this.previousIntent = steer;
-    let rate = lerp(7, 3.2, speedT);
-    rate = lerp(rate, 4.2, drift) * config.steering.rackRate / 7;
-    if (steer === 0) rate = config.steering.returnRate;
+    let rate = lerp(st.rackRate, st.highSpeedRackRate ?? st.rackRate * 3.2 / 7, speedT);
+    rate = lerp(rate, st.rackRate * .6, drift);
+    if (steer === 0) rate = st.returnRate;
     const hold = Math.max(t.leftHoldTime, t.rightHoldTime);
     if (keyboard && hold > 0 && hold < .1) rate *= 1.35;
     if (this.transitionTime > 0) rate *= profile.transition;
@@ -86,15 +90,19 @@ export class DriverAssistance {
     t.steeringInput = steer; t.playerTarget = player; t.counterTarget = counter; t.finalTarget = target; t.driftFactor = drift;
     t.throttleRaw = clamp(input.throttle, 0, 1);
     t.throttleFiltered = moveToward(t.throttleFiltered, t.throttleRaw,
-      (t.throttleRaw > t.throttleFiltered ? throttleRise : throttleFall) * dt);
+      (t.throttleRaw > t.throttleFiltered ? pedals.throttleRise : pedals.throttleFall) * dt);
     const risk = Math.max(smoothstep(.35, .75, Math.abs(motion.rearSlipRatio)),
       smoothstep(45 * DEG, 90 * DEG, Math.abs(motion.yawRate)) * forwardGate);
     const trim = keyboard ? profile.trim : device === 'controller' ? Math.min(.12, profile.trim) : 0;
-    // A digital W through a road corner acts like a feathered pedal; once sliding it hands full throttle back.
-    const cornering = keyboard ? Math.abs(t.actualSteering) / max * (1 - drift) * smoothstep(5, 20, speed) : 0;
+    // A digital W through a road corner acts like a feathered pedal. Only a real rear slide (rear axle
+    // slip angle past the tire's range) hands full throttle back; a hard, gripping corner never does.
+    const rearAngle = Math.atan2(motion.vy - motion.yawRate * (motion.rearAxleM ?? 0), Math.max(1, motion.vx));
+    const sliding = smoothstep(8 * DEG, 16 * DEG, Math.abs(rearAngle)) * forwardGate;
+    const cornering = keyboard ? Math.abs(t.actualSteering) / max * (1 - sliding) * smoothstep(5, 20, speed) : 0;
     t.throttleAssisted = t.throttleFiltered * (1 - risk * trim) * (1 - (config.throttleFeather ?? 0) * cornering);
-    t.brake = moveToward(t.brake, clamp(input.brake, 0, 1), (input.brake > t.brake ? 7 : 9) * dt);
-    t.handbrake = moveToward(t.handbrake, clamp(input.handbrake, 0, 1), (input.handbrake > t.handbrake ? 12 : 18) * dt);
+    t.brake = moveToward(t.brake, clamp(input.brake, 0, 1), (input.brake > t.brake ? pedals.brakeRise ?? 7 : pedals.brakeFall ?? 9) * dt);
+    t.handbrake = moveToward(t.handbrake, clamp(input.handbrake, 0, 1),
+      (input.handbrake > t.handbrake ? pedals.handbrakeRise ?? 12 : pedals.handbrakeFall ?? 18) * dt);
     return t;
   }
 }
