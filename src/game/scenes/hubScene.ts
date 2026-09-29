@@ -56,6 +56,7 @@ import { PlayerVehicle } from "../vehicles/PlayerVehicle";
 import { PerformanceSystem } from "../vehicles/PerformanceSystem";
 import { TalyerPerformanceSystem } from '../vehicles/TalyerPerformanceSystem';
 import { AutoPartsShopSystem, autoPartsShopRejection } from '../marketplace/AutoPartsShopSystem';
+import { CarDealerSystem, carDealerRejection } from "../marketplace/CarDealerSystem";
 import { WheelSystem } from "../vehicles/WheelSystem";
 import { TireSystem } from "../vehicles/TireSystem";
 import { surfaceResolver } from "../world/surfaceAt";
@@ -246,6 +247,8 @@ export const hubScene: SceneDefinition = {
   addSystem(new TalyerPerformanceSystem(bridge, inventory, session, maintainedCar.definition.spec, talyer));
   addSystem(new AutoPartsShopSystem(bridge, session, inventory, interactions,
     () => autoPartsShopRejection({ mode: modes.mode, position: modes.position, racing: race.active }, zones)));
+  addSystem(new CarDealerSystem(bridge, session, ownedVehicleDefinitionIds, interactions,
+    () => carDealerRejection({ mode: modes.mode, position: modes.position, racing: race.active }, zones)));
     addSystem(new ExteriorSystem(bridge, inventory, maintainedCar, talyer));
     let footstepTime = 0;
     let footstepDistance = 0;

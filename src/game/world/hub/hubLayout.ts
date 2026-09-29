@@ -360,6 +360,24 @@ function talyer() {
   a.zone({ id: 'auto_parts_counter', kind: 'interact', rect: rect(53, 149, 64, 152.5), locationId: 'talyer',
     interaction: { action: 'browse_auto_parts', label: 'Banwa Auto Supply · Brand-new parts', priority: 2 } });
 
+  // Second-hand car lot on the frontage east of the counter: a sales kiosk and bunting. Bought
+  // cars are delivered home, so the lot itself stays empty.
+  a.surface({ kind: 'concrete', center: [79, 154], size: [14, 16] });
+  a.block({ center: [79, 1.4, 159.5], size: [6, 2.8, 3], color: WALL.cream, collide: true });
+  a.block({ center: [79, 2.9, 159.2], size: [7, .2, 4], color: '#8a2f24' });
+  a.block({ center: [79, .55, 157.7], size: [4, 1.1, .5], color: '#b3874a', collide: true });
+  a.block({ center: [79, 3.6, 157.3], size: [6.5, 1, .15], color: '#3a1f18' });
+  const lotSign = pixelText('USED CARS'), lotPixel = .1;
+  for (const run of lotSign.runs) a.block({
+    center: [79 - lotSign.columns * lotPixel / 2 + (run.col + run.length / 2) * lotPixel, 3.95 - (run.row + .5) * lotPixel, 157.2],
+    size: [run.length * lotPixel, lotPixel, .03], color: '#ffd873', glow: true,
+  });
+  for (const x of [72.5, 85.5]) a.block({ center: [x, 1.6, 147], size: [.15, 3.2, .15], color: '#d8d8d4', collide: true });
+  for (let i = 0; i < 12; i++) a.block({ center: [73.1 + i * 1.08, 3 - (i % 2) * .15, 147], size: [.5, .4, .03], color: ['#d13a2a', '#f1c232', '#2a6fd1'][i % 3] });
+  a.lamp({ id: 'car_dealer_kiosk', at: [79, 2.7, 157], profile: 'porch' });
+  a.zone({ id: 'car_dealer_kiosk', kind: 'interact', rect: rect(75.5, 154.5, 82.5, 157.4), locationId: 'talyer',
+    interaction: { action: 'browse_car_dealer', label: 'Banwa Motors · Buy a car', priority: 2 } });
+
   // Neighbours: sari-sari store house and a vacant lot with tall grass.
   house([-5, 160], [14, 12], { wall: WALL.sand, roof: ROOF.gi, facingDeg: 180, window: true });
   a.prop("sign_roadside", [-5, 149], { rotDeg: 0, tint: "#ffe9b0" });

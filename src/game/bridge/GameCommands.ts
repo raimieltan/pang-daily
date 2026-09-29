@@ -30,6 +30,10 @@ export type GameCommandMap = {
   closeAutoPartsShop: void;
   quoteAutoPart: { partId: string };
   buyAutoPart: { quoteId: string };
+  openCarDealer: void;
+  closeCarDealer: void;
+  quoteCar: { definitionId: string };
+  buyCar: { quoteId: string };
   quotePerformancePart: { itemId: string; operation: 'install' | 'remove' };
   installPerformancePart: { quoteId: string };
   dismissPerformanceQuote: void;
@@ -155,6 +159,10 @@ export interface GameCommands {
   closeAutoPartsShop(): void;
   quoteAutoPart(partId: string): void;
   buyAutoPart(quoteId: string): void;
+  openCarDealer(): void;
+  closeCarDealer(): void;
+  quoteCar(definitionId: string): void;
+  buyCar(quoteId: string): void;
   quotePerformancePart(itemId: string, operation: 'install' | 'remove'): void;
   installPerformancePart(quoteId: string): void;
   dismissPerformanceQuote(): void;
@@ -216,6 +224,10 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     closeAutoPartsShop: () => dispatch('closeAutoPartsShop'),
     quoteAutoPart: partId => dispatch('quoteAutoPart', { partId }),
     buyAutoPart: quoteId => dispatch('buyAutoPart', { quoteId }),
+    openCarDealer: () => dispatch('openCarDealer'),
+    closeCarDealer: () => dispatch('closeCarDealer'),
+    quoteCar: definitionId => dispatch('quoteCar', { definitionId }),
+    buyCar: quoteId => dispatch('buyCar', { quoteId }),
     quotePerformancePart: (itemId, operation) => dispatch('quotePerformancePart', { itemId, operation }),
     installPerformancePart: quoteId => dispatch('installPerformancePart', { quoteId }),
     dismissPerformanceQuote: () => dispatch('dismissPerformanceQuote'),

@@ -11,17 +11,21 @@ import { bindVehicleDebugStore } from "@/state/vehicleDebugStore";
 import { bindMaintenanceStore } from "@/state/maintenanceStore";
 import { bindPerformanceStore } from '@/state/performanceStore';
 import { bindAutoPartsStore } from '@/state/autoPartsStore';
+import { bindCarDealerStore } from '@/state/carDealerStore';
 import { bindJobStore } from "@/state/jobStore";
 import { bindMarketStore } from "@/state/marketStore";
 import { bindSocialStore } from "@/state/socialStore";
 import type { RuntimeBootstrap } from '@/game-core/persistence/RuntimeBootstrap';
+import type { GameEventSource } from '@/game/bridge';
 
 /**
  * Mounts the Babylon runtime on a canvas and binds the bridge to the UI stores.
  * Lifecycle only — no game logic belongs in this component.
  */
-export function GameCanvas({ bootstrap }: { bootstrap: RuntimeBootstrap }) {
+export function GameCanvas({ bootstrap, onBootstrapStale }: { bootstrap: RuntimeBootstrap; onBootstrapStale?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stale = useRef(onBootstrapStale);
+  useEffect(() => { stale.current = onBootstrapStale; }, [onBootstrapStale]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,6 +48,10 @@ export function GameCanvas({ bootstrap }: { bootstrap: RuntimeBootstrap }) {
           bindMaintenanceStore(game.events),
           bindPerformanceStore(game.events),
           bindAutoPartsStore(game.events),
+          bindCarDealerStore(game.events),
+          // A bought car only parks at home once the runtime is rebuilt from the new save; wait
+          // until the player leaves the lot so the receipt stays readable.
+          bootstrapRefreshAfterPurchase(game.events, () => stale.current?.()),
           bindJobStore(game.events),
           bindMarketStore(game.events),
           bindPersistenceStore(game.events),
@@ -69,4 +77,13 @@ export function GameCanvas({ bootstrap }: { bootstrap: RuntimeBootstrap }) {
   }, [bootstrap]);
 
   return <canvas ref={canvasRef} className="block h-full w-full touch-none outline-none" />;
+}
+
+function bootstrapRefreshAfterPurchase(events: GameEventSource, refresh: () => void) {
+  let bought = false;
+  const release = [
+    events.on('carPurchased', () => { bought = true; }),
+    events.on('carDealer', view => { if (!view && bought) { bought = false; refresh(); } }),
+  ];
+  return () => release.forEach(off => off());
 }

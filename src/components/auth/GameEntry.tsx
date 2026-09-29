@@ -22,6 +22,13 @@ export function GameEntry() {
     if (error instanceof PlayerApiError && error.status === 401) setEntry({ status: 'anonymous' });
     else setEntry({ status: 'error', failure: persistenceFailure(error) });
   }
+  // Rebuilds the runtime from the server save without a loading screen, e.g. after buying a car.
+  async function refresh() {
+    try {
+      const loaded = await playerService.bootstrap();
+      setEntry({ status: 'ready', ...loaded });
+    } catch (error) { failed(error); }
+  }
   async function load() {
     setEntry({ status: 'loading' });
     try {
@@ -54,7 +61,7 @@ export function GameEntry() {
   }
   if (entry.status === 'ready' && entry.bootstrap.chapters?.some(chapter => chapter.id === 'chapter_1' && chapter.currentBeatId === 'choose_origin')) return <StarterOrigin onSaved={async () => { const loaded = await playerService.bootstrap(); setEntry({ status: 'ready', ...loaded }); }} />;
   if (entry.status === 'ready') return <>
-    <GameCanvas bootstrap={entry.bootstrap} />
+    <GameCanvas bootstrap={entry.bootstrap} onBootstrapStale={() => void refresh()} />
     <HudOverlay />
     <LegacyTransitionNotice />
     <button type="button" disabled={busy} onClick={() => void logout()} className="absolute right-3 bottom-3 z-50 rounded bg-black/80 px-3 py-2 text-xs text-white" aria-label={`Sign out ${entry.name}`}>Sign out</button>

@@ -37,6 +37,9 @@ export type GameEventMap = {
   autoPartsShop: import('../marketplace/AutoPartsShopSystem').AutoPartsShopView | null;
   autoPartsQuote: import('../marketplace/AutoPartsShopSystem').AutoPartsQuote | null;
   autoPartPurchased: import('../../game-core/shops/AutoPartsShop').AutoPartsPurchase;
+  carDealer: import('../marketplace/CarDealerSystem').CarDealerView | null;
+  carDealerQuote: import('../marketplace/CarDealerSystem').CarDealerQuote | null;
+  carPurchased: import('../marketplace/CarDealerSystem').CarPurchase;
   performanceWorkshop: import('../vehicles/TalyerPerformanceSystem').PerformanceWorkshopView | null;
   performanceQuote: import('../vehicles/TalyerPerformanceSystem').PerformanceQuote | null;
   performanceInstalled: import('../vehicles/TalyerPerformanceSystem').PerformanceReceipt;

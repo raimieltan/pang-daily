@@ -27,6 +27,7 @@ import { ConditionHud, RepairPanel } from "./RepairPanel";
 import { JobBoardPanel, JobTracker } from "./JobPanels";
 import { MarketplaceApp } from "./MarketplaceApp";
 import { AutoPartsShopPanel } from './AutoPartsShopPanel';
+import { CarDealerPanel } from "./CarDealerPanel";
 import { useMarketStore } from "@/state/marketStore";
 
 const buttonClass = "tape-button";
@@ -111,7 +112,7 @@ export function HudOverlay() {
       {status === "ready" && !paused && !intro && <div className="flex flex-col gap-3">
         <LocationToast /><CommandNotice /><TireHud /><DialogueBox /><JobTracker /><ConditionHud /><DrivingHud /><InteractionPrompt />
       </div>}
-      {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /><MarketplaceApp /><AutoPartsShopPanel /></>}
+      {status === "ready" && !paused && !intro && <><RepairPanel /><FuelPanel /><JobBoardPanel /><MarketplaceApp /><AutoPartsShopPanel /><CarDealerPanel /></>}
       <ContactsApp />
       {status === "ready" && !contactsOpen && <div className="absolute top-40 left-4 z-30"><SocialFeedback /></div>}
       <RaceIntro />

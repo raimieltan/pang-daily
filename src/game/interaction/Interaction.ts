@@ -23,6 +23,7 @@ export const INTERACTION_ACTIONS = [
   "refuel",
   "browse_jobs",
   "browse_auto_parts",
+  "browse_car_dealer",
   "job_objective",
   "wheel_service",
   "inspect_tire",
