@@ -37,7 +37,7 @@ it('lists the catalogue at the hub lot and buys an unowned car through the serve
   const s = setup();
   s.commands.interact();
   expect(s.result.view?.listings.map(l => [l.definitionId, l.owned])).toEqual([
-    ['banwa_dalagan_1996', true], ['hiraya_kidlat_1997', false], ['banwa_silak_1983', false]]);
+    ['banwa_dalagan_1996', true], ['hiraya_kidlat_1997', false], ['banwa_silak_1983', false], ['hiraya_kidlat_fd_2007', false]]);
   expect(s.result.view?.listings.find(l => l.definitionId === 'banwa_silak_1983')?.pricePhp).toBe(165000);
   s.commands.quoteCar('banwa_dalagan_1996');
   expect(s.result.errors.at(-1)).toMatch(/already own/);
@@ -48,6 +48,20 @@ it('lists the catalogue at the hub lot and buys an unowned car through the serve
   expect(s.result.bought).toEqual(['hiraya_kidlat_1997']);
   expect(s.result.quote).toBeNull();
   expect(s.result.view?.listings.find(l => l.definitionId === 'hiraya_kidlat_1997')?.owned).toBe(true);
+});
+
+it('quotes and purchases the FD, then refuses a duplicate purchase', async () => {
+  const s = setup();
+  s.commands.openCarDealer();
+  s.commands.quoteCar('hiraya_kidlat_fd_2007');
+  expect(s.result.quote?.listing).toMatchObject({ definitionId: 'hiraya_kidlat_fd_2007', pricePhp: 325000, owned: false });
+  s.commands.buyCar(s.result.quote!.id);
+  await flush();
+  expect(s.result.bought).toEqual(['hiraya_kidlat_fd_2007']);
+  expect(s.sent[0]).toMatchObject({ type: 'vehicle_purchase', definitionId: 'hiraya_kidlat_fd_2007' });
+  expect(s.result.view?.listings.find(l => l.definitionId === 'hiraya_kidlat_fd_2007')?.owned).toBe(true);
+  s.commands.quoteCar('hiraya_kidlat_fd_2007');
+  expect(s.result.errors.at(-1)).toMatch(/already own/);
 });
 
 it('refuses away from the lot, while driving or racing, and without an account', () => {

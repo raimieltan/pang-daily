@@ -245,10 +245,61 @@ export const BANWA_SILAK_1983: VehicleDefinition = parseVehicleDefinition({
   },
 });
 
+/** Civic FD reference: a newer, planted 1.8 EFI sedan; not the high-revving FD2 Type R. */
+export const HIRAYA_KIDLAT_FD_2007: VehicleDefinition = parseVehicleDefinition({
+  ...BANWA_DALAGAN_1996,
+  id: "hiraya_kidlat_fd_2007",
+  tags: ["hiraya_kidlat_fd", "sedan", "compact", "two_thousands", "fwd"],
+  identity: {
+    make: "Hiraya", model: "Kidlat FD", trim: "1.8 S", year: 2007, bodyStyle: "sedan",
+    description: "The FD daily: a swept-back cabin, a smooth 1.8 and a planted front end. Brake into the corner, lift to tuck the nose, then feed the power in.",
+  },
+  drivetrain: { layout: "FWD", transmission: "manual", gears: 5 },
+  engine: {
+    id: "hiraya_18_efi", displacementCc: 1799, layout: "inline_4", aspiration: "naturally_aspirated",
+    fuelSystem: "efi", basePowerHp: 140, baseTorqueNm: 174, weightKg: 120, reliability: .88, heatOutput: 1,
+  },
+  power: { displacementCc: 1799, aspiration: "naturally_aspirated", peakPowerHp: 140, peakPowerRpm: 6300,
+    peakTorqueNm: 174, peakTorqueRpm: 4300, redlineRpm: 6800 },
+  weight: { curbKg: 1240, frontWeightRatio: .61 },
+  grip: { tireGrip: 1.06, tireSize: "205/55R16" },
+  braking: { decelerationMps2: 8.8, frontBias: .67, front: "disc", rear: "disc" },
+  reliability: { baseline: .86, wearRate: .9, weakPoints: ["suspension", "cooling"] },
+  dimensions: { lengthM: 4.54, widthM: 1.755, heightM: 1.46, wheelbaseM: 2.7, trackM: 1.5, wheelRadiusM: .316 },
+  market: { basePricePhp: 325000, partsAvailability: .88 },
+  visual: {
+    model: {
+      url: "/model/civic-fd/civic_fd_2007_modular.glb", unitScale: 1,
+      bodyNodes: ["shell_base", "bumper_front_stock", "bumper_rear_stock"],
+      wheelNodes: { fl: "wheel_fl", fr: "wheel_fr", rl: "wheel_rl", rr: "wheel_rr" }, paintMaterial: "paint",
+      attachments: BANWA_DALAGAN_1996.visual.model.attachments.map(a => ({
+        ...a,
+        // Every FD attachment has an authored mount, including paired panels and empty slots.
+        mountNode: `attach_${a.slot}`,
+        stockNode: a.slot === 'side_mirrors' ? ['mirror_l', 'mirror_r'] : a.slot === 'exhaust' ? 'exhaust_stock' : a.stockNode,
+        anchor: a.stockNode === null ? (a.slot === 'roof' ? { x: 0, y: 1.46, z: -.4 } : { x: 0, y: .35, z: a.slot === 'accessory_front' ? 2.27 : -2.27 }) : null,
+      })),
+      budget: { maxTriangles: 50000, maxDrawCalls: 110, maxMaterials: 16 },
+    },
+    rideHeight: { minM: -.06, maxM: .04, defaultM: 0 }, defaultPaint: "#eeeee7",
+  },
+  wheels: {
+    sockets: { fl: "wheel_fl_socket", fr: "wheel_fr_socket", rl: "wheel_rl_socket", rr: "wheel_rr_socket" },
+    stock: { diameterM: .632, widthM: .205, offsetMm: 45, massKg: 17 },
+    arch: { gapM: .035, lipM: .878, innerM: .625 },
+  },
+  condition: {
+    ...BANWA_DALAGAN_1996.condition,
+    typical: { engine: .86, transmission: .85, suspension: .78, brakes: .82, tires: .78, body: .84,
+      electrical: .88, clutch: .83, cooling: .84 },
+  },
+});
+
 export const VEHICLE_CATALOG: Readonly<Record<string, VehicleDefinition>> = {
   [BANWA_DALAGAN_1996.id]: BANWA_DALAGAN_1996,
   [HIRAYA_KIDLAT_1997.id]: HIRAYA_KIDLAT_1997,
   [BANWA_SILAK_1983.id]: BANWA_SILAK_1983,
+  [HIRAYA_KIDLAT_FD_2007.id]: HIRAYA_KIDLAT_FD_2007,
 };
 
 export function getVehicleDefinition(id: string): VehicleDefinition {

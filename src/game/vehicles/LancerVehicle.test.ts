@@ -34,7 +34,7 @@ describe('Lancer inspired modular RWD car', () => {
 
   it('keeps both other cars available at home and respects account ownership', () => {
     const driven = playerCar('banwa_dalagan_1996');
-    expect(parkedPlayerCars(driven).map(c => c.spec.id)).toEqual(['hiraya_kidlat_1997', 'banwa_silak_1983']);
+    expect(parkedPlayerCars(driven).map(c => c.spec.id)).toEqual(['hiraya_kidlat_1997', 'banwa_silak_1983', 'hiraya_kidlat_fd_2007']);
     expect(parkedPlayerCars(driven, ['banwa_dalagan_1996'])).toEqual([]);
     expect(parkedPlayerCars(driven, ['banwa_dalagan_1996', 'banwa_silak_1983']).map(c => c.spec.id)).toEqual(['banwa_silak_1983']);
   });

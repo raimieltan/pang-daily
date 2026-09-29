@@ -129,6 +129,7 @@ export const HOME_SECOND_BAY: Pose = { x: -70.5, z: 151.5, headingDeg: 180 };
 export const HOME_PARKED_BAYS: readonly Pose[] = [
   HOME_SECOND_BAY,
   { x: -74, z: 151.5, headingDeg: 180 },
+  { x: -67.8, z: 151.5, headingDeg: 180 },
 ];
 
 /** Banwa Motors stock, nosed toward the road in front of the kiosk (see `talyer()`). */
@@ -136,6 +137,7 @@ export const CAR_DEALER_DISPLAY_BAYS: readonly Pose[] = [
   { x: 74, z: 151, headingDeg: 200 },
   { x: 79, z: 150.5, headingDeg: 180 },
   { x: 84, z: 151, headingDeg: 160 },
+  { x: 88, z: 151, headingDeg: 160 },
 ];
 
 export const HUB_LOCATIONS: readonly LocationData[] = [
@@ -369,7 +371,7 @@ function talyer() {
 
   // Second-hand car lot on the frontage east of the counter: a sales kiosk, bunting and the stock
   // out front (CAR_DEALER_DISPLAY_BAYS). Bought cars are delivered home.
-  a.surface({ kind: 'concrete', center: [79, 154], size: [14, 16] });
+  a.surface({ kind: 'concrete', center: [81, 154], size: [18, 16] });
   a.block({ center: [79, 1.4, 159.5], size: [6, 2.8, 3], color: WALL.cream, collide: true });
   a.block({ center: [79, 2.9, 159.2], size: [7, .2, 4], color: '#8a2f24' });
   a.block({ center: [79, .55, 157.7], size: [4, 1.1, .5], color: '#b3874a', collide: true });

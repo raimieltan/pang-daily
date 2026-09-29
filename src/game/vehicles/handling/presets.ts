@@ -118,6 +118,34 @@ export const HANDLING_PRESETS = {
     },
   },
 
+  // civic-fd/fd.md: momentum, entry rotation and progressive FWD corner exits.
+  fwd_fd: {
+    name: "FD 1.8 FWD sedan",
+    description: "Planted rear, responsive turn-in. Rushed throttle washes the front wide; lift and trail brake to tighten the line.",
+    extends: "fwd_worn_sedan",
+    overrides: {
+      chassis: { massKg: 1240, wheelbaseM: 2.7, frontWeight: .61, cgHeightM: .5, trackWidthM: 1.5, yawInertiaScale: 1.12 },
+      steering: { maxAngleDeg: 33, turnInSeconds: .18, unwindSeconds: .12, fullLockLateralG: 1.28 },
+      drive: { accelerationMps2: 4.35, topSpeedKmh: 205, engineBrakingMps2: 1.35 },
+      brakes: { decelerationMps2: 8.8, frontBias: .67 },
+      tires: { frontGrip: 1.02, rearGrip: 1.075, frontPeakSlipDeg: 6.5, rearPeakSlipDeg: 6 },
+      balance: { understeer: .44, rearSlideFalloff: .1, weightTransfer: .64, weightTransferRate: 5.5,
+        liftOffRotation: .1, liftOffBuildRate: 3, liftOffReleaseRate: 6 },
+      assists: { traction: .28, stability: .5 },
+      handbrake: { rearGripMultiplier: .45, frontGripMultiplier: 1, rearBrakeMps2: 6, releaseSmoothing: 9 },
+    },
+  },
+  fwd_fd_rotation: {
+    name: "FD · entry rotation tune",
+    description: "Sharper entry and a livelier rear, still front-wheel drive. Rotate with braking and lift-off, recover with power.",
+    extends: "fwd_fd",
+    overrides: {
+      steering: { turnInSeconds: .15 },
+      tires: { frontGrip: 1.055, rearGrip: 1.04 },
+      balance: { understeer: .36, liftOffRotation: .16, rearSlideFalloff: .14 },
+      assists: { stability: .3 },
+    },
+  },
   fwd_hatch: {
     name: "'90s FWD hot hatch",
     description: "Lighter, longer wheelbase, rear discs and a rev-happy 1.6. Less push, more lift-off bite.",

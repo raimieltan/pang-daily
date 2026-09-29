@@ -1,0 +1,50 @@
+{
+  "source": "civic_fd_2007_modular.glb",
+  "renderer": "Blender Cycles, exported GLB reimport",
+  "views": [
+    {
+      "view": "01_front_left",
+      "hidden": []
+    },
+    {
+      "view": "02_rear_left",
+      "hidden": []
+    },
+    {
+      "view": "03_side",
+      "hidden": []
+    },
+    {
+      "view": "04_front",
+      "hidden": []
+    },
+    {
+      "view": "05_rear",
+      "hidden": []
+    },
+    {
+      "view": "06_hood_removed",
+      "hidden": [
+        "hood_stock"
+      ]
+    },
+    {
+      "view": "07_panels_removed",
+      "hidden": [
+        "hood_stock",
+        "fender_fl_stock",
+        "bumper_front_stock",
+        "chin_front_stock",
+        "lip_front_stock"
+      ]
+    },
+    {
+      "view": "08_rear_parts_removed",
+      "hidden": [
+        "bumper_rear_stock",
+        "spoiler_rear_stock",
+        "sideskirt_l_stock"
+      ]
+    }
+  ]
+}

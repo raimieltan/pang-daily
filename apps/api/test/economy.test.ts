@@ -9,7 +9,7 @@ import { bootstrapSchema, type PlayerAction, type CommandReceipt } from '@pang-d
 import { createApplication } from '../src/bootstrap';
 import { DatabaseService } from '../src/database/database.service';
 import { AUTO_PARTS_STOCK } from '@pang-daily/game-core/shops/AutoPartsShop';
-import { HIRAYA_KIDLAT_1997 } from '@pang-daily/game-core/vehicles/catalog';
+import { HIRAYA_KIDLAT_1997, HIRAYA_KIDLAT_FD_2007 } from '@pang-daily/game-core/vehicles/catalog';
 import { HUB_JOBS } from '@pang-daily/game-core/jobs/catalog';
 import { raceEconomy } from '@pang-daily/game-core/economy/raceRules';
 const product = [...AUTO_PARTS_STOCK].sort((a,b) => a.pricePhp - b.pricePhp)[0];
@@ -107,6 +107,33 @@ test('server economy and garage commands preserve exact ledger and ownership', a
       assert.equal(loaded.profile.activeVehicleId, receipt.resourceId); assert.equal(loaded.vehicles.length, 1); assert.equal(loaded.vehicles[0].definitionId, HIRAYA_KIDLAT_1997.id);
       assert.equal(await db.vehicle.count({ where: { id: a.car, retiredAt: { not: null } } }), 1);
       assert.equal(await db.transaction.count({ where: { playerId: a.playerId, kind: 'VEHICLE_SALE' } }), 1);
+    });
+    await t.test('FD purchase debits the server price once, persists its condition and can be selected after reload', async () => {
+      const a = await account(), b = await account();
+      const action: PlayerAction = { type: 'vehicle_purchase', definitionId: 'hiraya_kidlat_fd_2007' };
+      const before = await db.wallet.findUniqueOrThrow({ where: { playerId: a.playerId } });
+      assert.equal((await command(a.cookie, action, randomUUID(), 409)).code, 'INSUFFICIENT_FUNDS');
+      assert.equal(await db.vehicle.count({ where: { playerId: a.playerId } }), 1);
+      assert.equal((await db.wallet.findUniqueOrThrow({ where: { playerId: a.playerId } })).balanceCentavos, before.balanceCentavos);
+      await grant(a.playerId);
+      const key = randomUUID();
+      const receipts = await Promise.all([command(a.cookie, action, key), command(a.cookie, action, key)]);
+      assert.deepEqual(receipts[0], receipts[1]);
+      const receipt = receipts[0];
+      assert.equal(receipt.amountCentavos, '-32500000');
+      assert.equal((await command(a.cookie, action, randomUUID(), 409)).code, 'VEHICLE_ALREADY_OWNED');
+      assert.equal(await db.transaction.count({ where: { playerId: a.playerId, kind: 'VEHICLE_PURCHASE' } }), 1);
+      assert.equal((await command(b.cookie, { type: 'vehicle_select', vehicleId: receipt.resourceId! }, randomUUID(), 404)).code, 'OWNED_RESOURCE_NOT_FOUND');
+      await command(a.cookie, { type: 'vehicle_select', vehicleId: receipt.resourceId! });
+      const saved = bootstrapSchema.parse(await (await call('/player/bootstrap', a.cookie)).json());
+      assert.equal(saved.profile.activeVehicleId, receipt.resourceId);
+      const fd = saved.vehicles.find(v => v.id === receipt.resourceId)!;
+      assert.equal(fd.definitionId, 'hiraya_kidlat_fd_2007');
+      assert.equal(fd.paint, '#eeeee7');
+      const row = await db.vehicleCondition.findUniqueOrThrow({ where: { vehicleId: fd.id } });
+      assert.equal(Number(row.engine), HIRAYA_KIDLAT_FD_2007.condition.typical.engine);
+      assert.equal(Number(row.tires), HIRAYA_KIDLAT_FD_2007.condition.typical.tires);
+      assert.equal(stockVehicleTires(fd.definitionId).car.corners.FL !== null, true);
     });
     await t.test('tire damage survives reload, cannot heal by checkpoint, and talyer service charges the server price', async () => {
       const a = await account(); await grant(a.playerId);

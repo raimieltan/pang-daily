@@ -1,4 +1,4 @@
-import { BANWA_DALAGAN_1996, BANWA_SILAK_1983, HIRAYA_KIDLAT_1997, type VehicleDefinition } from "@/game-core/vehicles";
+import { BANWA_DALAGAN_1996, BANWA_SILAK_1983, HIRAYA_KIDLAT_1997, HIRAYA_KIDLAT_FD_2007, type VehicleDefinition } from "@/game-core/vehicles";
 import type { HandlingPresetId } from "./handling/presets";
 import type { TuneId } from "../../game-core/tuning/tunes";
 
@@ -85,11 +85,24 @@ export const RWD_BOX_SEDAN: VehicleRuntimeDefinition = {
   gearThresholdsKmh: [1, 38, 68, 105, 145],
 };
 
+export const CIVIC_FD_SEDAN: VehicleRuntimeDefinition = {
+  spec: HIRAYA_KIDLAT_FD_2007,
+  tunes: { street: "fwd_fd", drift: "fwd_fd_rotation" },
+  collision: {
+    body: { width: 1.72, height: 1.15, length: 4.48, bottomY: .25, centerZ: 0 },
+    wheels: { halfTrack: .75, frontZ: 1.37, rearZ: -1.33, radius: .316 },
+    centerOfMass: { y: .35, z: .317 },
+    tipInertiaScale: 3.4, angularDamping: .55, suspensionTravel: .19,
+  },
+  gearThresholdsKmh: [1, 40, 72, 110, 150],
+};
+
 /** Drivable cars by spec id. Scenes pick one with `?car=<id>`, defaulting to the sedan. */
 export const PLAYER_CARS: Readonly<Record<string, VehicleRuntimeDefinition>> = {
   [STARTER_SEDAN.spec.id]: STARTER_SEDAN,
   [STARTER_HATCH.spec.id]: STARTER_HATCH,
   [RWD_BOX_SEDAN.spec.id]: RWD_BOX_SEDAN,
+  [CIVIC_FD_SEDAN.spec.id]: CIVIC_FD_SEDAN,
 };
 
 export function playerCar(id: string | null): VehicleRuntimeDefinition {
