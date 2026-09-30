@@ -10,13 +10,15 @@ export function damageCorner(saved: SavedSuspension, index: number, energy: numb
   d.fatigue = clamp(d.fatigue + loss * .05, 0, 1);
   for (const key of COMPONENTS) d.health[key] = clamp(d.health[key] - loss * (key === 'tieRod' ? 1.5 : key === 'spring' ? .4 : 1), 0, 1);
   const f = d.deformation;
-  f.toe = clamp(f.toe + sign * loss * .12, -.3, .3); f.camber = clamp(f.camber - loss * .08, -.4, .4);
+  // Toe is semantic (positive = inward on either side): impacts bend it outward on both sides.
+  // Steering centre and position are vehicle-frame, so they take the struck side's sign.
+  f.toe = clamp(f.toe - loss * .12, -.3, .3); f.camber = clamp(f.camber - loss * .08, -.4, .4);
   f.caster = clamp(f.caster - loss * .03, -.3, .3); f.position.z = clamp(f.position.z - loss * .04, -.3, .3);
   f.position.x = clamp(f.position.x + sign * loss * .012, -.2, .2);
   f.rideHeight = clamp(f.rideHeight - loss * .015, -.15, 0); f.travelReduction = clamp(f.travelReduction + loss * .015, 0, .15);
   f.steeringCenter = clamp(f.steeringCenter + sign * loss * .025, -.2, .2);
   // Service adjustment drifts independently; replacing a component does not perform alignment.
-  saved.alignment[index].toe = clamp(saved.alignment[index].toe + sign * loss * .003, -.2, .2);
+  saved.alignment[index].toe = clamp(saved.alignment[index].toe - loss * .003, -.2, .2);
 }
 export function repairComponent(s: SavedSuspension, index: number, component: Component): void {
   const d = s.damage[index]; d.health[component] = 1;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SERVICE_COMPONENTS, SERVICE_RULES, type ServiceComponent } from '@/game-core/maintenance/condition';
 import type { RepairQuote } from '@/game-core/maintenance/VehicleSession';
 import { useMaintenanceStore } from '@/state/maintenanceStore';
@@ -58,6 +58,7 @@ function QuoteForm({ quote }: { quote: RepairQuote }) {
   const total = quote.lines.filter(line => selected.includes(line.component)).reduce((sum, line) => sum + line.costPhp, 0);
   const short = Math.max(0, total - wallet);
   const healthy = quote.totalPhp === 0;
+  useEffect(() => { commands?.setGarageView(section); }, [commands, section]);
   return <section aria-label="Talyer inspection and repair" onKeyDown={event => event.stopPropagation()}
     className="pointer-events-auto absolute right-3 top-24 z-40 max-h-[72dvh] w-[25rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto border border-amber-100/25 bg-neutral-950/95 p-5 text-sm shadow-2xl sm:right-8">
     <header className="flex items-start justify-between gap-3">

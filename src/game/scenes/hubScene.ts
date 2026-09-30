@@ -31,6 +31,7 @@ import { RenderingGroup } from "@babylonjs/core/Rendering/renderingGroup";
 import { ChaseCamera } from "../cameras/ChaseCamera";
 import { RaceIntroduction } from "../cameras/RaceIntroduction";
 import { ChapterCamera } from "../cameras/ChapterCamera";
+import { GarageCamera } from "../cameras/GarageCamera";
 import { ChapterGuide } from '../progression/ChapterGuide';
 import { WalkCamera } from "../cameras/WalkCamera";
 import { WalkingCharacter } from "../characters/WalkingCharacter";
@@ -45,7 +46,7 @@ import type { SceneDefinition } from "../engine/types";
 import { DriverControls } from "../input/DriverControls";
 import { InputManager } from "../input/InputManager";
 import { loadHavok } from "../physics/havok";
-import { PhysicsWorld } from "../physics/PhysicsWorld";
+import { CollisionGroup, PhysicsWorld } from "../physics/PhysicsWorld";
 import { GraphicsSystem } from "../rendering/GraphicsSystem";
 import { DEFAULT_TIME_OF_DAY, GRAPHICS_PRESETS, TIMES_OF_DAY, type GraphicsQuality, type TimeOfDay } from "../rendering/LightingConfig";
 import { SceneLighting } from "../rendering/SceneLighting";
@@ -303,7 +304,12 @@ export const hubScene: SceneDefinition = {
     addSystem(chase);
     addSystem(walkCamera);
     addSystem(new RaceIntroduction(race, player, chase));
-    addSystem(new ChapterCamera(chase, player, modes, dialogue, () => socialStorage.chapters?.(), () => talyerSystem?.inspectionOpen ?? false));
+    // The garage view frames the car while the Talyer panel is open, so the chapter camera no longer frames Mang Boy then.
+    addSystem(new ChapterCamera(chase, player, modes, dialogue, () => socialStorage.chapters?.()));
+    const garage = addSystem(new GarageCamera(scene, chase.camera, player,
+      (from, to) => world.raycast(from, to, { collideWith: CollisionGroup.STATIC })?.hitPointWorld.clone() ?? null,
+      () => talyerSystem?.inspectionOpen ?? false, () => chase.reducedMotion));
+    bridge.handle('setGarageView', ({ section }) => { garage.setSection(section); });
     addSystem(new ChapterGuide(bridge, modes, socialStorage, () => race.active || jobs.current !== null, () => socialStorage.chapters?.()));
     const pools = [...chunks, ...mountain.chunks].map((c) => c.pools).filter((m): m is Mesh => m !== null);
     const graphics = addSystem(new GraphicsSystem(scene, engine, chase.camera, bridge, lighting, pools, preset.quality, {

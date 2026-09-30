@@ -115,8 +115,11 @@ export class SuspensionSolver {
       c.status = health < .15 ? 'FAILED' : health < .8 ? 'DAMAGED' : c.compression >= upLimit ? 'BOTTOMED' : c.travelRemainingDroop < .002 ? 'FULL DROOP'
         : !c.isGrounded ? 'AIRBORNE' : bump > 0 ? 'NEAR BUMP STOP' : 'NORMAL';
       this.cooldown[i] = Math.max(0, this.cooldown[i] - dt);
-      if (this.cooldown[i] === 0 && (c.wheelLoad > staticTotal * 3 || c.bumpStopForce > staticTotal * 2)) {
-        const energy = .5 * s.unsprungMass * wheelV * wheelV + Math.max(0, c.bumpStopForce) * .01;
+      // Riding on the elastomer bump stops is normal on a lowered car; only bottoming past the
+      // hard limit, or a tire spike, is an impact that can bend parts.
+      const hardStop = c.compression > upLimit ? 600000 * (c.compression - upLimit) : 0;
+      if (this.cooldown[i] === 0 && (c.wheelLoad > staticTotal * 3 || hardStop > staticTotal * 2)) {
+        const energy = .5 * s.unsprungMass * wheelV * wheelV + hardStop * .01;
         this.events.push({ corner: c.corner, type: 'impact', intensity: Math.min(1, energy / part.strength) });
         if (input.damage) damageCorner(this.saved, i, energy, side);
         this.cooldown[i] = .15;

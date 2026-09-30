@@ -73,6 +73,7 @@ export type GameCommandMap = {
   dismissRepair: void;
   setVehiclePaint: { color: string };
   showSuspensionDebug: { enabled: boolean };
+  setGarageView: { section: string };
   setRideHeight: { offsetM: number };
   suspensionAction: { action: import('@/game-core/suspension/actions').SuspensionAction };
   previewSuspension: { mode: 'off' | 'cornering' | 'braking' | 'acceleration' | 'lock' };
@@ -200,6 +201,8 @@ export interface GameCommands {
   dismissRepair(): void;
   setVehiclePaint(color: string): void;
   showSuspensionDebug(enabled: boolean): void;
+  /** Frames the car for the open Talyer tab. */
+  setGarageView(section: string): void;
   setRideHeight(offsetM: number): void;
   suspensionAction(action: import('@/game-core/suspension/actions').SuspensionAction): void;
   previewSuspension(mode: 'off' | 'cornering' | 'braking' | 'acceleration' | 'lock'): void;
@@ -271,6 +274,7 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     dismissRepair: () => dispatch("dismissRepair"),
     setVehiclePaint: color => dispatch('setVehiclePaint', { color }),
     showSuspensionDebug: enabled => dispatch('showSuspensionDebug', { enabled }),
+    setGarageView: section => dispatch('setGarageView', { section }),
     setRideHeight: offsetM => dispatch('setRideHeight', { offsetM }),
     suspensionAction: action => dispatch('suspensionAction', { action }),
     previewSuspension: mode => dispatch('previewSuspension', { mode }),

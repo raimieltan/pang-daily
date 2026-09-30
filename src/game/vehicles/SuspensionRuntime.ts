@@ -25,9 +25,16 @@ export class SuspensionRuntime {
     this.solver.baseline.mass = this.model.config.chassis.massKg;
     this.vehicle.setMass(this.model.config.chassis.massKg);
   }
-  setSaved(saved: SavedSuspension): void { this.solver.saved = structuredClone(saved); this.updateMass(); }
+  /** Seconds left in which the car is settling onto a new setup. That is a garage service, not an impact. */
+  settling = 0;
+  setSaved(saved: SavedSuspension): void {
+    const previous = this.solver.saved;
+    if (previous.part !== saved.part || JSON.stringify(previous.setup) !== JSON.stringify(saved.setup)) this.settling = 2;
+    this.solver.saved = structuredClone(saved); this.updateMass();
+  }
   reset() { this.solver.reset(); this.previousVelocities.fill(0); }
   step(dt: number, linear: Vector3, angular: Vector3) {
+    this.settling = Math.max(0, this.settling - dt);
     const { vehicle: v, solver: s } = this, { up } = v;
     const mounts: number[] = [], velocities: number[] = [], roads: (number | null)[] = [];
     const zOffset = v.collisionConfig.wheels.frontZ - s.baseline.wheelbase * (1 - s.baseline.frontWeight);
@@ -45,7 +52,7 @@ export class SuspensionRuntime {
         roads.push(Vector3.Dot(hit.hitPointWorld, up)); this.points[i].copyFrom(hit.hitPointWorld); this.normals[i].copyFrom(hit.hitNormalWorld);
       } else { roads.push(null); this.points[i].copyFrom(mount); this.normals[i].copyFrom(up); }
     }
-    s.step(dt, { mounts, velocities, roads, steering: this.model.state.steerAngle, damage: true,
+    s.step(dt, { mounts, velocities, roads, steering: this.model.state.steerAngle, damage: this.settling === 0,
       accelerations: velocities.map((value, i) => Math.max(-100, Math.min(100, (value - this.previousVelocities[i]) / dt))),
       disabled: this.model.tires.map(t => !t.installed || t.raised) });
     velocities.forEach((value, i) => { this.previousVelocities[i] = value; });

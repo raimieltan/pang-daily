@@ -25,8 +25,16 @@ export type CornerDamage = z.infer<typeof damageSchema>;
 const alignmentSchema = z.object({ camber: bounded(-.2, .2), toe: bounded(-.2, .2), caster: bounded(-.2, .2) });
 export const PART_IDS = ['stock', 'lowering', 'street', 'track', 'race', 'rally', 'drift'] as const;
 export type PartId = typeof PART_IDS[number];
-export const suspensionSaveSchema = z.object({ version: z.literal(1), part: z.enum(PART_IDS), setup: suspensionSetupSchema,
-  damage: four(damageSchema), alignment: four(alignmentSchema), presets: z.record(z.string().min(1).max(32), z.object({ part: z.enum(PART_IDS), setup: suspensionSetupSchema })).default({}) });
+/** Version 1 damage came from a bug: ordinary bump-stop contact counted as impacts and bent toe
+ * outward on the left but inward on the right, so every car pulled left. Parts, setup and presets
+ * carry over; that damage and the alignment drift it caused are cleared once. */
+function migrateSave(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || (value as { version?: unknown }).version !== 1) return value;
+  return { ...value, version: 2, damage: [healthyDamage(), healthyDamage(), healthyDamage(), healthyDamage()],
+    alignment: Array.from({ length: 4 }, () => ({ camber: 0, toe: 0, caster: 0 })) };
+}
+export const suspensionSaveSchema = z.preprocess(migrateSave, z.object({ version: z.literal(2), part: z.enum(PART_IDS), setup: suspensionSetupSchema,
+  damage: four(damageSchema), alignment: four(alignmentSchema), presets: z.record(z.string().min(1).max(32), z.object({ part: z.enum(PART_IDS), setup: suspensionSetupSchema })).default({}) }));
 export type SavedSuspension = z.infer<typeof suspensionSaveSchema>;
 export interface SuspensionBaseline { mass: number; frontWeight: number; wheelbase: number; track: number; cgHeight: number; frontSpring: number; rearSpring: number;
   radius?: number; frontARB?: number; rearARB?: number; damping?: number; camber?: number; toe?: number; caster?: number; maxLock?: number }
@@ -39,7 +47,7 @@ export function createSuspension(b: SuspensionBaseline, height = 0): SavedSuspen
       camber: b.camber ?? (front ? -1 : -.8) * DEG, toe: b.toe ?? (front ? .03 : .12) * DEG, caster: front ? b.caster ?? 6 * DEG : 0,
       compressionTravel: .09, droopTravel: .06, bumpStop: .02, unsprungMass: 35, trackOffset: 0 };
   }) as SuspensionSetup['corners'];
-  return { version: 1, part: 'stock', setup: { corners, frontARB: b.frontARB ?? 10000, rearARB: b.rearARB ?? 7000,
+  return { version: 2, part: 'stock', setup: { corners, frontARB: b.frontARB ?? 10000, rearARB: b.rearARB ?? 7000,
     maxLock: b.maxLock ?? 34 * DEG, ackermann: .75, steeringRatio: 16 }, damage: [healthyDamage(), healthyDamage(), healthyDamage(), healthyDamage()],
     alignment: Array.from({length: 4}, () => ({ camber: 0, toe: 0, caster: 0 })) as SavedSuspension['alignment'], presets: {} };
 }

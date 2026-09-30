@@ -168,10 +168,15 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       if (deltaV < 2.4 || this.impactCooldown > 0) return;
       this.impactStrength = Math.min(1, (deltaV - 2.4) / 7 + 0.2);
         this.impactSerial++;
+      // Only side-on hits near a wheel bend its suspension. The body landing on the road is
+      // bottoming (the solver handles it), and a bumper hit on the centreline has no corner.
       const localHit = (event.point ?? this.body.position).subtract(this.body.position);
-      const side = Vector3.Dot(localHit, this.body.right) > 0 ? 1 : 0;
-      const axle = Vector3.Dot(localHit, this.body.forward) > 0 ? 0 : 2;
-      damageCorner(this.suspension.saved, axle + side, .5 * this.suspension.saved.setup.corners[axle + side].unsprungMass * deltaV * deltaV, side ? 1 : -1);
+      const lateral = Vector3.Dot(localHit, this.body.right);
+      const fromBelow = event.normal ? Math.abs(Vector3.Dot(event.normal, this.body.up)) > .7 : false;
+      if (!fromBelow && Math.abs(lateral) > .4 && this.controller.suspension.settling === 0) {
+        const side = lateral > 0 ? 1 : 0, axle = Vector3.Dot(localHit, this.body.forward) > 0 ? 0 : 2;
+        damageCorner(this.suspension.saved, axle + side, .5 * this.suspension.saved.setup.corners[axle + side].unsprungMass * deltaV * deltaV, side ? 1 : -1);
+      }
         bridge.emit("vehicleImpact", { strength: this.impactStrength });
         this.impactListeners.forEach((listener) => listener(this.impactStrength, event.point));
       this.impactCooldown = 0.32;
