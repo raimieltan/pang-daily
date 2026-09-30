@@ -34,6 +34,7 @@ export function FuelHud() {
   const summary = useMaintenanceStore(s => s.summary);
   if (!summary) return null;
   const fuel = summary.fuelLiters ?? summary.fuelCapacityLiters;
+  if (fuel === undefined) return null;
   const low = fuel <= 5;
   return <section aria-label="Fuel and wallet" className={`absolute right-3 top-3 z-30 flex items-center gap-3 bg-black/55 px-2 py-1 text-[10px] tracking-[.14em] ${low ? 'text-amber-200' : 'text-white/70'}`}>
     <span>₱{summary.walletPhp.toLocaleString('en-PH')}</span><span>FUEL {fuel.toFixed(1)} / {summary.fuelCapacityLiters} L{low && ' · LOW'}</span>

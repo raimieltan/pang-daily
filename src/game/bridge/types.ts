@@ -29,6 +29,7 @@ export type VehicleSummary = {
  * summary; values are rounded for display, not for replaying the simulation.
  */
 export type VehicleTelemetry = {
+  suspension?: ReturnType<import("@/game-core/suspension/solver").SuspensionSolver["snapshot"]>;
   mechanics?: {
     headingDeg: number; velocityHeadingDeg: number; yawRateDeg: number; drifting: boolean;
     controls: ControlTelemetry; wheels: WheelState[]; engineRpm: number; gear: number; clutch: number;

@@ -52,7 +52,7 @@ export type DriverInput = {
  * Share (0..1) of each axle's wheels touching the ground, from the physics layer. `wheels`, when
  * given, is each corner's own contact in `CORNERS` order and overrides the axle shares.
  */
-export type AxleContact = { front: number; rear: number; wheels?: readonly boolean[] };
+export type AxleContact = { front: number; rear: number; wheels?: readonly boolean[]; suspension?: readonly import("@/game-core/suspension/solver").SuspensionCornerState[] };
 
 /** Stable corner order used everywhere: front-left, front-right, rear-left, rear-right. */
 export const CORNERS = ["FL", "FR", "RL", "RR"] as const;

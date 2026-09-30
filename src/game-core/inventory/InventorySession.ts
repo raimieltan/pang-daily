@@ -1,3 +1,4 @@
+import { suspensionSaveSchema, type SavedSuspension } from "../suspension/schema";
 import type { PersistencePort, PersistentIntent } from '../persistence/PersistencePort';
 import { z } from 'zod';
 import { PART_SLOTS, partDefinition, partIdSchema, type PartSlot } from '../parts/parts';
@@ -35,6 +36,7 @@ const installsSchema = z.record(z.string().min(1), z.partialRecord(z.enum(PART_S
 const inventorySaveSchema = z.object({ version: z.literal(1), serial: z.number().int().nonnegative(), items: z.array(itemSchema), installed: installsSchema,
   retiredKeys: z.array(z.string().min(1)).default([]),
   appearance: z.record(z.string().min(1), vehicleAppearanceSchema).default({}),
+  suspension: z.record(z.string().min(1), suspensionSaveSchema).optional(),
   stockSpoilerRemoved: z.record(z.string().min(1), z.boolean()).optional(),
   /** Tito Jun's setup per car; absent = street. */
   tunes: z.record(z.string().min(1), tuneIdSchema).optional(),
@@ -111,6 +113,14 @@ export class InventorySession {
     (this.state.tunes ??= {})[vehicleId] = tune;
     this.changed();
     return tune;
+  }
+
+  suspension(vehicleId: string): SavedSuspension | null { return this.state.suspension?.[vehicleId] ? structuredClone(this.state.suspension[vehicleId]) : null; }
+  setSuspension(vehicleId: string, value: SavedSuspension): SavedSuspension | Rejection {
+    if (this.remote) return { rejected: 'Suspension requires a server-confirmed action.' };
+    const parsed = suspensionSaveSchema.safeParse(value);
+    if (!vehicleId || !parsed.success) return { rejected: 'Invalid suspension state.' };
+    (this.state.suspension ??= {})[vehicleId] = parsed.data; this.changed(); return structuredClone(parsed.data);
   }
 
   appearance(vehicleId: string): VehicleAppearance | null {

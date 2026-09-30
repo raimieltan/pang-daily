@@ -1,4 +1,6 @@
-import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { SuspensionRuntime } from "./SuspensionRuntime";
+import { physicalConfig } from "./suspensionConfig";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { PhysicsWorld } from "../physics/PhysicsWorld";
 import { ArcadeHandlingModel, type DriverInput } from "./handling/ArcadeHandlingModel";
 import type { VehicleControlInput } from "./handling/DriverAssistance";
@@ -7,25 +9,19 @@ import type { VehicleBody } from "./VehicleBody";
 import type { PerformanceStats } from '../../game-core/performance/calculator';
 import { performanceHandling } from '../maintenance/conditionHandling';
 
+/** Anything that can say what the driver wants this step (keyboard/gamepad, AI, replay, tests). */
 /** Per-second pull back to the spot the car was held at. Soaks up solver drift on slopes. */
 const HOLD_ANCHOR_RATE = 10;
 
-/** Anything that can say what the driver wants this step (keyboard/gamepad, AI, replay, tests). */
 export interface DriverInputSource {
   read(): DriverInput | VehicleControlInput;
 }
 
-/**
- * Glue between the handling model and the rigid body, run before every fixed physics step:
- *
- *   body velocity → car frame → model.syncMotion → model.step → back to world → Havok step
- *
- * The model owns planar velocity and yaw; Havok keeps the velocity along the car's up axis
- * (gravity, bumps, landings), pitch/roll, and everything that happens in collisions,
- * which the next sync then picks up.
- */
+/** Fixed-step adapter: sample chassis motion and road, solve suspension/tire forces, then
+ * let Havok integrate the chassis. Static parking is the only velocity constraint here. */
 export class VehicleController {
   readonly model: ArcadeHandlingModel;
+  readonly suspension: SuspensionRuntime;
  fuelAvailable = true;
   engineOperational = true;
   /** Speed supplied by a person pushing from behind, independent of engine power. */
@@ -33,11 +29,10 @@ export class VehicleController {
   private readonly release: () => void;
   private readonly linear = new Vector3();
   private readonly angular = new Vector3();
-  private readonly tmp = new Vector3();
-  private readonly spin = new Quaternion();
-  private readonly nextForward = new Vector3();
-  private readonly nextRight = new Vector3();
+  private readonly com = new Vector3();
   private holdAnchor: Vector3 | null = null;
+  /** Set by a teleport: the car stays parked, even through its landing, until driven or pushed. */
+  private parked = true;
 
   constructor(
     world: PhysicsWorld,
@@ -45,7 +40,8 @@ export class VehicleController {
     config: HandlingConfig,
     private readonly input: DriverInputSource,
   ) {
-    this.model = new ArcadeHandlingModel(config);
+    this.model = new ArcadeHandlingModel(physicalConfig(config));
+    this.suspension = new SuspensionRuntime(world, vehicle, this.model);
     this.release = world.onBeforeStep((dt) => this.step(dt, world.gravity));
   }
 
@@ -54,12 +50,13 @@ export class VehicleController {
     const { body, forward, right, up } = vehicle;
 
     vehicle.updateAxes();
-    vehicle.updateContacts();
+    // Suspension probes below determine actual contact.
     body.getLinearVelocityToRef(linear);
     body.getAngularVelocityToRef(angular);
 
     const vUp = Vector3.Dot(linear, up);
     model.syncMotion(Vector3.Dot(linear, forward), Vector3.Dot(linear, right), Vector3.Dot(angular, up));
+    this.suspension.step(dt, linear, angular);
     const raw = this.input.read();
     const controls = 'steering' in raw ? { ...raw, steer: raw.steering } : raw;
     model.step(dt, { ...controls, engineAvailable: this.fuelAvailable && this.engineOperational }, vehicle.contact);
@@ -69,33 +66,36 @@ export class VehicleController {
       model.state.yawRate = 0;
       model.diagnostics.held = false;
     }
-    const { vx, vy, yawRate } = model.state;
+    if (vehicle.isTeleporting) { this.parked = true; this.holdAnchor = null; return; }
+    // Any drive demand releases it; in reverse the brake pedal is the drive pedal.
+    if ((controls.throttle ?? 0) > .01 || model.state.reversing || this.pushSpeedMps > 0) this.parked = false;
+    const grounded = vehicle.contact.front + vehicle.contact.rear > 0;
 
-    // The model integrates in the car's frame, which Havok is about to rotate by yawRate·dt.
-    // Write the planar velocity against the post-step axes, or the turn would be counted twice.
-    Quaternion.RotationAxisToRef(up, yawRate * dt, this.spin);
-    forward.rotateByQuaternionToRef(this.spin, this.nextForward);
-    right.rotateByQuaternionToRef(this.spin, this.nextRight);
-    linear.copyFrom(up).scaleInPlace(vUp);
-    linear.addInPlace(this.nextForward.scaleInPlace(vx)).addInPlace(this.nextRight.scaleInPlace(vy));
-
-    if (model.diagnostics.held) {
-      // Havok is about to add gravity; pre-cancel the part along the road, then pull back
-      // any leftover solver drift, so a car parked on a slope doesn't creep.
-      const along = this.tmp.copyFrom(gravity).subtractInPlace(up.scale(Vector3.Dot(gravity, up)));
-      linear.subtractInPlace(along.scaleInPlace(dt));
+    // The mechanical model predicts planar motion to solve wheel slip, but Havok integrates
+    // the actual chassis once from these forces. Never overwrite its yaw/pitch/roll velocities.
+    if (this.pushSpeedMps > 0) {
+      const along = Vector3.Dot(linear, forward);
+      if (along < this.pushSpeedMps) body.applyForce(forward.scale((this.pushSpeedMps - along) * model.config.chassis.massKg * 2), vehicle.position);
+    }
+    if (grounded && (model.diagnostics.held || this.parked)) {
+      // Static brake constraint, as impulses: cancel planar and yaw motion and pull back to
+      // the held spot. Velocity writes would leave Havok's reported vertical speed biased.
+      // Vertical suspension settling stays free.
+      const { mass, centerOfMass, inertia } = body.getMassProperties();
+      const com = vehicle.toWorld(centerOfMass!, this.com);
       this.holdAnchor ??= vehicle.position.clone();
-      const drift = this.tmp.copyFrom(this.holdAnchor).subtractInPlace(vehicle.position);
-      drift.subtractInPlace(up.scale(Vector3.Dot(drift, up)));
-      linear.addInPlace(drift.scaleInPlace(HOLD_ANCHOR_RATE));
+      const target = this.holdAnchor.subtract(vehicle.position).scaleInPlace(HOLD_ANCHOR_RATE);
+      target.subtractInPlace(up.scale(Vector3.Dot(target, up)));
+      const planar = linear.subtract(up.scale(vUp));
+      body.applyImpulse(target.subtractInPlace(planar).scaleInPlace(mass!), com);
+      const alongGravity = gravity.subtract(up.scale(Vector3.Dot(gravity, up)));
+      body.applyForce(alongGravity.scaleInPlace(-mass!), com);
+      body.applyAngularImpulse(up.scale(-Vector3.Dot(angular, up) * mass! * inertia!.y));
     } else {
       this.holdAnchor = null;
     }
-    body.setLinearVelocity(linear);
+    this.suspension.applyTireForces();
 
-    // Keep Havok's pitch/roll, replace yaw.
-    angular.subtractInPlace(up.scale(Vector3.Dot(angular, up))).addInPlace(up.scale(yawRate));
-    body.setAngularVelocity(angular);
   }
 
   setPerformance(base: HandlingConfig, stock: PerformanceStats, final: PerformanceStats): void {
@@ -103,12 +103,14 @@ export class VehicleController {
   }
 
   setConfig(config: HandlingConfig): void {
-    this.model.setConfig(config);
+    this.model.setConfig(physicalConfig(config));
+    this.suspension.updateMass();
   }
 
   /** Clears handling state (gear, pedals, lift-off). Pair with `VehicleBody.place`. */
   reset(): void {
     this.model.reset();
+    this.suspension.reset();
     this.pushSpeedMps = 0;
     this.holdAnchor = null;
   }

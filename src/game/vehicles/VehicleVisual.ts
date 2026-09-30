@@ -1,5 +1,6 @@
+import type { SuspensionSolver } from "@/game-core/suspension/solver";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { VehicleDefinition } from "@/game-core/vehicles";
 import { VehicleModel } from "./VehicleModel";
@@ -13,7 +14,35 @@ export class VehicleVisual {
   private spin = 0;
   private readonly wheelSpins = [0, 0, 0, 0];
 
-  private constructor(readonly model: VehicleModel) {}
+  private readonly spinNodes: TransformNode[] = [];
+  private readonly bases: { x: number; y: number; z: number }[];
+  private constructor(readonly model: VehicleModel) { this.bases = model.wheels.map(w => ({ x: w.hub.position.x, y: w.hub.position.y, z: w.hub.position.z })); }
+
+  updateSuspension(dt: number, solver: SuspensionSolver, angularVelocities: readonly number[], preview = false): void {
+    const model = this.model;
+    model.setPhysicalSuspension(true);
+    model.setBodySway(preview ? solver.pose.pitch : 0, preview ? solver.pose.roll : 0);
+    model.setSuspensionPreviewHeight(preview ? solver.pose.heave : 0);
+    model.wheels.forEach((wheel, i) => {
+      const c = solver.corners[i], side = i % 2 ? 1 : -1;
+      if (!this.spinNodes[i]) {
+        const spin = new TransformNode(`${wheel.id}_suspension_spin`, model.root.getScene());
+        spin.rotationQuaternion = Quaternion.Identity(); spin.parent = wheel.hub; wheel.socket.parent = spin; this.spinNodes[i] = spin;
+      }
+      const stockZ = i < 2 ? solver.baseline.wheelbase * (1 - solver.baseline.frontWeight) : -solver.baseline.wheelbase * solver.baseline.frontWeight;
+      wheel.hub.position.set(this.bases[i].x + c.wheelPosition.x - side * solver.baseline.track / 2 - side * solver.offsets[i],
+        c.wheelPosition.y, this.bases[i].z + c.wheelPosition.z - stockZ);
+      if (preview) {
+        // Preview pose is relative to the parked car; rotate the entire solved wheel position too.
+        const q = Quaternion.RotationYawPitchRoll(0, solver.pose.pitch, solver.pose.roll);
+        wheel.hub.position.rotateByQuaternionToRef(q, wheel.hub.position); wheel.hub.position.y += solver.pose.heave;
+      }
+      Quaternion.RotationYawPitchRollToRef(c.heading, 0, -side * c.camber, wheel.hub.rotationQuaternion!);
+      if (preview) wheel.hub.rotationQuaternion = Quaternion.RotationYawPitchRoll(0, solver.pose.pitch, solver.pose.roll).multiply(wheel.hub.rotationQuaternion!);
+      this.wheelSpins[i] = (this.wheelSpins[i] + (angularVelocities[i] ?? 0) * dt) % (2 * Math.PI);
+      Quaternion.RotationYawPitchRollToRef(0, this.wheelSpins[i], 0, this.spinNodes[i].rotationQuaternion!);
+    });
+  }
 
   /** `source` overrides the definition's model URL (see `VehicleModel.load`). */
   static async load(

@@ -54,6 +54,15 @@ export class VehicleBody {
   private readonly shape: PhysicsShapeContainer;
   private readonly probeQuery = { membership: CollisionGroup.VEHICLE, collideWith: CollisionGroup.STATIC };
   private teleporting = false;
+  /** True until the pre-step that applies a `place`; Havok still holds the old pose, so forces must wait. */
+  get isTeleporting(): boolean { return this.teleporting; }
+  suspensionEnabled = false;
+  private suspensionCG = .5;
+  get collisionConfig() { return this.config; }
+  enableSuspension(cgHeight: number): void {
+    if (!this.suspensionEnabled) for (let i = 4; i >= 1; i--) this.shape.removeChild(i);
+    this.suspensionEnabled = true; this.suspensionCG = cgHeight;
+  }
   private readonly releaseAfterStep: () => void;
   private readonly tmpFrom = new Vector3();
   private readonly tmpTo = new Vector3();
@@ -118,8 +127,8 @@ export class VehicleBody {
     const l2 = box.length ** 2;
     this.body.setMassProperties({
       mass: massKg,
-      centerOfMass: new Vector3(0, centerOfMass.y, centerOfMass.z),
-      inertia: new Vector3(((h2 + l2) / 12) * tipInertiaScale, (w2 + l2) / 12, ((w2 + h2) / 12) * tipInertiaScale),
+      centerOfMass: new Vector3(0, this.suspensionEnabled ? this.suspensionCG : centerOfMass.y, centerOfMass.z),
+      inertia: new Vector3(((h2 + l2) / 12) * (this.suspensionEnabled ? 1 : tipInertiaScale), (w2 + l2) / 12, ((w2 + h2) / 12) * (this.suspensionEnabled ? 1 : tipInertiaScale)),
     });
   }
 

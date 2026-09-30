@@ -37,6 +37,7 @@ export function differentialTorques(left: number, right: number, axleTorque: num
  * Low speed uses the same implicit tire solve, not a kinematic drift/parking mode.
  */
 export class FourWheelDynamics {
+  readonly appliedForces = Array.from({ length: 4 }, () => ({ forward: 0, right: 0 }));
   readonly wheels = Array.from({ length: 4 }, newWheel);
   readonly assistance = new DriverAssistance();
   readonly detector = new DriftDetector();
@@ -76,7 +77,13 @@ export class FourWheelDynamics {
     // Bounded substeps make the stiff wheel/contact solve consistent at 30–240 Hz.
     const steps = Math.ceil(Math.min(dt, .25) / (1 / 600));
     const h = Math.min(dt, .25) / steps;
-    for (let i = 0; i < steps; i++) this.integrate(h, input, contact);
+    this.appliedForces.forEach(f => { f.forward = f.right = 0; });
+    for (let i = 0; i < steps; i++) {
+      this.integrate(h, input, contact);
+      this.model.corners.forEach((c, j) => { const cos = Math.cos(c.steerAngle), sin = Math.sin(c.steerAngle);
+        this.appliedForces[j].forward += (c.fx * cos - c.fy * sin) / steps;
+        this.appliedForces[j].right += (c.fx * sin + c.fy * cos) / steps; });
+    }
   }
   private integrate(dt: number, input: DriverInput, contact: AxleContact): void {
     const model = this.model, c = model.config, p = c.mechanical!, s = model.state, diag = model.diagnostics;
@@ -118,19 +125,24 @@ export class FourWheelDynamics {
     const totalWeight = mass * G;
     const pitchTarget = clamp(-s.longAccel * height / (G * L), -.35, .35);
     const spring = (p.suspension.frontSpring + p.suspension.rearSpring) / mass;
-    this.pitchVelocity += ((pitchTarget - s.loadShift) * spring - 2 * p.suspension.damping * Math.sqrt(spring) * this.pitchVelocity) * dt;
-    s.loadShift += this.pitchVelocity * dt;
+    if (!contact.suspension) this.pitchVelocity += ((pitchTarget - s.loadShift) * spring - 2 * p.suspension.damping * Math.sqrt(spring) * this.pitchVelocity) * dt;
+    if (!contact.suspension) s.loadShift += this.pitchVelocity * dt;
     const rollTarget = clamp(s.latAccel * height / (G * c.chassis.trackWidthM), -.48, .48);
-    this.rollVelocity += ((rollTarget - s.lateralLoadShift) * spring - 2 * p.suspension.damping * Math.sqrt(spring) * this.rollVelocity) * dt;
-    s.lateralLoadShift += this.rollVelocity * dt;
+    if (!contact.suspension) this.rollVelocity += ((rollTarget - s.lateralLoadShift) * spring - 2 * p.suspension.damping * Math.sqrt(spring) * this.rollVelocity) * dt;
+    if (!contact.suspension) s.lateralLoadShift += this.rollVelocity * dt;
     const frontStiffness = p.suspension.frontSpring + p.suspension.frontAntiRoll;
     const rearStiffness = p.suspension.rearSpring + p.suspension.rearAntiRoll;
     const rollFront = frontStiffness / (frontStiffness + rearStiffness);
     const frontLoad = totalWeight * clamp(c.chassis.frontWeight + s.loadShift, .05, .95), rearLoad = totalWeight - frontLoad;
     this.frontTransfer = clamp(totalWeight * s.lateralLoadShift * rollFront, -frontLoad / 2, frontLoad / 2);
     this.rearTransfer = clamp(totalWeight * s.lateralLoadShift * (1 - rollFront), -rearLoad / 2, rearLoad / 2);
-    const loads = [frontLoad / 2 + this.frontTransfer, frontLoad / 2 - this.frontTransfer,
+    const loads = contact.suspension ? contact.suspension.map(c => c.wheelLoad) : [frontLoad / 2 + this.frontTransfer, frontLoad / 2 - this.frontTransfer,
       rearLoad / 2 + this.rearTransfer, rearLoad / 2 - this.rearTransfer];
+    if (contact.suspension) {
+      contact.suspension.forEach((c, i) => { grounded[i] = grounded[i] && c.isGrounded; });
+      s.loadShift = (loads[0] + loads[1]) / totalWeight - c.chassis.frontWeight;
+      s.lateralLoadShift = (loads[0] + loads[2] - loads[1] - loads[3]) / (2 * totalWeight);
+    }
     const frontDrive = c.drive.drivetrain === 'FWD' ? 1 : c.drive.drivetrain === 'AWD' ? .4 : 0;
     const drivenSpeed = (this.wheels[0].angularVelocity + this.wheels[1].angularVelocity) / 2 * frontDrive
       + (this.wheels[2].angularVelocity + this.wheels[3].angularVelocity) / 2 * (1 - frontDrive);
@@ -190,9 +202,12 @@ export class FourWheelDynamics {
     const torques = [...(frontDrive > 0 ? frontTorques : [0, 0]), ...(frontDrive < 1 ? rearTorques : [0, 0])];
     let fxTotal = 0, fyTotal = 0, moment = 0;
     this.wheels.forEach((w, i) => {
-      const front = i < 2, left = i % 2 === 0, x = front ? a : -b, y = left ? -halfTrack : halfTrack;
+      const geometry = contact.suspension?.[i];
+      const front = i < 2, left = i % 2 === 0;
+      const x = geometry?.wheelPosition.z ?? (front ? a : -b), y = geometry?.wheelPosition.x ?? (left ? -halfTrack : halfTrack);
+      const radius = geometry?.radius ?? p.wheel.radiusM;
       const toe = p.suspension.toeDeg * DEG * (left ? 1 : -1);
-      const steer = (front ? s.steerAngle : 0) + toe;
+      const steer = geometry?.heading ?? ((front ? s.steerAngle : 0) + toe);
       const cos = Math.cos(steer), sin = Math.sin(steer);
       const cornerLong = s.vx - yaw * y, cornerLat = s.vy + yaw * x;
       const u = cornerLong * cos + cornerLat * sin, v = -cornerLong * sin + cornerLat * cos;
@@ -205,15 +220,16 @@ export class FourWheelDynamics {
       const reference = totalWeight * (front ? c.chassis.frontWeight : 1 - c.chassis.frontWeight) / 2;
       const heatGrip = .9 + .1 * smoothstep(p.tire.ambientC, p.tire.optimalC, w.temperature)
         - .4 * smoothstep(p.tire.overheatC, p.tire.overheatC + 70, w.temperature);
-      const camberGrip = Math.cos(p.suspension.camberDeg * DEG);
+      const camber = geometry?.roadCamber ?? geometry?.camber ?? p.suspension.camberDeg * DEG;
+      const camberGrip = Math.max(.35, Math.cos(camber * 2.5));
       const cap = grounded[i] ? (front ? c.tires.frontGrip : c.tires.rearGrip) * model.surfaceGrip * tire.grip
         * reference * (w.verticalLoad / reference) ** p.tire.loadExponent * heatGrip * (1 - .65 * w.wear) * camberGrip : 0;
-      w.maxLateralGrip = cap; w.maxLongitudinalGrip = cap * tire.longitudinalGrip;
+      w.maxLateralGrip = cap; w.maxLongitudinalGrip = cap * tire.longitudinalGrip * Math.max(.35, Math.cos(camber * 4));
       const peakAngle = (front ? c.tires.frontPeakSlipDeg : c.tires.rearPeakSlipDeg) * DEG * tire.slipScale;
       // Brush-style combined demand: increasing drive slip consumes the lateral budget smoothly.
       const forceAt = (omega: number) => {
         const kappa = (omega * radius - u) / Math.max(Math.abs(u), 1);
-        const sx = kappa / p.tire.peakSlipRatio, sy = Math.tan(clamp(w.slipAngle, -1.5, 1.5)) / Math.tan(peakAngle);
+        const sx = kappa / p.tire.peakSlipRatio, sy = Math.tan(clamp(w.slipAngle, -1.5, 1.5)) / Math.tan(peakAngle) + (geometry ? camber * (left ? 1 : -1) * .55 : 0);
         const demand = Math.hypot(sx, sy);
         const saturation = (1 - Math.exp(-1.5 * demand)) * (1 - (p.tire.breakaway ?? .22) * smoothstep(1, 5, demand));
         const scale = demand > 1e-9 ? saturation / demand : 1.5;
@@ -223,7 +239,7 @@ export class FourWheelDynamics {
       const hand = !front ? s.handbrake * mass * c.handbrake.rearBrakeMps2 * radius / 2 : 0;
       const esc = front && ((yawError > 0) !== left) ? escBrake * mass * G * radius : 0;
       const absScale = p.abs && w.slipRatio < -.16 && Math.abs(u) > 2 ? .15 : 1;
-      const rolling = grounded[i] ? (tire.rollingResistance * loads[i] + mass * c.drive.rollingResistanceMps2 / 4) * radius : 0;
+      const rolling = grounded[i] ? ((tire.rollingResistance + (geometry?.rubbing ? .12 : 0)) * loads[i] + mass * c.drive.rollingResistanceMps2 / 4) * radius : 0;
       const brakeTorque = (service + esc) * absScale + hand + rolling;
       const free = w.angularVelocity + torques[i] / p.wheel.inertia * dt;
       // Implicit angular momentum + tire reaction, with Coulomb brake holding at zero.

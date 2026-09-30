@@ -1,0 +1,44 @@
+import { createServer } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { chromium, expect } from '@playwright/test';
+const root = fileURLToPath(new URL('../', import.meta.url));
+const server = await createServer({ configFile: false, root, optimizeDeps: { entries: ['tests/fixtures/suspension.html'] }, resolve: { alias: { '@': `${root}src` } },
+  esbuild: { jsx: 'automatic' }, server: { host: '127.0.0.1', port: 4193, strictPort: true } });
+let browser;
+try {
+  await server.listen();
+  browser = await chromium.launch({ headless: true, ...(process.platform === 'darwin' ? { executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' } : {}) });
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1050 } }), errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('http://127.0.0.1:4193/tests/fixtures/suspension.html');
+  await expect(page.getByRole('heading', { name: 'Suspension workshop' })).toBeVisible({ timeout: 90000 });
+  await page.waitForTimeout(1500);
+  const stock = await page.evaluate(() => window.suspensionTest.sample());
+  expect(stock.suspension.corners.every(c => c.isGrounded)).toBe(true);
+  await page.getByLabel('Suspension kit').selectOption('race');
+  await page.waitForTimeout(1200);
+  const low = await page.evaluate(() => window.suspensionTest.sample());
+  expect(low.height).toBeLessThan(stock.height - .01);
+  await page.getByRole('tab', { name: 'Alignment', exact: true }).click();
+  await page.getByLabel('Front Camber', { exact: true }).fill('-6');
+  await page.getByLabel('Front Camber', { exact: true }).dispatchEvent('change');
+  await page.waitForTimeout(500);
+  const camber = await page.evaluate(() => window.suspensionTest.sample());
+  expect(Math.abs(camber.wheels[0].rotation[2])).toBeGreaterThan(.07);
+  expect(camber.wheels[0].rotation[2] * camber.wheels[1].rotation[2]).toBeLessThan(0);
+  await page.screenshot({ path: '/tmp/pang-suspension-alignment.png' });
+  await page.getByRole('button', { name: 'Simulate cornering', exact: true }).click();
+  await page.waitForTimeout(800);
+  const roll = await page.evaluate(() => window.suspensionTest.sample());
+  expect(Math.abs(roll.suspension.pose.roll)).toBeGreaterThan(.002);
+  await page.screenshot({ path: '/tmp/pang-suspension-cornering.png' });
+  await page.getByRole('button', { name: 'Stop preview', exact: true }).click();
+  await page.evaluate(() => window.suspensionTest.damage());
+  await page.waitForTimeout(2200);
+  await page.getByRole('tab', { name: 'Damage', exact: true }).click();
+  await page.getByRole('button', { name: 'Align FL', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('CANNOT REACH TARGET');
+  expect((await page.evaluate(() => window.suspensionTest.saved())).suspension.banwa_dalagan_1996.damage[0].health.tieRod).toBeLessThan(1);
+  expect(errors).toEqual([]);
+  console.log('PASS real GLB + Havok workshop: grounded baseline, physical lowering, mirrored camber, solver cornering preview, damaged alignment and persisted corner damage.');
+} finally { await browser?.close(); await server.close(); }

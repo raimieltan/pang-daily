@@ -65,6 +65,7 @@ export function runtimeBootstrap(dto: PlayerBootstrap): RuntimeBootstrap {
         revision: safeInteger(vehicle.conditionRevision), fuelLiters: vehicle.fuelLiters }])) },
     inventory: { version: 1, serial: items.length, items, installed,
       retiredKeys: dto.inventory.parts.filter(part => part.retired).map(part => part.acquisitionKey),
+      suspension: Object.fromEntries(dto.vehicles.filter(vehicle => vehicle.suspension).map(vehicle => [vehicle.definitionId, vehicle.suspension!])),
       appearance: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, { paint: vehicle.paint, rideHeightM: vehicle.rideHeightM }])),
       stockSpoilerRemoved: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, vehicle.stockSpoilerRemoved])),
       tunes: Object.fromEntries(dto.vehicles.map(vehicle => [vehicle.definitionId, vehicle.tune ?? DEFAULT_TUNE])) },

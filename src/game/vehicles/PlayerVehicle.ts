@@ -1,5 +1,9 @@
+import { SuspensionDebugVisual } from "./SuspensionDebugVisual";
+import { SuspensionSolver } from "@/game-core/suspension/solver";
+import { damageCorner } from "@/game-core/suspension/service";
+import type { SavedSuspension } from "@/game-core/suspension/schema";
 import { assistanceProfileSchema } from "./handling/MechanicalConfig";
-import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import {
   SummaryPublisher,
@@ -66,6 +70,30 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private spawnId: SpawnPointId;
   private readonly hud: SummaryPublisher<VehicleSummary>;
   private telemetryAge = 0;
+  private readonly suspensionDebug: SuspensionDebugVisual;
+  private previewSolver: SuspensionSolver | null = null;
+  private previewMode = 'off';
+  private previewTime = 0;
+  get suspension() { return this.controller.suspension.solver; }
+  setSuspension(saved: SavedSuspension): void {
+    this.controller.suspension.setSaved(saved);
+    const setup = saved.setup;
+    const p = this.controller.model.config.mechanical!;
+    p.steering.roadAngleDeg = setup.maxLock * 180 / Math.PI;
+    p.steering.driftAngleDeg = setup.maxLock * 180 / Math.PI;
+    p.steering.rackRate = 7 * 16 / setup.steeringRatio;
+    p.steering.returnRate = 3 + setup.corners[0].caster * 180 / Math.PI * .4;
+    p.suspension.casterDeg = setup.corners[0].caster * 180 / Math.PI;
+    if (this.previewMode !== 'off') this.previewSuspension(this.previewMode);
+  }
+  previewSuspension(mode: string): void {
+    this.previewMode = mode; this.previewTime = 0;
+    this.previewSolver = mode === 'off' ? null : new SuspensionSolver(this.suspension.baseline, structuredClone(this.suspension.saved));
+    if (this.previewSolver) for (let i = 0; i < 240; i++) this.previewSolver.preview(1 / 120);
+  }
+  get suspensionPreview() { return this.previewMode; }
+  get suspensionTelemetry() { return this.previewSolver?.snapshot() ?? this.suspension.snapshot(); }
+
   /** Runs after `place`, e.g. to snap the camera. */
   onPlaced?: () => void;
   /** Runs after a wheel or body part swap, e.g. to re-light the new meshes. */
@@ -108,7 +136,6 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   readonly bodyParts: BodyPartSwapper;
   private readonly effects: VehicleEffects;
   /** Legacy presets do not have the four-wheel suspension solver, but every car still visibly moves on its springs. */
-  private visualAttitude = { pitch: 0, roll: 0 };
 
   private constructor(
     private readonly bridge: RuntimePort,
@@ -128,6 +155,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
         }
         bridge.emit('driftCallout', { text, intensity });
       });
+    this.suspensionDebug = new SuspensionDebugVisual(visual.model);
+    bridge.handle("showSuspensionDebug", ({ enabled }) => { this.suspensionDebug.enabled = enabled; });
     this.presetId = presetId;
     this.baseConfig = controller.model.config;
     this.spawnId = options.initialSpawn;
@@ -139,6 +168,10 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       if (deltaV < 2.4 || this.impactCooldown > 0) return;
       this.impactStrength = Math.min(1, (deltaV - 2.4) / 7 + 0.2);
         this.impactSerial++;
+      const localHit = (event.point ?? this.body.position).subtract(this.body.position);
+      const side = Vector3.Dot(localHit, this.body.right) > 0 ? 1 : 0;
+      const axle = Vector3.Dot(localHit, this.body.forward) > 0 ? 0 : 2;
+      damageCorner(this.suspension.saved, axle + side, .5 * this.suspension.saved.setup.corners[axle + side].unsprungMass * deltaV * deltaV, side ? 1 : -1);
         bridge.emit("vehicleImpact", { strength: this.impactStrength });
         this.impactListeners.forEach((listener) => listener(this.impactStrength, event.point));
       this.impactCooldown = 0.32;
@@ -271,10 +304,16 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
 
   update(dt: number): void {
     this.impactCooldown = Math.max(0, this.impactCooldown - dt);
-    const { state } = this.controller.model;
     const mechanics = this.controller.model.config.mechanical ? this.controller.model.mechanics : null;
-    const attitude = mechanics?.bodyAttitude() ?? this.legacyBodyAttitude(dt);
-    this.visual.update(dt, state.steerAngle, state.vx, mechanics?.wheels.map(w => w.angularVelocity), attitude);
+    this.previewTime += dt;
+    if (this.previewSolver) {
+      const pulse = Math.sin(Math.min(Math.PI, this.previewTime * 1.4));
+      this.previewSolver.preview(dt, this.previewMode === 'braking' ? -6 * pulse : this.previewMode === 'acceleration' ? 5 * pulse : 0,
+        this.previewMode === 'cornering' ? 6 * pulse : 0, this.previewMode === 'lock' ? this.suspension.saved.setup.maxLock : 0);
+      if (this.previewTime > 4) this.previewTime = 0;
+    }
+    this.visual.updateSuspension(dt, this.previewSolver ?? this.suspension, mechanics?.wheels.map(w => w.angularVelocity) ?? [0, 0, 0, 0], !!this.previewSolver);
+    this.suspensionDebug.update(this.previewSolver ?? this.suspension);
     this.effects.update(dt, this.controller.model, this.condition.engine);
     this.hud.tick(dt, () => this.summarize());
     this.telemetryAge += dt;
@@ -282,21 +321,6 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
       this.telemetryAge %= TELEMETRY_INTERVAL_SECONDS;
       this.bridge.emit("vehicleTelemetry", this.sample());
     }
-  }
-
-  /** Shared visual suspension for every non-mechanical car. Worn suspension leans and dives more. */
-  private legacyBodyAttitude(dt: number): { pitch: number; roll: number } {
-    const { chassis } = this.controller.model.config;
-    const health = Math.max(.2, this.condition.suspension);
-    const quality = 1 / health;
-    const target = {
-      pitch: Math.max(-.09, Math.min(.09, -this.controller.model.state.longAccel * chassis.cgHeightM / 95 * quality)),
-      roll: Math.max(-.15, Math.min(.15, -this.controller.model.state.latAccel * chassis.cgHeightM / (chassis.trackWidthM * 32) * quality)),
-    };
-    const blend = Math.min(1, dt * (7 / quality));
-    this.visualAttitude.pitch += (target.pitch - this.visualAttitude.pitch) * blend;
-    this.visualAttitude.roll += (target.roll - this.visualAttitude.roll) * blend;
-    return this.visualAttitude;
   }
 
   setFuelAvailable(available: boolean): void { this.controller.fuelAvailable = available; }
@@ -315,7 +339,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     const physics = calculateVehiclePerformance(this.definition.spec, this.performanceParts, { ...this.condition, tires: 1 },
       { modifiers: combineModifiers(physicalWheelModifiers(this.wheelEffects), this.bodyEffects.modifiers) }).stats;
     this.controller.setPerformance(this.baseConfig, calculateVehiclePerformance(this.definition.spec).stats, physics);
-    this.body.setMass(this.controller.model.config.chassis.massKg);
+    this.controller.suspension.updateMass();
+    this.setSuspension(this.suspension.saved);
   }
 
   /** The wheel part on the car (null = stock wheels). */
@@ -338,6 +363,8 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.wheelEffects = wheelModifiers(this.definition.spec, part, condition);
     this.wheelSet = wheelSetup(part, condition);
     this.setCondition(this.condition);
+    this.visual.model.wheels.forEach((wheel, i) => { this.suspension.radii[i] = wheel.radius; this.suspension.widths[i] = wheel.fit.widthM;
+      this.suspension.offsets[i] = (this.definition.spec.wheels.stock.offsetMm - wheel.fit.offsetMm) / 1000; });
     this.onVisualsChanged?.();
     return true;
   }
@@ -392,6 +419,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   }
 
   dispose(): void {
+    this.suspensionDebug.dispose();
     this.effects.dispose();
     this.wheels.dispose();
     this.bodyParts.dispose();
@@ -413,7 +441,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
     this.presetId = presetId;
     this.baseConfig = config;
     this.setCondition(this.condition);
-    this.body.setMass(config.chassis.massKg);
+    this.controller.suspension.updateMass();
   }
 
   private publishDebugInfo(): void {
@@ -435,6 +463,7 @@ export class PlayerVehicle implements GameSystem, ChaseTarget {
   private sample(): VehicleTelemetry {
     const { state: s, diagnostics: d } = this.controller.model;
     return {
+      suspension: this.suspensionTelemetry,
       ...(this.controller.model.config.mechanical ? { mechanics: {
         headingDeg: Math.atan2(this.forward.x, this.forward.z) * DEG,
         velocityHeadingDeg: Math.atan2(

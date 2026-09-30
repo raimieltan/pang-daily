@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EXTERIOR_SLOTS } from '../vehicles/VehicleDefinition';
 import { PART_SLOTS, PART_TEMPLATES } from '../parts/parts';
+import { createSuspension } from '../suspension/schema';
+import { damageCorner } from '../suspension/service';
 import { InventorySession, type AddItem, type InventoryItem, type InventorySave } from './InventorySession';
 
 const grant = (partId: string, condition: number | null = .7, key?: string): AddItem => ({ partId, condition, key, origin: { kind: 'grant', reason: 'test' } });
@@ -21,6 +23,18 @@ describe('part definitions', () => {
 });
 
 describe('InventorySession', () => {
+  it('keeps a car\'s suspension through unrelated inventory changes and reloads', () => {
+    const { inventory, saves } = setup();
+    const base = { mass: 1200, frontWeight: .6, wheelbase: 2.6, track: 1.5, cgHeight: .5, frontSpring: 28000, rearSpring: 24000 };
+    const saved = createSuspension(base); damageCorner(saved, 0, 4000, 1);
+    expect(inventory.setSuspension('car_a', saved)).not.toHaveProperty('rejected');
+    inventory.setAppearance('car_a', { paint: '#123456', rideHeightM: -.02 });
+    inventory.setTune('car_a', inventory.tune('car_a'));
+    expect(inventory.add(grant(PART_TEMPLATES[0].id))).not.toHaveProperty('rejected');
+    const reloaded = new InventorySession(JSON.parse(JSON.stringify(saves.at(-1))));
+    expect(reloaded.suspension('car_a')).toEqual(saved);
+    expect(reloaded.suspension('car_b')).toBeNull();
+  });
   it('persists per-car paint and ride height, validates inputs and reads older saves', () => {
     const { inventory, saves } = setup();
     expect(inventory.setAppearance('car_a', { paint: '#abcdef', rideHeightM: -0.04 })).toEqual({ paint: '#abcdef', rideHeightM: -0.04 });

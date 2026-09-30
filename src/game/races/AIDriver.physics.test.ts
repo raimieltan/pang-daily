@@ -44,7 +44,8 @@ it('drives a colliding Havok car through normal controller inputs', () => {
   } });
   expect(body.place(road.spawnPoints.start)).toBe(true);
   let previous = body.position.clone(), maxStep = 0, maxSpeed = 0;
-  for (let i = 0; i < 1200; i++) {
+  // A stock sedan on real gearing and full mass reaches 83 km/h in about 11 s.
+  for (let i = 0; i < 1500; i++) {
     world.step();
     maxStep = Math.max(maxStep, Vector3.Distance(body.position, previous));
     maxSpeed = Math.max(maxSpeed, controller.model.state.vx);

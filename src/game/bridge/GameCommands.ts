@@ -72,7 +72,10 @@ export type GameCommandMap = {
   repairVehicle: { quoteId: string; components: ServiceComponent[] };
   dismissRepair: void;
   setVehiclePaint: { color: string };
+  showSuspensionDebug: { enabled: boolean };
   setRideHeight: { offsetM: number };
+  suspensionAction: { action: import('@/game-core/suspension/actions').SuspensionAction };
+  previewSuspension: { mode: 'off' | 'cornering' | 'braking' | 'acceleration' | 'lock' };
   quoteFuel: FuelRequest;
   purchaseFuel: { quoteId: string };
   dismissFuel: void;
@@ -196,7 +199,10 @@ export interface GameCommands {
   repairVehicle(quoteId: string, components: ServiceComponent[]): void;
   dismissRepair(): void;
   setVehiclePaint(color: string): void;
+  showSuspensionDebug(enabled: boolean): void;
   setRideHeight(offsetM: number): void;
+  suspensionAction(action: import('@/game-core/suspension/actions').SuspensionAction): void;
+  previewSuspension(mode: 'off' | 'cornering' | 'braking' | 'acceleration' | 'lock'): void;
   quoteFuel(request: FuelRequest): void;
   purchaseFuel(quoteId: string): void;
   dismissFuel(): void;
@@ -264,7 +270,10 @@ export function createGameCommands(dispatch: Dispatch): GameCommands {
     repairVehicle: (quoteId, components) => dispatch("repairVehicle", { quoteId, components }),
     dismissRepair: () => dispatch("dismissRepair"),
     setVehiclePaint: color => dispatch('setVehiclePaint', { color }),
+    showSuspensionDebug: enabled => dispatch('showSuspensionDebug', { enabled }),
     setRideHeight: offsetM => dispatch('setRideHeight', { offsetM }),
+    suspensionAction: action => dispatch('suspensionAction', { action }),
+    previewSuspension: mode => dispatch('previewSuspension', { mode }),
     quoteFuel: request => dispatch("quoteFuel", request),
     purchaseFuel: quoteId => dispatch("purchaseFuel", { quoteId }),
     dismissFuel: () => dispatch("dismissFuel"),

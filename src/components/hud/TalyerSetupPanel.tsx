@@ -1,4 +1,5 @@
 'use client';
+import { SuspensionPanel } from './SuspensionPanel';
 
 import { FITMENT_LABELS } from '@/game-core/wheels';
 import { useCustomizationStore } from '@/state/maintenanceStore';
@@ -7,7 +8,7 @@ import type { CustomizationView } from '@/game/vehicles/CustomizationSystem';
 
 export function TalyerSetupPanel({ section }: { section: 'paint' | 'suspension' }) {
   const view = useCustomizationStore(s => s.view);
-  return view ? <SetupForm view={view} section={section} />
+  return view ? section === 'suspension' && view.suspension ? <SuspensionPanel view={view} /> : <SetupForm view={view} section={section} />
     : <p role="status" className="my-4 text-sm text-white/60">Bringing your car into the bay…</p>;
 }
 

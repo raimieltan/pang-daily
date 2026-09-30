@@ -191,6 +191,7 @@ model Vehicle {
   acquiredAt          DateTime          @default(now()) @db.Timestamptz(3)
   retiredAt           DateTime?         @db.Timestamptz(3)
   paint               String            @db.VarChar(7)
+  suspension          Json?
   rideHeightM         Decimal           @default(0) @db.Decimal(5, 3)
   stockSpoilerRemoved Boolean           @default(false)
   tune                String            @default("street") @db.VarChar(16)

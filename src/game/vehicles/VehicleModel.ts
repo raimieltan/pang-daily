@@ -94,6 +94,10 @@ type Bounds = { min: Vector3; max: Vector3; center: Vector3; size: Vector3 };
  */
 export class VehicleModel {
   private rideHeightM: number;
+  private physicalSuspension = false;
+  private previewHeight = 0;
+  setPhysicalSuspension(enabled: boolean): void { this.physicalSuspension = enabled; this.setRideHeight(this.rideHeightM); }
+  setSuspensionPreviewHeight(height: number): void { this.previewHeight = height; this.setRideHeight(this.rideHeightM); }
   private paintHex: string;
   private stockSpoilerVisible = true;
   private trunkHinge: TransformNode | null | undefined;
@@ -202,7 +206,7 @@ export class VehicleModel {
   setRideHeight(offsetM: number): number {
     const { minM, maxM } = this.definition.visual.rideHeight;
     this.rideHeightM = Math.min(maxM, Math.max(minM, offsetM));
-    this.chassis.position.set(this.jackOffset.x, this.rideHeightM + this.tireLiftM + this.jackOffset.y, this.jackOffset.z);
+    this.chassis.position.set(this.jackOffset.x, (this.physicalSuspension ? this.previewHeight : this.rideHeightM + this.tireLiftM) + this.jackOffset.y, this.jackOffset.z);
     return this.rideHeightM;
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { SuspensionDebugReadout } from "./SuspensionDebugReadout";
 import { useState } from "react";
 import type { VehicleTelemetry } from "@/game";
 import { useGameUiStore } from "@/state/gameUiStore";
@@ -69,6 +70,7 @@ export function HandlingDebugPanel() {
               </button>
             ))}
           </div>
+          {telemetry?.suspension && <label><input type="checkbox" onChange={e => commands?.showSuspensionDebug(e.target.checked)} /> Suspension vectors</label>}
           {telemetry && <TelemetryReadout t={telemetry} />}
         </div>
       )}
@@ -97,6 +99,7 @@ function TelemetryReadout({ t }: { t: VehicleTelemetry }) {
       <Row label="g long/lat" value={`${t.longAccelG.toFixed(2)} / ${t.latAccelG.toFixed(2)}`} />
       <Row label="load shift F/L" value={`${(t.loadShift * 100).toFixed(1)}% / ${(t.lateralLoadShift * 100).toFixed(1)}%`} />
       <Row label="stability" value={t.stabilityYaw.toFixed(2)} />
+      {t.suspension && <SuspensionDebugReadout state={t.suspension} />}
       {t.mechanics && <MechanicalReadout m={t.mechanics} />}
       {state && <span className="text-white/90">{state}</span>}
     </div>

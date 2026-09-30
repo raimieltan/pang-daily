@@ -1,3 +1,4 @@
+import { suspensionSaveSchema } from "@pang-daily/game-core/suspension/schema";
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { DEFAULT_TUNE, tuneIdSchema } from '@pang-daily/game-core/tuning/tunes';
 import { randomUUID } from 'node:crypto';
@@ -79,6 +80,7 @@ export class PlayerRepository {
               conditionRevision: vehicle.condition!.revision.toString(), fuelLiters: Number(vehicle.condition!.fuelLiters), paint: vehicle.paint,
               rideHeightM: Number(vehicle.rideHeightM), stockSpoilerRemoved: vehicle.stockSpoilerRemoved,
               tune: tuneIdSchema.catch(DEFAULT_TUNE).parse(vehicle.tune),
+              suspension: suspensionSaveSchema.nullable().parse(vehicle.suspension),
               tires: { revision: vehicle.tireState?.revision.toString() ?? '0',
                 state: (vehicle.tireState?.state ?? null) as VehicleTireState | null } })),
             inventory: { revision: player.inventory.revision.toString(), parts: player.inventory.parts.map(part => ({ id: part.id, definitionId: part.partDefinitionId,

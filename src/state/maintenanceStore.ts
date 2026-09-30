@@ -20,7 +20,7 @@ export function bindMaintenanceStore(events: GameEventSource) {
     events.on('repairQuote', quote => set({ quote, error: null, ...(!quote ? { receipt: null } : {}) })),
     events.on('repairCompleted', receipt => set({ receipt, error: null })),
     events.on('commandRejected', ({ command, reason }) => {
-      if (command === 'setVehiclePaint' || command === 'setRideHeight') useCustomizationStore.setState({ error: reason });
+      if (command === 'setVehiclePaint' || command === 'setRideHeight' || command === 'suspensionAction' || command === 'previewSuspension') useCustomizationStore.setState({ error: reason });
       if (command === 'quoteFuel' || command === 'purchaseFuel') set({ fuelError: reason });
       if (command === 'inspectVehicle' || command === 'repairVehicle') set({ error: reason });
     }),

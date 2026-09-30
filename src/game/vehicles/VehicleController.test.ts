@@ -12,6 +12,7 @@ import { resolveHandlingPreset } from "./handling/HandlingConfig";
 import { HANDLING_PRESETS } from "./handling/presets";
 import { VehicleBody } from "./VehicleBody";
 import { VehicleController } from "./VehicleController";
+import { physicalConfig } from "./suspensionConfig";
 import { STARTER_SEDAN } from "./VehicleDefinition";
 
 /**
@@ -74,8 +75,19 @@ describe("vehicle physics body", () => {
     expect(planarSpeed()).toBeGreaterThan(0.8);
     expect(Vector3.Distance(start, vehicle.position)).toBeGreaterThan(1);
     controller.pushSpeedMps = 0;
+    // Released in neutral with the engine off, only rolling resistance slows it: it coasts, then stops.
     run(2);
-    expect(planarSpeed()).toBeLessThan(0.5);
+    expect(planarSpeed()).toBeLessThan(0.9);
+    run(6);
+    expect(planarSpeed()).toBeLessThan(0.05);
+  });
+
+  it("backs out of its spawn when the driver holds the brake into reverse", () => {
+    const { vehicle, controller, run } = setup();
+    const start = vehicle.position.clone();
+    run(4, { throttle: 0, brake: 1, steer: 0 });
+    expect(controller.model.state.reversing).toBe(true);
+    expect(Vector3.Dot(vehicle.position.subtract(start), vehicle.forward)).toBeLessThan(-0.5);
   });
 
   it("stops engine drive at zero condition while allowing braking", () => {
@@ -92,7 +104,7 @@ describe("vehicle physics body", () => {
   });
 
   it("settles on flat ground without bouncing and reports all four wheels in contact", () => {
-    const { vehicle, run, velocity } = setup();
+    const { vehicle, run, velocity, planarSpeed } = setup();
     let peakRebound = 0;
     let peakPlanar = 0;
     run(2, IDLE, () => {
@@ -104,9 +116,14 @@ describe("vehicle physics body", () => {
     // Spawn drops the car a few centimetres; it must land dead, not bounce or skate.
     expect(peakRebound).toBeLessThan(0.05);
     expect(peakPlanar).toBeLessThan(0.01);
-    expect(velocity().length()).toBeLessThan(0.01);
-    expect(vehicle.contact).toEqual({ front: 1, rear: 1, wheels: [true, true, true, true] });
-    // Wheel spheres on the road: the car-space origin sits at road level.
+    // Havok's reported velocity carries a small vertical bias under per-step suspension impulses,
+    // so rest is checked where it matters: no planar motion and a body that no longer moves.
+    expect(planarSpeed()).toBeLessThan(0.01);
+    const rest = vehicle.position.clone();
+    run(0.5);
+    expect(Vector3.Distance(rest, vehicle.position)).toBeLessThan(0.001);
+    expect(vehicle.contact).toMatchObject({ front: 1, rear: 1, wheels: [true, true, true, true] });
+    // Tires at static load on the road: the car-space origin sits at road level.
     expect(vehicle.position.y).toBeCloseTo(0, 1);
     expect(vehicle.up.y).toBeGreaterThan(0.999);
   });
@@ -155,7 +172,7 @@ describe("vehicle physics body", () => {
     for (const [seconds, drive] of script) run(seconds, drive);
 
     // Same inputs through the bare model, integrating heading from its yaw rate.
-    const reference = new ArcadeHandlingModel(config);
+    const reference = new ArcadeHandlingModel(physicalConfig(config));
     let referenceHeading = 0;
     for (const [seconds, drive] of script) {
       for (let t = 0; t < seconds; t += 1 / 120) {
@@ -166,9 +183,10 @@ describe("vehicle physics body", () => {
 
     const heading = Math.atan2(vehicle.forward.x, vehicle.forward.z);
     expect(heading).toBeGreaterThan(0.5);
-    // Writing velocity against the wrong axes (counting the turn twice) shows up
-    // as a heading and speed that drift far from the model's own prediction.
-    expect(heading).toBeCloseTo(referenceHeading, 1);
+    // Counting the turn twice shows up as a heading and speed far from the model's own
+    // prediction. The chassis steers through real suspension geometry (Ackermann, toe,
+    // per-corner loads) the bare model lacks, so heading agrees to 10%, not exactly.
+    expect(Math.abs(heading - referenceHeading)).toBeLessThan(0.1 * referenceHeading);
     expect(velocity().length()).toBeCloseTo(Math.hypot(reference.state.vx, reference.state.vy), 0);
     expect(vehicle.groundedWheels).toBe(4);
   });
@@ -186,7 +204,8 @@ describe("vehicle physics body", () => {
       }
     });
 
-    expect(lowestGap).toBeGreaterThan(-0.05);
+    // The body rides on real suspension: hitting the slope at speed compresses it, within its travel.
+    expect(lowestGap).toBeGreaterThan(-0.1);
     expect(lowestGap).toBeLessThan(0.3);
     expect(vehicle.position.z).toBeGreaterThan(road.sections.downhill.from.z);
   });

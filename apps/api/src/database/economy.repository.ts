@@ -1,3 +1,6 @@
+import { createSuspension, suspensionSaveSchema } from "@pang-daily/game-core/suspension/schema";
+import { applySuspensionAction } from "@pang-daily/game-core/suspension/actions";
+import { vehicleSuspensionBaseline } from "@pang-daily/game-core/suspension/baseline";
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { type PlayerCommand, type CommandReceipt, type TransactionHistory } from '@pang-daily/contracts';
@@ -76,6 +79,7 @@ export class EconomyRepository {
     const defs = new Map(vehicles.map(v => [v.id, v.definitionId]));
     const save: InventorySave = { version: 1, serial: parts.length, retiredKeys: [], items: parts.map(p => ({ id: p.id, partId: p.partDefinitionId,
       key: p.acquisitionKey, condition: p.condition === null ? null : Number(p.condition), revealedBy: p.revealedBy, finish: p.finish, acquiredAt: p.acquiredAt.getTime(), origin: { kind: 'grant', reason: 'server-owned' } })),
+      suspension: Object.fromEntries(vehicles.filter(v => v.suspension).map(v => [v.definitionId, suspensionSaveSchema.parse(v.suspension)])),
       installed: {}, appearance: Object.fromEntries(vehicles.map(v => [v.definitionId, { paint: v.paint, rideHeightM: Number(v.rideHeightM) }])),
       tunes: Object.fromEntries(vehicles.map(v => [v.definitionId, v.tune as TuneId])) };
     for (const install of installs) { const def = defs.get(install.vehicleId); if (!def) continue; save.installed[def] ??= {}; for (const slot of install.slots) save.installed[def][slot.slotId as keyof typeof save.installed[string]] = install.ownedPartId; }
@@ -286,6 +290,15 @@ export class EconomyRepository {
           if (a.spoilerMode) { const slots = await tx.installedPartSlot.findMany({ where: { vehicleId: vehicle.id, slotId: 'spoiler' } }); for (const slot of slots) await this.removeInstallation(tx, playerId, slot.ownedPartId); }
           await tx.vehicle.update({ where: { id: vehicle.id }, data: { ...(a.paint !== undefined ? { paint: a.paint } : {}), ...(a.rideHeightM !== undefined ? { rideHeightM: a.rideHeightM } : {}), ...(a.spoilerMode ? { stockSpoilerRemoved: a.spoilerMode === 'none' } : {}) } }); receipt.resourceId = vehicle.id; break;
         }
+        case 'vehicle_suspension': {
+          const vehicle = await this.vehicle(tx, playerId, a.vehicleId), definition = getVehicleDefinition(vehicle.definitionId);
+          const baseline = vehicleSuspensionBaseline(definition);
+          const saved = vehicle.suspension ? suspensionSaveSchema.parse(vehicle.suspension) : createSuspension(baseline, Number(vehicle.rideHeightM));
+          const result = applySuspensionAction(saved, a.action, baseline);
+          if ('rejected' in result) refuse('INVALID_SUSPENSION', result.rejected);
+          await tx.vehicle.update({ where: { id: vehicle.id }, data: { suspension: result as unknown as Prisma.InputJsonValue } });
+          receipt.resourceId = vehicle.id; break;
+        }
         case 'vehicle_tune': {
           const vehicle = await this.vehicle(tx, playerId, a.vehicleId);
           if (vehicle.tune === a.tune) refuse('ALREADY_TUNED', `This car already runs the ${TUNES[a.tune].label.toLowerCase()} tune.`);
@@ -459,7 +472,7 @@ export class EconomyRepository {
       }
       await progressSocial(tx, playerId, a, receipt);
       await advanceChapter(tx, playerId, receipt.resourceId ?? command.key);
-      if (['part_purchase','market_purchase','part_sell','part_install','part_remove','part_refinish','part_inspect','refund','vehicle_appearance','vehicle_tune'].includes(a.type)) await tx.inventory.update({ where: { playerId }, data: { revision: { increment: 1 } } });
+      if (['part_purchase','market_purchase','part_sell','part_install','part_remove','part_refinish','part_inspect','refund','vehicle_appearance','vehicle_tune','vehicle_suspension'].includes(a.type)) await tx.inventory.update({ where: { playerId }, data: { revision: { increment: 1 } } });
       return receipt;
     });
     this.logger.log(JSON.stringify({ event: 'economy.command_completed', requestId, action: command.action.type, transactionId: result.transactionId, resourceId: result.resourceId, amountCentavos: result.amountCentavos }));

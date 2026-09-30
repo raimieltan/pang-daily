@@ -1,3 +1,5 @@
+import { suspensionSaveSchema } from "@pang-daily/game-core/suspension/schema";
+import { suspensionActionSchema } from "@pang-daily/game-core/suspension/actions";
 import { z } from 'zod';
 import type { SocialState } from '@pang-daily/game-core/social/contract';
 import { vehicleTireStateSchema } from '@pang-daily/game-core/tires/TireSession';
@@ -25,6 +27,7 @@ export const bootstrapSchema = z.object({
     rideHeightM: z.number().min(-.15).max(.15), stockSpoilerRemoved: z.boolean(),
     /** Tito Jun's setup; absent from older servers = street. */
     tune: tuneIdSchema.optional(),
+    suspension: suspensionSaveSchema.nullable().optional(),
     /** Simulated wheel assemblies; `state` null = never saved (a stock set). */
     tires: z.object({ revision: exactInteger, state: vehicleTireStateSchema.nullable() }).optional() })).min(1),
   inventory: z.object({ revision: exactInteger,
@@ -70,6 +73,7 @@ export const playerCommandSchema = z.strictObject({
     z.strictObject({ type: z.literal('part_remove'), vehicleId: id, partId: id }),
     z.strictObject({ type: z.literal('part_refinish'), partId: id, finish }),
     z.strictObject({ type: z.literal('vehicle_appearance'), vehicleId: id, paint: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), rideHeightM: z.number().min(-.15).max(.15).optional(), spoilerMode: z.enum(['none','stock']).optional() }),
+    z.strictObject({ type: z.literal('vehicle_suspension'), vehicleId: id, action: suspensionActionSchema }),
     z.strictObject({ type: z.literal('vehicle_tune'), vehicleId: id, tune: tuneIdSchema }),
     z.strictObject({ type: z.literal('vehicle_select'), vehicleId: id }),
     z.strictObject({ type: z.literal('vehicle_checkpoint'), vehicleId: id, revision: exactInteger, conditionLoss: vehicleCondition, fuelConsumedMilliliters: z.number().int().min(0).max(45000), odometerDeltaMeters: z.number().int().min(0).max(100000) }),
